@@ -1,0 +1,367 @@
+# Project: Wii64-PS3
+# Makefile created by Dev-C++ 5.11
+
+CPP      = g++.exe
+CC       = gcc.exe
+WINDRES  = windres.exe
+OBJ      = fileBrowser/fileBrowser.o fileBrowser/fileBrowser-ps3.o r4300/ARAM-blocks.o r4300/exception.o r4300/interupt.o r4300/Invalid_Code.o r4300/pure_interp.o r4300/r4300.o r4300/recomp.o r4300/Recomp-Cache-Heap.o r4300/ppc/FuncTree.o r4300/ppc/MIPS-to-PPC.o r4300/ppc/Recompile.o r4300/ppc/Register-Cache.o r4300/ppc/Wrappers.o gc_audio/audio.o gc_input/controller-PS3.o gc_input/input.o gc_memory/dma.o gc_memory/flashram.o gc_memory/memory.o gc_memory/pif.o gc_memory/tlb.o main/adler32.o main/main_gc-menu2.o main/rom_gc.o main/ROM-Cache-PS3.o main/rsxutil.o main/savestates_gc.o main/timers.o menu/ConfigureButtonsFrame.o menu/ConfigureInputFrame.o menu/ConfigurePaksFrame.o menu/CurrentRomFrame.o menu/FileBrowserFrame.o menu/LoadRomFrame.o menu/LoadSaveFrame.o menu/MainFrame.o menu/MenuContext.o menu/SaveGameFrame.o menu/SelectCPUFrame.o menu/SettingsFrame.o mupen64_soft_gfx/bl.o mupen64_soft_gfx/cc.o mupen64_soft_gfx/rdp.o mupen64_soft_gfx/rs.o mupen64_soft_gfx/rsp.o mupen64_soft_gfx/softmain.o mupen64_soft_gfx/tf.o mupen64_soft_gfx/tx.o mupen64_soft_gfx/vi.o mupen64_soft_gfx/vi_GX.o glN64_GX/2xSAI.o glN64_GX/Combiner.o glN64_GX/Config_linux.o glN64_GX/CRC.o glN64_GX/DepthBuffer.o glN64_GX/F3D.o glN64_GX/F3DDKR.o glN64_GX/F3DEX.o glN64_GX/F3DEX2.o glN64_GX/F3DPD.o glN64_GX/F3DWRUS.o glN64_GX/FrameBuffer.o glN64_GX/GBI.o glN64_GX/gDP.o glN64_GX/glN64.o glN64_GX/gSP.o glN64_GX/L3D.o glN64_GX/L3DEX.o glN64_GX/L3DEX2.o glN64_GX/N64.o glN64_GX/OpenGL.o glN64_GX/RDP.o glN64_GX/RSP.o glN64_GX/S2DEX.o glN64_GX/S2DEX2.o glN64_GX/texture_env.o glN64_GX/Textures.o glN64_GX/VI.o glN64_GX/GL/NV_register_combiners.o glN64_GX/GL/texture_env_combine.o glN64_GX/GX/TEV_combiner.o rsp_hle/disasm.o rsp_hle/jpeg.o rsp_hle/rspmain.o rsp_hle/ucode1.o rsp_hle/ucode2.o rsp_hle/ucode3.o rsp_hle/ucode3mp3.o libgui/Button.o libgui/Component.o libgui/CursorManager.o libgui/FocusManager.o libgui/Frame.o libgui/GraphicsGX.o libgui/GraphicsRSX.o libgui/Gui.o libgui/GuiResources.o libgui/Image.o libgui/InputManager.o libgui/InputStatusBar.o libgui/IPLFont.o libgui/LoadingBar.o libgui/Logo.o libgui/MessageBox.o libgui/TextBox.o DynaRec/BranchType.o DynaRec/DynaRecProfile.o DynaRec/Fragment.o DynaRec/FragmentCache.o DynaRec/IndirectExitMap.o DynaRec/StaticAnalysis.o DynaRec/TraceRecorder.o
+LINKOBJ  = fileBrowser/fileBrowser.o fileBrowser/fileBrowser-ps3.o r4300/ARAM-blocks.o r4300/exception.o r4300/interupt.o r4300/Invalid_Code.o r4300/pure_interp.o r4300/r4300.o r4300/recomp.o r4300/Recomp-Cache-Heap.o r4300/ppc/FuncTree.o r4300/ppc/MIPS-to-PPC.o r4300/ppc/Recompile.o r4300/ppc/Register-Cache.o r4300/ppc/Wrappers.o gc_audio/audio.o gc_input/controller-PS3.o gc_input/input.o gc_memory/dma.o gc_memory/flashram.o gc_memory/memory.o gc_memory/pif.o gc_memory/tlb.o main/adler32.o main/main_gc-menu2.o main/rom_gc.o main/ROM-Cache-PS3.o main/rsxutil.o main/savestates_gc.o main/timers.o menu/ConfigureButtonsFrame.o menu/ConfigureInputFrame.o menu/ConfigurePaksFrame.o menu/CurrentRomFrame.o menu/FileBrowserFrame.o menu/LoadRomFrame.o menu/LoadSaveFrame.o menu/MainFrame.o menu/MenuContext.o menu/SaveGameFrame.o menu/SelectCPUFrame.o menu/SettingsFrame.o mupen64_soft_gfx/bl.o mupen64_soft_gfx/cc.o mupen64_soft_gfx/rdp.o mupen64_soft_gfx/rs.o mupen64_soft_gfx/rsp.o mupen64_soft_gfx/softmain.o mupen64_soft_gfx/tf.o mupen64_soft_gfx/tx.o mupen64_soft_gfx/vi.o mupen64_soft_gfx/vi_GX.o glN64_GX/2xSAI.o glN64_GX/Combiner.o glN64_GX/Config_linux.o glN64_GX/CRC.o glN64_GX/DepthBuffer.o glN64_GX/F3D.o glN64_GX/F3DDKR.o glN64_GX/F3DEX.o glN64_GX/F3DEX2.o glN64_GX/F3DPD.o glN64_GX/F3DWRUS.o glN64_GX/FrameBuffer.o glN64_GX/GBI.o glN64_GX/gDP.o glN64_GX/glN64.o glN64_GX/gSP.o glN64_GX/L3D.o glN64_GX/L3DEX.o glN64_GX/L3DEX2.o glN64_GX/N64.o glN64_GX/OpenGL.o glN64_GX/RDP.o glN64_GX/RSP.o glN64_GX/S2DEX.o glN64_GX/S2DEX2.o glN64_GX/texture_env.o glN64_GX/Textures.o glN64_GX/VI.o glN64_GX/GL/NV_register_combiners.o glN64_GX/GL/texture_env_combine.o glN64_GX/GX/TEV_combiner.o rsp_hle/disasm.o rsp_hle/jpeg.o rsp_hle/rspmain.o rsp_hle/ucode1.o rsp_hle/ucode2.o rsp_hle/ucode3.o rsp_hle/ucode3mp3.o libgui/Button.o libgui/Component.o libgui/CursorManager.o libgui/FocusManager.o libgui/Frame.o libgui/GraphicsGX.o libgui/GraphicsRSX.o libgui/Gui.o libgui/GuiResources.o libgui/Image.o libgui/InputManager.o libgui/InputStatusBar.o libgui/IPLFont.o libgui/LoadingBar.o libgui/Logo.o libgui/MessageBox.o libgui/TextBox.o DynaRec/BranchType.o DynaRec/DynaRecProfile.o DynaRec/Fragment.o DynaRec/FragmentCache.o DynaRec/IndirectExitMap.o DynaRec/StaticAnalysis.o DynaRec/TraceRecorder.o
+LIBS     = -L"J:/Dev-Cpp/MinGW64/lib" -L"J:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -L"J:/PS3/PSDK3v2/MinGW/lib" -static-libgcc -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf -lopengl32 -L"J:/PS3/PSDK3v2/libraries-src" -L"J:/PS3/PSDK3v2/ps3dev/portlibs/ppu/lib" -L"J:/PS3/PSDK3v2/MinGW/lib" -L"J:/PS3/PSDK3v2/psl1ght/ppu/lib" -L"J:/PS3/PSDK3v2/psl1ght/spu/lib" -L"J:/PS3/PSDK3v2/ps3dev/spu/spu/lib"
+INCS     = -I"J:/Dev-Cpp/MinGW64/include" -I"J:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"J:/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"J:/PS3/PSDK3v2/MinGW/include" -I"J:/PS3/PSDK3v2/psl1ght/ppu/include"
+CXXINCS  = -I"J:/Dev-Cpp/MinGW64/include" -I"J:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"J:/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"J:/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++" -I"J:/PS3/PSDK3v2/MinGW/include" -I"J:/PS3/PSDK3v2/psl1ght/ppu/include"
+BIN      = Wii64-PS3.exe
+CXXFLAGS = $(CXXINCS) 
+CFLAGS   = $(INCS) 
+RM       = rm.exe -f
+
+.PHONY: all all-before all-after clean clean-custom
+
+all: all-before $(BIN) all-after
+
+clean: clean-custom
+	${RM} $(OBJ) $(BIN)
+
+$(BIN): $(OBJ)
+	$(CPP) $(LINKOBJ) -o $(BIN) $(LIBS)
+
+fileBrowser/fileBrowser.o: fileBrowser/fileBrowser.c
+	$(CPP) -c fileBrowser/fileBrowser.c -o fileBrowser/fileBrowser.o $(CXXFLAGS)
+
+fileBrowser/fileBrowser-ps3.o: fileBrowser/fileBrowser-ps3.c
+	$(CPP) -c fileBrowser/fileBrowser-ps3.c -o fileBrowser/fileBrowser-ps3.o $(CXXFLAGS)
+
+r4300/ARAM-blocks.o: r4300/ARAM-blocks.c
+	$(CPP) -c r4300/ARAM-blocks.c -o r4300/ARAM-blocks.o $(CXXFLAGS)
+
+r4300/exception.o: r4300/exception.c
+	$(CPP) -c r4300/exception.c -o r4300/exception.o $(CXXFLAGS)
+
+r4300/interupt.o: r4300/interupt.c
+	$(CPP) -c r4300/interupt.c -o r4300/interupt.o $(CXXFLAGS)
+
+r4300/Invalid_Code.o: r4300/Invalid_Code.c
+	$(CPP) -c r4300/Invalid_Code.c -o r4300/Invalid_Code.o $(CXXFLAGS)
+
+r4300/pure_interp.o: r4300/pure_interp.c
+	$(CPP) -c r4300/pure_interp.c -o r4300/pure_interp.o $(CXXFLAGS)
+
+r4300/r4300.o: r4300/r4300.c
+	$(CPP) -c r4300/r4300.c -o r4300/r4300.o $(CXXFLAGS)
+
+r4300/recomp.o: r4300/recomp.c
+	$(CPP) -c r4300/recomp.c -o r4300/recomp.o $(CXXFLAGS)
+
+r4300/Recomp-Cache-Heap.o: r4300/Recomp-Cache-Heap.c
+	$(CPP) -c r4300/Recomp-Cache-Heap.c -o r4300/Recomp-Cache-Heap.o $(CXXFLAGS)
+
+r4300/ppc/FuncTree.o: r4300/ppc/FuncTree.c
+	$(CPP) -c r4300/ppc/FuncTree.c -o r4300/ppc/FuncTree.o $(CXXFLAGS)
+
+r4300/ppc/MIPS-to-PPC.o: r4300/ppc/MIPS-to-PPC.c
+	$(CPP) -c r4300/ppc/MIPS-to-PPC.c -o r4300/ppc/MIPS-to-PPC.o $(CXXFLAGS)
+
+r4300/ppc/Recompile.o: r4300/ppc/Recompile.c
+	$(CPP) -c r4300/ppc/Recompile.c -o r4300/ppc/Recompile.o $(CXXFLAGS)
+
+r4300/ppc/Register-Cache.o: r4300/ppc/Register-Cache.c
+	$(CPP) -c r4300/ppc/Register-Cache.c -o r4300/ppc/Register-Cache.o $(CXXFLAGS)
+
+r4300/ppc/Wrappers.o: r4300/ppc/Wrappers.c
+	$(CPP) -c r4300/ppc/Wrappers.c -o r4300/ppc/Wrappers.o $(CXXFLAGS)
+
+gc_audio/audio.o: gc_audio/audio.c
+	$(CPP) -c gc_audio/audio.c -o gc_audio/audio.o $(CXXFLAGS)
+
+gc_input/controller-PS3.o: gc_input/controller-PS3.c
+	$(CPP) -c gc_input/controller-PS3.c -o gc_input/controller-PS3.o $(CXXFLAGS)
+
+gc_input/input.o: gc_input/input.c
+	$(CPP) -c gc_input/input.c -o gc_input/input.o $(CXXFLAGS)
+
+gc_memory/dma.o: gc_memory/dma.c
+	$(CPP) -c gc_memory/dma.c -o gc_memory/dma.o $(CXXFLAGS)
+
+gc_memory/flashram.o: gc_memory/flashram.c
+	$(CPP) -c gc_memory/flashram.c -o gc_memory/flashram.o $(CXXFLAGS)
+
+gc_memory/memory.o: gc_memory/memory.c
+	$(CPP) -c gc_memory/memory.c -o gc_memory/memory.o $(CXXFLAGS)
+
+gc_memory/pif.o: gc_memory/pif.c
+	$(CPP) -c gc_memory/pif.c -o gc_memory/pif.o $(CXXFLAGS)
+
+gc_memory/tlb.o: gc_memory/tlb.c
+	$(CPP) -c gc_memory/tlb.c -o gc_memory/tlb.o $(CXXFLAGS)
+
+main/adler32.o: main/adler32.c
+	$(CPP) -c main/adler32.c -o main/adler32.o $(CXXFLAGS)
+
+main/main_gc-menu2.o: main/main_gc-menu2.cpp
+	$(CPP) -c main/main_gc-menu2.cpp -o main/main_gc-menu2.o $(CXXFLAGS)
+
+main/rom_gc.o: main/rom_gc.c
+	$(CPP) -c main/rom_gc.c -o main/rom_gc.o $(CXXFLAGS)
+
+main/ROM-Cache-PS3.o: main/ROM-Cache-PS3.c
+	$(CPP) -c main/ROM-Cache-PS3.c -o main/ROM-Cache-PS3.o $(CXXFLAGS)
+
+main/rsxutil.o: main/rsxutil.cpp
+	$(CPP) -c main/rsxutil.cpp -o main/rsxutil.o $(CXXFLAGS)
+
+main/savestates_gc.o: main/savestates_gc.c
+	$(CPP) -c main/savestates_gc.c -o main/savestates_gc.o $(CXXFLAGS)
+
+main/timers.o: main/timers.c
+	$(CPP) -c main/timers.c -o main/timers.o $(CXXFLAGS)
+
+menu/ConfigureButtonsFrame.o: menu/ConfigureButtonsFrame.cpp
+	$(CPP) -c menu/ConfigureButtonsFrame.cpp -o menu/ConfigureButtonsFrame.o $(CXXFLAGS)
+
+menu/ConfigureInputFrame.o: menu/ConfigureInputFrame.cpp
+	$(CPP) -c menu/ConfigureInputFrame.cpp -o menu/ConfigureInputFrame.o $(CXXFLAGS)
+
+menu/ConfigurePaksFrame.o: menu/ConfigurePaksFrame.cpp
+	$(CPP) -c menu/ConfigurePaksFrame.cpp -o menu/ConfigurePaksFrame.o $(CXXFLAGS)
+
+menu/CurrentRomFrame.o: menu/CurrentRomFrame.cpp
+	$(CPP) -c menu/CurrentRomFrame.cpp -o menu/CurrentRomFrame.o $(CXXFLAGS)
+
+menu/FileBrowserFrame.o: menu/FileBrowserFrame.cpp
+	$(CPP) -c menu/FileBrowserFrame.cpp -o menu/FileBrowserFrame.o $(CXXFLAGS)
+
+menu/LoadRomFrame.o: menu/LoadRomFrame.cpp
+	$(CPP) -c menu/LoadRomFrame.cpp -o menu/LoadRomFrame.o $(CXXFLAGS)
+
+menu/LoadSaveFrame.o: menu/LoadSaveFrame.cpp
+	$(CPP) -c menu/LoadSaveFrame.cpp -o menu/LoadSaveFrame.o $(CXXFLAGS)
+
+menu/MainFrame.o: menu/MainFrame.cpp
+	$(CPP) -c menu/MainFrame.cpp -o menu/MainFrame.o $(CXXFLAGS)
+
+menu/MenuContext.o: menu/MenuContext.cpp
+	$(CPP) -c menu/MenuContext.cpp -o menu/MenuContext.o $(CXXFLAGS)
+
+menu/SaveGameFrame.o: menu/SaveGameFrame.cpp
+	$(CPP) -c menu/SaveGameFrame.cpp -o menu/SaveGameFrame.o $(CXXFLAGS)
+
+menu/SelectCPUFrame.o: menu/SelectCPUFrame.cpp
+	$(CPP) -c menu/SelectCPUFrame.cpp -o menu/SelectCPUFrame.o $(CXXFLAGS)
+
+menu/SettingsFrame.o: menu/SettingsFrame.cpp
+	$(CPP) -c menu/SettingsFrame.cpp -o menu/SettingsFrame.o $(CXXFLAGS)
+
+mupen64_soft_gfx/bl.o: mupen64_soft_gfx/bl.cpp
+	$(CPP) -c mupen64_soft_gfx/bl.cpp -o mupen64_soft_gfx/bl.o $(CXXFLAGS)
+
+mupen64_soft_gfx/cc.o: mupen64_soft_gfx/cc.cpp
+	$(CPP) -c mupen64_soft_gfx/cc.cpp -o mupen64_soft_gfx/cc.o $(CXXFLAGS)
+
+mupen64_soft_gfx/rdp.o: mupen64_soft_gfx/rdp.cpp
+	$(CPP) -c mupen64_soft_gfx/rdp.cpp -o mupen64_soft_gfx/rdp.o $(CXXFLAGS)
+
+mupen64_soft_gfx/rs.o: mupen64_soft_gfx/rs.cpp
+	$(CPP) -c mupen64_soft_gfx/rs.cpp -o mupen64_soft_gfx/rs.o $(CXXFLAGS)
+
+mupen64_soft_gfx/rsp.o: mupen64_soft_gfx/rsp.cpp
+	$(CPP) -c mupen64_soft_gfx/rsp.cpp -o mupen64_soft_gfx/rsp.o $(CXXFLAGS)
+
+mupen64_soft_gfx/softmain.o: mupen64_soft_gfx/softmain.cpp
+	$(CPP) -c mupen64_soft_gfx/softmain.cpp -o mupen64_soft_gfx/softmain.o $(CXXFLAGS)
+
+mupen64_soft_gfx/tf.o: mupen64_soft_gfx/tf.cpp
+	$(CPP) -c mupen64_soft_gfx/tf.cpp -o mupen64_soft_gfx/tf.o $(CXXFLAGS)
+
+mupen64_soft_gfx/tx.o: mupen64_soft_gfx/tx.cpp
+	$(CPP) -c mupen64_soft_gfx/tx.cpp -o mupen64_soft_gfx/tx.o $(CXXFLAGS)
+
+mupen64_soft_gfx/vi.o: mupen64_soft_gfx/vi.cpp
+	$(CPP) -c mupen64_soft_gfx/vi.cpp -o mupen64_soft_gfx/vi.o $(CXXFLAGS)
+
+mupen64_soft_gfx/vi_GX.o: mupen64_soft_gfx/vi_GX.cpp
+	$(CPP) -c mupen64_soft_gfx/vi_GX.cpp -o mupen64_soft_gfx/vi_GX.o $(CXXFLAGS)
+
+glN64_GX/2xSAI.o: glN64_GX/2xSAI.cpp
+	$(CPP) -c glN64_GX/2xSAI.cpp -o glN64_GX/2xSAI.o $(CXXFLAGS)
+
+glN64_GX/Combiner.o: glN64_GX/Combiner.cpp
+	$(CPP) -c glN64_GX/Combiner.cpp -o glN64_GX/Combiner.o $(CXXFLAGS)
+
+glN64_GX/Config_linux.o: glN64_GX/Config_linux.cpp
+	$(CPP) -c glN64_GX/Config_linux.cpp -o glN64_GX/Config_linux.o $(CXXFLAGS)
+
+glN64_GX/CRC.o: glN64_GX/CRC.cpp
+	$(CPP) -c glN64_GX/CRC.cpp -o glN64_GX/CRC.o $(CXXFLAGS)
+
+glN64_GX/DepthBuffer.o: glN64_GX/DepthBuffer.cpp
+	$(CPP) -c glN64_GX/DepthBuffer.cpp -o glN64_GX/DepthBuffer.o $(CXXFLAGS)
+
+glN64_GX/F3D.o: glN64_GX/F3D.cpp
+	$(CPP) -c glN64_GX/F3D.cpp -o glN64_GX/F3D.o $(CXXFLAGS)
+
+glN64_GX/F3DDKR.o: glN64_GX/F3DDKR.cpp
+	$(CPP) -c glN64_GX/F3DDKR.cpp -o glN64_GX/F3DDKR.o $(CXXFLAGS)
+
+glN64_GX/F3DEX.o: glN64_GX/F3DEX.cpp
+	$(CPP) -c glN64_GX/F3DEX.cpp -o glN64_GX/F3DEX.o $(CXXFLAGS)
+
+glN64_GX/F3DEX2.o: glN64_GX/F3DEX2.cpp
+	$(CPP) -c glN64_GX/F3DEX2.cpp -o glN64_GX/F3DEX2.o $(CXXFLAGS)
+
+glN64_GX/F3DPD.o: glN64_GX/F3DPD.cpp
+	$(CPP) -c glN64_GX/F3DPD.cpp -o glN64_GX/F3DPD.o $(CXXFLAGS)
+
+glN64_GX/F3DWRUS.o: glN64_GX/F3DWRUS.cpp
+	$(CPP) -c glN64_GX/F3DWRUS.cpp -o glN64_GX/F3DWRUS.o $(CXXFLAGS)
+
+glN64_GX/FrameBuffer.o: glN64_GX/FrameBuffer.cpp
+	$(CPP) -c glN64_GX/FrameBuffer.cpp -o glN64_GX/FrameBuffer.o $(CXXFLAGS)
+
+glN64_GX/GBI.o: glN64_GX/GBI.cpp
+	$(CPP) -c glN64_GX/GBI.cpp -o glN64_GX/GBI.o $(CXXFLAGS)
+
+glN64_GX/gDP.o: glN64_GX/gDP.cpp
+	$(CPP) -c glN64_GX/gDP.cpp -o glN64_GX/gDP.o $(CXXFLAGS)
+
+glN64_GX/glN64.o: glN64_GX/glN64.cpp
+	$(CPP) -c glN64_GX/glN64.cpp -o glN64_GX/glN64.o $(CXXFLAGS)
+
+glN64_GX/gSP.o: glN64_GX/gSP.cpp
+	$(CPP) -c glN64_GX/gSP.cpp -o glN64_GX/gSP.o $(CXXFLAGS)
+
+glN64_GX/L3D.o: glN64_GX/L3D.cpp
+	$(CPP) -c glN64_GX/L3D.cpp -o glN64_GX/L3D.o $(CXXFLAGS)
+
+glN64_GX/L3DEX.o: glN64_GX/L3DEX.cpp
+	$(CPP) -c glN64_GX/L3DEX.cpp -o glN64_GX/L3DEX.o $(CXXFLAGS)
+
+glN64_GX/L3DEX2.o: glN64_GX/L3DEX2.cpp
+	$(CPP) -c glN64_GX/L3DEX2.cpp -o glN64_GX/L3DEX2.o $(CXXFLAGS)
+
+glN64_GX/N64.o: glN64_GX/N64.cpp
+	$(CPP) -c glN64_GX/N64.cpp -o glN64_GX/N64.o $(CXXFLAGS)
+
+glN64_GX/OpenGL.o: glN64_GX/OpenGL.cpp
+	$(CPP) -c glN64_GX/OpenGL.cpp -o glN64_GX/OpenGL.o $(CXXFLAGS)
+
+glN64_GX/RDP.o: glN64_GX/RDP.cpp
+	$(CPP) -c glN64_GX/RDP.cpp -o glN64_GX/RDP.o $(CXXFLAGS)
+
+glN64_GX/RSP.o: glN64_GX/RSP.cpp
+	$(CPP) -c glN64_GX/RSP.cpp -o glN64_GX/RSP.o $(CXXFLAGS)
+
+glN64_GX/S2DEX.o: glN64_GX/S2DEX.cpp
+	$(CPP) -c glN64_GX/S2DEX.cpp -o glN64_GX/S2DEX.o $(CXXFLAGS)
+
+glN64_GX/S2DEX2.o: glN64_GX/S2DEX2.cpp
+	$(CPP) -c glN64_GX/S2DEX2.cpp -o glN64_GX/S2DEX2.o $(CXXFLAGS)
+
+glN64_GX/texture_env.o: glN64_GX/texture_env.cpp
+	$(CPP) -c glN64_GX/texture_env.cpp -o glN64_GX/texture_env.o $(CXXFLAGS)
+
+glN64_GX/Textures.o: glN64_GX/Textures.cpp
+	$(CPP) -c glN64_GX/Textures.cpp -o glN64_GX/Textures.o $(CXXFLAGS)
+
+glN64_GX/VI.o: glN64_GX/VI.cpp
+	$(CPP) -c glN64_GX/VI.cpp -o glN64_GX/VI.o $(CXXFLAGS)
+
+glN64_GX/GL/NV_register_combiners.o: glN64_GX/GL/NV_register_combiners.cpp
+	$(CPP) -c glN64_GX/GL/NV_register_combiners.cpp -o glN64_GX/GL/NV_register_combiners.o $(CXXFLAGS)
+
+glN64_GX/GL/texture_env_combine.o: glN64_GX/GL/texture_env_combine.cpp
+	$(CPP) -c glN64_GX/GL/texture_env_combine.cpp -o glN64_GX/GL/texture_env_combine.o $(CXXFLAGS)
+
+glN64_GX/GX/TEV_combiner.o: glN64_GX/GX/TEV_combiner.cpp
+	$(CPP) -c glN64_GX/GX/TEV_combiner.cpp -o glN64_GX/GX/TEV_combiner.o $(CXXFLAGS)
+
+rsp_hle/disasm.o: rsp_hle/disasm.c
+	$(CPP) -c rsp_hle/disasm.c -o rsp_hle/disasm.o $(CXXFLAGS)
+
+rsp_hle/jpeg.o: rsp_hle/jpeg.c
+	$(CPP) -c rsp_hle/jpeg.c -o rsp_hle/jpeg.o $(CXXFLAGS)
+
+rsp_hle/rspmain.o: rsp_hle/rspmain.c
+	$(CPP) -c rsp_hle/rspmain.c -o rsp_hle/rspmain.o $(CXXFLAGS)
+
+rsp_hle/ucode1.o: rsp_hle/ucode1.cpp
+	$(CPP) -c rsp_hle/ucode1.cpp -o rsp_hle/ucode1.o $(CXXFLAGS)
+
+rsp_hle/ucode2.o: rsp_hle/ucode2.cpp
+	$(CPP) -c rsp_hle/ucode2.cpp -o rsp_hle/ucode2.o $(CXXFLAGS)
+
+rsp_hle/ucode3.o: rsp_hle/ucode3.cpp
+	$(CPP) -c rsp_hle/ucode3.cpp -o rsp_hle/ucode3.o $(CXXFLAGS)
+
+rsp_hle/ucode3mp3.o: rsp_hle/ucode3mp3.cpp
+	$(CPP) -c rsp_hle/ucode3mp3.cpp -o rsp_hle/ucode3mp3.o $(CXXFLAGS)
+
+libgui/Button.o: libgui/Button.cpp
+	$(CPP) -c libgui/Button.cpp -o libgui/Button.o $(CXXFLAGS)
+
+libgui/Component.o: libgui/Component.cpp
+	$(CPP) -c libgui/Component.cpp -o libgui/Component.o $(CXXFLAGS)
+
+libgui/CursorManager.o: libgui/CursorManager.cpp
+	$(CPP) -c libgui/CursorManager.cpp -o libgui/CursorManager.o $(CXXFLAGS)
+
+libgui/FocusManager.o: libgui/FocusManager.cpp
+	$(CPP) -c libgui/FocusManager.cpp -o libgui/FocusManager.o $(CXXFLAGS)
+
+libgui/Frame.o: libgui/Frame.cpp
+	$(CPP) -c libgui/Frame.cpp -o libgui/Frame.o $(CXXFLAGS)
+
+libgui/GraphicsGX.o: libgui/GraphicsGX.cpp
+	$(CPP) -c libgui/GraphicsGX.cpp -o libgui/GraphicsGX.o $(CXXFLAGS)
+
+libgui/GraphicsRSX.o: libgui/GraphicsRSX.cpp
+	$(CPP) -c libgui/GraphicsRSX.cpp -o libgui/GraphicsRSX.o $(CXXFLAGS)
+
+libgui/Gui.o: libgui/Gui.cpp
+	$(CPP) -c libgui/Gui.cpp -o libgui/Gui.o $(CXXFLAGS)
+
+libgui/GuiResources.o: libgui/GuiResources.cpp
+	$(CPP) -c libgui/GuiResources.cpp -o libgui/GuiResources.o $(CXXFLAGS)
+
+libgui/Image.o: libgui/Image.cpp
+	$(CPP) -c libgui/Image.cpp -o libgui/Image.o $(CXXFLAGS)
+
+libgui/InputManager.o: libgui/InputManager.cpp
+	$(CPP) -c libgui/InputManager.cpp -o libgui/InputManager.o $(CXXFLAGS)
+
+libgui/InputStatusBar.o: libgui/InputStatusBar.cpp
+	$(CPP) -c libgui/InputStatusBar.cpp -o libgui/InputStatusBar.o $(CXXFLAGS)
+
+libgui/IPLFont.o: libgui/IPLFont.cpp
+	$(CPP) -c libgui/IPLFont.cpp -o libgui/IPLFont.o $(CXXFLAGS)
+
+libgui/LoadingBar.o: libgui/LoadingBar.cpp
+	$(CPP) -c libgui/LoadingBar.cpp -o libgui/LoadingBar.o $(CXXFLAGS)
+
+libgui/Logo.o: libgui/Logo.cpp
+	$(CPP) -c libgui/Logo.cpp -o libgui/Logo.o $(CXXFLAGS)
+
+libgui/MessageBox.o: libgui/MessageBox.cpp
+	$(CPP) -c libgui/MessageBox.cpp -o libgui/MessageBox.o $(CXXFLAGS)
+
+libgui/TextBox.o: libgui/TextBox.cpp
+	$(CPP) -c libgui/TextBox.cpp -o libgui/TextBox.o $(CXXFLAGS)
+
+DynaRec/BranchType.o: DynaRec/BranchType.cpp
+	$(CPP) -c DynaRec/BranchType.cpp -o DynaRec/BranchType.o $(CXXFLAGS)
+
+DynaRec/DynaRecProfile.o: DynaRec/DynaRecProfile.cpp
+	$(CPP) -c DynaRec/DynaRecProfile.cpp -o DynaRec/DynaRecProfile.o $(CXXFLAGS)
+
+DynaRec/Fragment.o: DynaRec/Fragment.cpp
+	$(CPP) -c DynaRec/Fragment.cpp -o DynaRec/Fragment.o $(CXXFLAGS)
+
+DynaRec/FragmentCache.o: DynaRec/FragmentCache.cpp
+	$(CPP) -c DynaRec/FragmentCache.cpp -o DynaRec/FragmentCache.o $(CXXFLAGS)
+
+DynaRec/IndirectExitMap.o: DynaRec/IndirectExitMap.cpp
+	$(CPP) -c DynaRec/IndirectExitMap.cpp -o DynaRec/IndirectExitMap.o $(CXXFLAGS)
+
+DynaRec/StaticAnalysis.o: DynaRec/StaticAnalysis.cpp
+	$(CPP) -c DynaRec/StaticAnalysis.cpp -o DynaRec/StaticAnalysis.o $(CXXFLAGS)
+
+DynaRec/TraceRecorder.o: DynaRec/TraceRecorder.cpp
+	$(CPP) -c DynaRec/TraceRecorder.cpp -o DynaRec/TraceRecorder.o $(CXXFLAGS)
