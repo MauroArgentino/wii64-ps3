@@ -142,7 +142,6 @@ extern void fileBrowserFrame_OpenDirectory(fileBrowser_file* dir);
 
 void Func_LoadROM()
 {
-#ifdef PS3
 	//Select USB device only
 	// Deinit any existing romFile state
 	if(romFile_deinit) romFile_deinit( romFile_topLevel );
@@ -159,9 +158,6 @@ void Func_LoadROM()
 	
 	pMenuContext->setActiveFrame(MenuContext::FRAME_FILEBROWSER);
 	fileBrowserFrame_OpenDirectory(romFile_topLevel);
-#else //PS3
-	pMenuContext->setActiveFrame(MenuContext::FRAME_LOADROM);
-#endif //!PS3
 }
 
 extern BOOL hasLoadedROM;

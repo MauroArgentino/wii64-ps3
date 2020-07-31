@@ -33,6 +33,8 @@
 #include <sys/stat.h>
 #include "fileBrowser.h"
 
+typedef struct __dirstream DIR;
+
 fileBrowser_file topLevel_ps3_Default =
 	{ "/dev_usb/wii64/roms", // file name
 	  0, // offset
