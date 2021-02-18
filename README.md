@@ -2,9 +2,9 @@
 A very old proof of concept in porting mupen64 (wii64 specifically from 2011) to the PS3 using PSL1GHT v1.
 
 ## Features
-* No audio
-* No hardware accelerated graphics
-* Basic input
+* Sin audio
+* Sin gráficos acelerados por hardware
+* Entrada básica
 * Interprete puro
 * Menú
 * Carga USB
