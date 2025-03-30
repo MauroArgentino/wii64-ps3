@@ -1,0 +1,12 @@
+# Archivo de idioma Inglés (lang_en.txt)
+Load ROM=Load ROM
+Current ROM=Current ROM
+Settings=Settings
+Credits=Credits
+Quit=Quit
+Play Game=Play Game
+Resume Game=Resume Game
+Please load a ROM first=Please load a ROM first
+Are you sure you want to exit to loader?=Are you sure you want to exit to loader?
+Automatically saved to USB device=Automatically saved to USB device
+Failed to Save=Failed to Save

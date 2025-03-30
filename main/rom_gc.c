@@ -202,7 +202,7 @@ int rom_read(fileBrowser_file* file){
 
   //Set VI limit based on ROM header
   InitTimer();
-	dbg_printf("Loaded: %s\r\n",&ROM_SETTINGS.goodname[0]);
+	dbg_printf("Cargado: %s\r\n",&ROM_SETTINGS.goodname[0]);
    return ret;
 }
 
@@ -220,11 +220,11 @@ void countrycodestring(unsigned short countrycode, char *string)
         break;
 
     case 0x41: /* Japan / USA */
-        strcpy(string, ("USA/Japan"));
+        strcpy(string, ("USA/Japon"));
         break;
 
     case 0x44: /* Germany */
-        strcpy(string, ("Germany"));
+        strcpy(string, ("Alemania"));
         break;
 
     case 0x45: /* USA */
@@ -232,19 +232,19 @@ void countrycodestring(unsigned short countrycode, char *string)
         break;
 
     case 0x46: /* France */
-        strcpy(string, ("France"));
+        strcpy(string, ("Francia"));
         break;
 
     case 'I':  /* Italy */
-        strcpy(string, ("Italy"));
+        strcpy(string, ("Italia"));
         break;
 
     case 0x4A: /* Japan */
-        strcpy(string, ("Japan"));
+        strcpy(string, ("Japon"));
         break;
 
     case 'S':  /* Spain */
-        strcpy(string, ("Spain"));
+        strcpy(string, ("Espana"));
         break;
 
     case 0x55: case 0x59:  /* Australia */
@@ -253,11 +253,11 @@ void countrycodestring(unsigned short countrycode, char *string)
 
     case 0x50: case 0x58: case 0x20:
     case 0x21: case 0x38: case 0x70:
-        sprintf(string, ("Europe (0x%02X)"), countrycode);
+        sprintf(string, ("Europa (0x%02X)"), countrycode);
         break;
 
     default:
-        sprintf(string, ("Unknown (0x%02X)"), countrycode);
+        sprintf(string, ("Desconocido (0x%02X)"), countrycode);
         break;
     }
 }
@@ -276,32 +276,32 @@ char *saveregionstr()
         return "(JU)";
         break;
     case 0x44: /* Germany */
-        return "(G)";
+        return "(Ge)";
         break;
     case 0x45: /* USA */
-        return "(U)";
+        return "(USA)";
         break;
     case 0x46: /* France */
-        return "(F)";
+        return "(Fr)";
         break;
     case 'I':  /* Italy */
-        return "(I)";
+        return "(It)";
         break;
     case 0x4A: /* Japan */
-        return "(J)";
+        return "(Jp)";
         break;
     case 'S':  /* Spain */
-        return "(S)";
+        return "(Es)";
         break;
     case 0x55: case 0x59:  /* Australia */
-        return "(A)";
+        return "(Au)";
         break;
     case 0x50: case 0x58: case 0x20:
     case 0x21: case 0x38: case 0x70:
-        return "(E)";
+        return "(Eu)";
         break;
     default:
-        return "(Unk)";
+        return "(Desc)";
         break;
     }
 }

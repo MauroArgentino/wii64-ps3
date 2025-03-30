@@ -1,0 +1,12 @@
+# Archivo de idioma Español (lang_es.txt)
+Load ROM=Cargar ROM
+Current ROM=ROM Actual
+Settings=Ajustes
+Credits=Créditos
+Quit=Salir
+Play Game=Jugar
+Resume Game=Reanudar Juego
+Please load a ROM first=Por favor, carga una ROM primero
+Are you sure you want to exit to loader?=¿Seguro que quieres salir al cargador?
+Automatically saved to USB device=Guardado automáticamente en el dispositivo USB
+Failed to Save=Error al Guardar

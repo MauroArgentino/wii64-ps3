@@ -296,12 +296,12 @@ int main(int argc, char* argv[]){
 	int (*configFile_init)(fileBrowser_file*) = fileBrowser_ps3_init;
 	configFile_file = &saveDir_ps3_Default;
 	if(configFile_init(configFile_file)) {                //only if device initialized ok
-		FILE* f = fopen( "/dev_usb/wii64/settings.cfg", "r" );  //attempt to open file
+		FILE* f = fopen( "/dev_usb000/wii64/settings.cfg", "r" );  //attempt to open file
 		if(f) {        //open ok, read it
 			readConfig(f);
 			fclose(f);
 		}
-		f = fopen( "/dev_usb/wii64/controlP.cfg", "r" );  //attempt to open file
+		f = fopen( "/dev_usb000/wii64/controlP.cfg", "r" );  //attempt to open file
 		if(f) {
 			load_configurations(f, &controller_PS3);					//read in GC controller mappings
 			fclose(f);

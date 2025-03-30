@@ -107,7 +107,7 @@ void InputStatusBar::drawComponent(Graphics& gfx)
 	if(!hasLoadedROM)
 	{
 		IplFont::getInstance().drawInit(activeColor);
-		sprintf(buffer,"No ROM Loaded");
+		sprintf(buffer,"No hay ROM cargada");
 		IplFont::getInstance().drawString((int) box_x + 15, (int) text_y, buffer, 0.8, false);
 	}
 	else
@@ -120,11 +120,11 @@ void InputStatusBar::drawComponent(Graphics& gfx)
 		text_y += 13;
 		IplFont::getInstance().drawString((int) box_x + 15, (int) text_y, buffer, 0.7, false);
 		if (autoSave)
-			sprintf(buffer,"AutoSave Enabled");
+			sprintf(buffer,"Guardado automatico habilitado");
 		else if (!flashramWritten && !sramWritten && !eepromWritten && !mempakWritten)
-			sprintf(buffer,"Nothing to Save");
+			sprintf(buffer,"Nada que guardar");
 		else
-			sprintf(buffer,"Game Needs Saving");
+			sprintf(buffer,"El juego necesita guardarse");
 		text_y += 25;
 		IplFont::getInstance().drawString((int) box_x + 15, (int) text_y, buffer, 0.7, false);
 	}

@@ -168,8 +168,8 @@ void Gui::drawBackground()
 	//Demo RSX draw code
 //	gfx->setTEV(GX_MODULATE);
 
-/*	//init shader:
-	u32 fpsize = 0;
+	//init shader:
+/*	u32 fpsize = 0;
 	u32 fp_offset;
 	u32 *fp_buffer = NULL;
 
@@ -181,12 +181,12 @@ void Gui::drawBackground()
 	s32 textureUnit_id = -1;
 
 	void *vp_ucode = NULL;
-//	rsxVertexProgram *vpo = (rsxVertexProgram*)texture_shader_vpo;
-	rsxVertexProgram *vpo = (rsxVertexProgram*)modulate_shader_vpo;
+	rsxVertexProgram *vpo = (rsxVertexProgram*)texture_shader_vpo;
+	// rsxVertexProgram *vpo = (rsxVertexProgram*)modulate_shader_vpo;
 
 	void *fp_ucode = NULL;
-//	rsxFragmentProgram *fpo = (rsxFragmentProgram*)texture_shader_fpo;
-	rsxFragmentProgram *fpo = (rsxFragmentProgram*)modulate_shader_fpo;
+	rsxFragmentProgram *fpo = (rsxFragmentProgram*)texture_shader_fpo;
+	// rsxFragmentProgram *fpo = (rsxFragmentProgram*)modulate_shader_fpo;
 
 	vp_ucode = rsxVertexProgramGetUCode(vpo);
 	projMatrix_id = rsxVertexProgramGetConst(vpo,"projMatrix");
@@ -205,8 +205,8 @@ void Gui::drawBackground()
 	rsxAddressToOffset(fp_buffer,&fp_offset);
 
 	textureUnit_id = rsxFragmentProgramGetAttrib(fpo,"texture");
-*/
-/*	int ind = 0;
+
+	int ind = 0;
 	for (int j=0; j<480; j++)
 	{
 		for (int i=0; i<640; i++)
@@ -308,8 +308,9 @@ void Gui::drawBackground()
 	gfx->setTEV(GX_MODULATE);
 	Resources::getInstance().getImage(Resources::IMAGE_LOGO)->activateImage(GX_TEXMAP0);
 	gfx->testPrim();
-*/
-/*	IMAGE_DEFAULT_BUTTON=1,
+	*/
+/*
+	IMAGE_DEFAULT_BUTTON=1,
 		IMAGE_DEFAULT_BUTTONFOCUS,
 		IMAGE_STYLEA_BUTTON,
 		IMAGE_STYLEA_BUTTONFOCUS,
@@ -326,9 +327,9 @@ void Gui::drawBackground()
 		IMAGE_CONTROLLER_WIIMOTE,
 		IMAGE_N64_CONTROLLER
 */
-	/*
+	
 	//setup draw environment:
-	rsxSetColorMask(context,GCM_COLOR_MASK_B |
+/*	rsxSetColorMask(context,GCM_COLOR_MASK_B |
 							GCM_COLOR_MASK_G |
 							GCM_COLOR_MASK_R |
 							GCM_COLOR_MASK_A);
@@ -388,22 +389,22 @@ void Gui::drawBackground()
 
 	for(int i=0;i<8;i++)
 		rsxSetViewportClip(context,i,display_width,display_height);
-*/
+
 //	gfx->setTEV(GX_MODULATE);
-/*
+
 	rsxLoadVertexProgram(context,vpo,vp_ucode);
 	rsxSetVertexProgramParameter(context,vpo,projMatrix_id,(float*)&P);
 	rsxSetVertexProgramParameter(context,vpo,modelViewMatrix_id,(float*)&modelViewMatrix);
 
 	rsxLoadFragmentProgramLocation(context,fpo,fp_offset,GCM_LOCATION_RSX);
-*/
-/*	rsxSetUserClipPlaneControl(context,GCM_USER_CLIP_PLANE_DISABLE,
+
+	rsxSetUserClipPlaneControl(context,GCM_USER_CLIP_PLANE_DISABLE,
 									   GCM_USER_CLIP_PLANE_DISABLE,
 									   GCM_USER_CLIP_PLANE_DISABLE,
 									   GCM_USER_CLIP_PLANE_DISABLE,
 									   GCM_USER_CLIP_PLANE_DISABLE,
-									   GCM_USER_CLIP_PLANE_DISABLE);*/
-/*
+									   GCM_USER_CLIP_PLANE_DISABLE);
+
 	//void rsxDrawVertexBegin(gcmContextData *context,u32 type);
 	rsxDrawVertexBegin(context,GCM_TYPE_QUADS);
 
@@ -441,11 +442,11 @@ void Gui::drawBackground()
 		rsxDrawVertex4f(context, vertexColor0_id, 0.0f, 0.0f, 0.0f, 1.0f);
 		rsxDrawVertex2f(context, vertexTexcoord_id, 0.0f, 1.0f);
 
-	rsxDrawVertexEnd(context);*/
-//	gfx->fillRect(50, 0, 100, 100);
-//	gfx->fillRect(50, 0, 100, 100);
-//void Graphics::drawImage(int textureId, int x, int y, int width, int height, float s1, float s2, float t1, float t2)
-/*	gfx->setTEV(GX_MODULATE);
+	rsxDrawVertexEnd(context);
+	gfx->fillRect(50, 0, 100, 100);
+	gfx->fillRect(50, 0, 100, 100);
+void Graphics::drawImage(int textureId, int x, int y, int width, int height, float s1, float s2, float t1, float t2)
+	gfx->setTEV(GX_MODULATE);
 	gfx->setDepth(0);
 	gfx->setColor((GXColor) {255,0,255,255});
 	gfx->drawImage(0, 0, 0, 100, 240, 0.0f, 1.0f, 0.0f, 1.0f);
@@ -454,12 +455,12 @@ void Gui::drawBackground()
 	gfx->drawImage(0, 100, 0, 100, 240, 0.0f, 1.0f, 0.0f, 1.0f);
 	gfx->setTEV(GX_PASSCLR);
 	gfx->drawImage(0, 200, 0, 100, 240, 0.0f, 1.0f, 0.0f, 1.0f);
-*/
-//	flip();
+
+	flip();
 
 	//free RSX buffers
-//	if (fp_buffer) rsxFree(fp_buffer);
-
+	if (fp_buffer) rsxFree(fp_buffer);
+*/
 }
 
 } //namespace menu 

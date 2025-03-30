@@ -64,13 +64,13 @@ void Func_PlayGame();
 #define FRAME_STRINGS mainFrameStrings
 
 char FRAME_STRINGS[7][20] =
-	{ "Load ROM",
-	  "Current ROM",
-	  "Settings",
-	  "Credits",
-	  "Quit",
-	  "Play Game",
-	  "Resume Game"};
+	{ "Cargar ROM",
+	  "ROM Actual",
+	  "Ajustes",
+	  "Creditos",
+	  "Salir",
+	  "Jugar Juego",
+	  "Reanudar Juego"};
 
 
 struct ButtonInfo
