@@ -152,7 +152,7 @@ void dma_pi_write()
 
 	pi_register.read_pi_status_reg |= 1;
 	update_count();
-	add_interupt_event(PI_INT, /*pi_register.pi_wr_len_reg*/0x1000);
+	add_interrupt_event(PI_INT, 0x1000);
 
 	return;
      }
