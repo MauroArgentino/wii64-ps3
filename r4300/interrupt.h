@@ -64,4 +64,4 @@ typedef struct _interrupt_queue
    int type;
    u32 count;
    struct _interrupt_queue *next;
-} interupt_queue;
+} interrupt_queue;
