@@ -37,7 +37,7 @@
 #include "../gc_memory/memory.h"
 #include "../fileBrowser/fileBrowser.h"
 #include "ROM-Cache.h"
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 
 int rom_length;
 int ROM_byte_swap;
@@ -305,4 +305,3 @@ char *saveregionstr()
         break;
     }
 }
-

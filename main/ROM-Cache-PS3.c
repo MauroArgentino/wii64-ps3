@@ -26,7 +26,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <malloc.h>
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include "winlnxdefs.h"
 #include "../fileBrowser/fileBrowser.h"
 //#include "../gui/gui_GX-menu.h"
@@ -144,6 +144,3 @@ int ROMCache_load(fileBrowser_file* f){
 	//SETLOADPROG( -1.0f );
 	return 0;
 }
-
-
-

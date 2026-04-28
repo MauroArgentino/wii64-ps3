@@ -110,7 +110,7 @@ void dynarec(unsigned int address){
 			r4300.last_pc = r4300.pc;
 			// Check for interrupts
 			if(r4300.next_interrupt <= Count){
-				gen_interupt();
+				gen_interrupt();
 				address = r4300.pc;
 			}
 		}

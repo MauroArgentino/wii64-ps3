@@ -2598,7 +2598,7 @@ static void BGTZL()
 	update_count();
      }
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void DADDI()
