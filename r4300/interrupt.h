@@ -59,9 +59,9 @@ void load_eventqueue_infos(char *buf);
 #define SP_INT      0x080
 #define DP_INT      0x100
 
-typedef struct _interupt_queue
+typedef struct _interrupt_queue
 {
    int type;
    u32 count;
-   struct _interupt_queue *next;
+   struct _interrupt_queue *next;
 } interupt_queue;
