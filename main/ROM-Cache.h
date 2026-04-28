@@ -26,7 +26,7 @@
 #define ROM_CACHE_H
 
 #include "../fileBrowser/fileBrowser.h"
-#include <psl1ght/types.h>
+#include <types.h>
 
 /* Rom Cache stuff */
 // Note: All length/size/offsets are in bytes

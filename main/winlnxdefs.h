@@ -30,7 +30,7 @@
 #ifndef WINLNXDEFS_H
 #define WINLNXDEFS_H
 
-#include <psl1ght/types.h>
+#include <types.h>
 
 #ifndef BOOL
 typedef u32 BOOL;

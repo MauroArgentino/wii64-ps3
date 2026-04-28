@@ -29,7 +29,7 @@
 
 #ifndef EXCEPTION_H
 #define EXCEPTION_H
-#include <psl1ght/types.h>
+#include <types.h>
 void address_error_exception();
 void TLB_invalid_exception();
 void TLB_refill_exception(u32 addresse, int w);

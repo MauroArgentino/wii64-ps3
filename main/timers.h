@@ -6,7 +6,7 @@ extern "C" {
 #endif
 #ifndef __TIMERS_H__
 #define __TIMERS_H__
-#include <psl1ght/types.h>
+#include <types.h>
 typedef struct {
    float	fps;			//Current fps
    float	vis;			//Current VI/s

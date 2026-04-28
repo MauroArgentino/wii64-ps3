@@ -29,7 +29,7 @@
 
 #ifndef MEMORY_H
 #define MEMORY_H
-#include <psl1ght/types.h>
+#include <types.h>
 #include "tlb.h"
 
 #ifdef __WIN32__
