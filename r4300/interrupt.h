@@ -26,24 +26,24 @@
  * USA.
  *
 **/
-#include <ppu-types.h>
+ #include <psl1ght/types.h>
 #include "r4300.h"
 #define Count r4300.reg_cop0[9]
 
-void compare_interupt();
+void compare_interrupt();
 void gen_dp();
-void init_interupt();
+void init_interrupt();
 
 extern int vi_field;
 extern u32 next_vi;
 
-void gen_interupt();
-void check_interupt();
+void gen_interrupt();
+void check_interrupt();
 
 void translate_event_queue(u32 base);
 void remove_event(int type);
-void add_interupt_event_count(int type, u32 count);
-void add_interupt_event(int type, u32 delay);
+void add_interrupt_event_count(int type, u32 count);
+void add_interrupt_event(int type, u32 delay);
 u32 get_event(int type);
 
 int save_eventqueue_infos(char *buf);

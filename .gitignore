@@ -4,3 +4,5 @@ rom.z64
 *.self
 *.log
 python2.7
+.vscode/
+gitk3y.txt

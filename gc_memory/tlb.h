@@ -29,7 +29,7 @@
 
 #ifndef TLB_H
 #define TLB_H
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 
 typedef struct _tlb
 {

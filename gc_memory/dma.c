@@ -29,13 +29,13 @@
 
 #include <stdio.h>
 #include <malloc.h>
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include "dma.h"
 #include "memory.h"
 #include "../main/rom.h"
 #include "../main/guifuncs.h"
 #include "../r4300/r4300.h"
-#include "../r4300/interupt.h"
+#include "../r4300/interrupt.h"
 #include "../r4300/macros.h"
 #include "../fileBrowser/fileBrowser.h"
 #include "../r4300/Invalid_Code.h"
@@ -119,7 +119,7 @@ void dma_pi_read()
 
    pi_register.read_pi_status_reg |= 1;
    update_count();
-   add_interupt_event(PI_INT, 0x1000/*pi_register.pi_rd_len_reg*/);
+   add_interrupt_event(PI_INT, 0x1000);
 }
 
 void dma_pi_write()

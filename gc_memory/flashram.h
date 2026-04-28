@@ -26,7 +26,7 @@
  * USA.
  *
 **/
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 extern int use_flashram;
 
 

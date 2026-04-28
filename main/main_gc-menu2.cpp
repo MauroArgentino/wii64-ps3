@@ -60,7 +60,7 @@ extern "C" {
 #include <string.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <net/socket.h>
@@ -138,9 +138,6 @@ static void rsp_info_init(void);
 void control_info_init(void);
 // -- End init functions --
 
-// -- Plugin data --
-//#define DEFAULT_FIFO_SIZE    (256*1024)//(64*1024) minimum
-
 CONTROL Controls[4];
 
 static GFX_INFO     gfx_info;
@@ -192,14 +189,6 @@ static struct {
   { "StatesDevice", &saveStateDevice, SAVESTATEDEVICE_SD, SAVESTATEDEVICE_USB },
   { "AutoSave", &autoSave, AUTOSAVE_DISABLE, AUTOSAVE_ENABLE },
   { "LimitVIs", &Timers.limitVIs, LIMITVIS_NONE, LIMITVIS_WAIT_FOR_FRAME },
-/*  { "PadType1", &padType[0], PADTYPE_NONE, PADTYPE_WII },
-  { "PadType2", &padType[1], PADTYPE_NONE, PADTYPE_WII },
-  { "PadType3", &padType[2], PADTYPE_NONE, PADTYPE_WII },
-  { "PadType4", &padType[3], PADTYPE_NONE, PADTYPE_WII },
-  { "PadAssign1", &padAssign[0], PADASSIGN_INPUT0, PADASSIGN_INPUT3 },
-  { "PadAssign2", &padAssign[1], PADASSIGN_INPUT0, PADASSIGN_INPUT3 },
-  { "PadAssign3", &padAssign[2], PADASSIGN_INPUT0, PADASSIGN_INPUT3 },
-  { "PadAssign4", &padAssign[3], PADASSIGN_INPUT0, PADASSIGN_INPUT3 },*/
   { "Pak1", &pakMode[0], PAKMODE_MEMPAK, PAKMODE_RUMBLEPAK },
   { "Pak2", &pakMode[1], PAKMODE_MEMPAK, PAKMODE_RUMBLEPAK },
   { "Pak3", &pakMode[2], PAKMODE_MEMPAK, PAKMODE_RUMBLEPAK },
@@ -245,30 +234,18 @@ int main(int argc, char* argv[]){
 	void* vmode=NULL;
 	MenuContext *menu = new MenuContext(vmode);
 
-#ifdef DEBUGON
-//	DEBUG_Init(GDBSTUB_DEVICE_TCP,GDBSTUB_DEF_TCPPORT); //Default port is 2828
-//	DEBUG_Init(GDBSTUB_DEVICE_USB, 1);
-//	_break();
-#endif
-
 	// Default Settings
 	audioEnabled     = 1; // Audio
 #ifdef RELEASE
-	showFPSonScreen  = 0; // Show FPS on Screen
+	showFPSonScreen  = 0;
 #else
-	showFPSonScreen  = 1; // Show FPS on Screen
+	showFPSonScreen  = 1;
 #endif
-	printToScreen    = 1; // Show DEBUG text on screen
-	printToSD        = 0; // Disable SD logging
-	Timers.limitVIs  = 0; // Sync to Audio
+	Timers.limitVIs  = 0;
 	saveEnabled      = 0; // Don't save game
-	nativeSaveDevice = 0; // SD
-	saveStateDevice	 = 0; // SD
-	autoSave         = 1; // Auto Save Game
-	creditsScrolling = 0; // Normal menu for now
-	dynacore         = 1; // Dynarec
-	screenMode		 = 0; // Stretch FB horizontally
-	padAutoAssign	 = PADAUTOASSIGN_AUTOMATIC;
+	autoSave         = 1;
+	dynacore         = 1;
+	screenMode		 = 0;
 	padType[0]		 = PADTYPE_NONE;
 	padType[1]		 = PADTYPE_NONE;
 	padType[2]		 = PADTYPE_NONE;
@@ -307,113 +284,20 @@ int main(int argc, char* argv[]){
 			fclose(f);
 		}
 	}
-#else //PS3
-	int (*configFile_init)(fileBrowser_file*) = fileBrowser_libfat_init;
-#ifdef HW_RVL
-	if(argv[0][0] == 'u') {  //assume USB
-		configFile_file = &saveDir_libfat_USB;
-		if(configFile_init(configFile_file)) {                //only if device initialized ok
-			FILE* f = fopen( "usb:/wii64/settings.cfg", "r" );  //attempt to open file
-			if(f) {        //open ok, read it
-				readConfig(f);
-				fclose(f);
-			}
-			f = fopen( "usb:/wii64/controlG.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_GC);					//read in GC controller mappings
-				fclose(f);
-			}
-#ifdef HW_RVL
-			f = fopen( "usb:/wii64/controlC.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_Classic);			//read in Classic controller mappings
-				fclose(f);
-			}
-			f = fopen( "usb:/wii64/controlN.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_WiimoteNunchuk);		//read in WM+NC controller mappings
-				fclose(f);
-			}
-			f = fopen( "usb:/wii64/controlW.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_Wiimote);			//read in Wiimote controller mappings
-				fclose(f);
-			}
-#endif //HW_RVL
-		}
-	}
-	else //if((argv[0][0]=='s') || (argv[0][0]=='/'))
-#endif
-	{ //assume SD
-		configFile_file = &saveDir_libfat_Default;
-		if(configFile_init(configFile_file)) {                //only if device initialized ok
-			FILE* f = fopen( "sd:/wii64/settings.cfg", "r" );  //attempt to open file
-			if(f) {        //open ok, read it
-				readConfig(f);
-				fclose(f);
-			}
-			f = fopen( "sd:/wii64/controlG.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_GC);					//read in GC controller mappings
-				fclose(f);
-			}
-#ifdef HW_RVL
-			f = fopen( "sd:/wii64/controlC.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_Classic);			//read in Classic controller mappings
-				fclose(f);
-			}
-			f = fopen( "sd:/wii64/controlN.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_WiimoteNunchuk);		//read in WM+NC controller mappings
-				fclose(f);
-			}
-			f = fopen( "sd:/wii64/controlW.cfg", "r" );  //attempt to open file
-			if(f) {
-				load_configurations(f, &controller_Wiimote);			//read in Wiimote controller mappings
-				fclose(f);
-			}
-#endif //HW_RVL
-		}
-	}
-#endif //!PS3
-#if defined(HW_RVL) || defined(PS3)
+
 	// Handle options passed in through arguments
 	int i;
 	for(i=1; i<argc; ++i){
 		handleConfigPair(argv[i]);
 	}
-#endif
+
 	running = 1;
 	while (menu->isRunning() && running) {}
-
 	delete menu;
-
 	return 0;
 }
 
-#if defined(WII)
-u16 readWPAD(void){
-	if(wpadNeedScan){ WPAD_ScanPads(); wpadNeedScan = 0; }
-	WPADData* wpad = WPAD_Data(0);
-
-	u16 b = 0;
-	if(wpad->err == WPAD_ERR_NONE &&
-	   wpad->exp.type == WPAD_EXP_CLASSIC){
-	   	u16 w = wpad->exp.classic.btns;
-	   	b |= (w & CLASSIC_CTRL_BUTTON_UP)    ? PAD_BUTTON_UP    : 0;
-	   	b |= (w & CLASSIC_CTRL_BUTTON_DOWN)  ? PAD_BUTTON_DOWN  : 0;
-	   	b |= (w & CLASSIC_CTRL_BUTTON_LEFT)  ? PAD_BUTTON_LEFT  : 0;
-	   	b |= (w & CLASSIC_CTRL_BUTTON_RIGHT) ? PAD_BUTTON_RIGHT : 0;
-	   	b |= (w & CLASSIC_CTRL_BUTTON_A) ? PAD_BUTTON_A : 0;
-	   	b |= (w & CLASSIC_CTRL_BUTTON_B) ? PAD_BUTTON_B : 0;
-	}
-
-	return b;
-}
-#else
 u16 readWPAD(void){ return 0; }
-#endif
 
 extern BOOL eepromWritten;
 extern BOOL mempakWritten;
@@ -443,20 +327,12 @@ int loadROM(fileBrowser_file* rom){
 		closeDLL_gfx();
 		ROMCache_deinit();
 		free_memory();
-#ifndef HW_RVL
-//		ARAM_manager_deinit();
-#endif
 	}
 	format_mempacks();
 	reset_flashram();
 	init_eeprom();
 	hasLoadedROM = TRUE;
-#ifndef HW_RVL
-//	ARAM_manager_init();
-//	TLBCache_init();
-#else
-	tlb_mem2_init();
-#endif
+
 	//romFile_init(rom);
 	ret = rom_read(rom);
 	if(ret){	// Something failed while trying to read the ROM.
@@ -486,36 +362,12 @@ int loadROM(fileBrowser_file* rom){
 	cpu_init();
 
   if(autoSave==AUTOSAVE_ENABLE) {
-#ifdef PS3
     // Adjust saveFile pointers
     saveFile_dir = &saveDir_ps3_Default;
     saveFile_readFile  = fileBrowser_ps3_readFile;
     saveFile_writeFile = fileBrowser_ps3_writeFile;
     saveFile_init      = fileBrowser_ps3_init;
     saveFile_deinit    = fileBrowser_ps3_deinit;
-#else //PS3
-    switch (nativeSaveDevice)
-    {
-    	case NATIVESAVEDEVICE_SD:
-    	case NATIVESAVEDEVICE_USB:
-    		// Adjust saveFile pointers
-    		saveFile_dir = (nativeSaveDevice==NATIVESAVEDEVICE_SD) ? &saveDir_libfat_Default:&saveDir_libfat_USB;
-    		saveFile_readFile  = fileBrowser_libfat_readFile;
-    		saveFile_writeFile = fileBrowser_libfat_writeFile;
-    		saveFile_init      = fileBrowser_libfat_init;
-    		saveFile_deinit    = fileBrowser_libfat_deinit;
-    		break;
-    	case NATIVESAVEDEVICE_CARDA:
-    	case NATIVESAVEDEVICE_CARDB:
-    		// Adjust saveFile pointers
-    		saveFile_dir       = (nativeSaveDevice==NATIVESAVEDEVICE_CARDA) ? &saveDir_CARD_SlotA:&saveDir_CARD_SlotB;
-    		saveFile_readFile  = fileBrowser_CARD_readFile;
-    		saveFile_writeFile = fileBrowser_CARD_writeFile;
-    		saveFile_init      = fileBrowser_CARD_init;
-    		saveFile_deinit    = fileBrowser_CARD_deinit;
-    		break;
-    }
-#endif //!PS3
     // Try loading everything
   	int result = 0;
   	saveFile_init(saveFile_dir);
@@ -524,31 +376,7 @@ int loadROM(fileBrowser_file* rom){
   	result += loadMempak(saveFile_dir);
   	result += loadFlashram(saveFile_dir);
   	saveFile_deinit(saveFile_dir);
-
-#ifdef PS3
-//	if (result) menu::MessageBox::getInstance().setMessage("Found & loaded save from USB device");
   	if (result) autoSaveLoaded = NATIVESAVEDEVICE_USB;
-#else //PS3
-  	switch (nativeSaveDevice)
-  	{
-  		case NATIVESAVEDEVICE_SD:
-//			if (result) menu::MessageBox::getInstance().setMessage("Found & loaded save from SD card");
-  			if (result) autoSaveLoaded = NATIVESAVEDEVICE_SD;
-  			break;
-  		case NATIVESAVEDEVICE_USB:
-//			if (result) menu::MessageBox::getInstance().setMessage("Found & loaded save from USB device");
-  			if (result) autoSaveLoaded = NATIVESAVEDEVICE_USB;
-  			break;
-  		case NATIVESAVEDEVICE_CARDA:
-//			if (result) menu::MessageBox::getInstance().setMessage("Found & loaded save from memcard in slot A");
-  			if (result) autoSaveLoaded = NATIVESAVEDEVICE_CARDA;
-  			break;
-  		case NATIVESAVEDEVICE_CARDB:
- //			if (result) menu::MessageBox::getInstance().setMessage("Found & loaded save from memcard in slot B");
-  			if (result) autoSaveLoaded = NATIVESAVEDEVICE_CARDB;
-  			break;
-  	}
-#endif //!PS3
   }
 	return 0;
 }

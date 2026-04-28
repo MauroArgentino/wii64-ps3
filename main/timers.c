@@ -3,7 +3,7 @@
 ****************************************************************************************/
 
 #include <stdio.h>
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include "winlnxdefs.h"
 #include "rom.h"
 #include "timers.h"

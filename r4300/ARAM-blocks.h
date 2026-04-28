@@ -23,7 +23,7 @@
 #ifndef ARAM_BLOCKS_H
 #define ARAM_BLOCKS_H
 
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include "ppc/Recompile.h"
 
 
@@ -32,4 +32,3 @@ inline PowerPC_block* blocks_get(u32 addr);
 inline void blocks_set(u32 addr, PowerPC_block* ptr);
 
 #endif
-

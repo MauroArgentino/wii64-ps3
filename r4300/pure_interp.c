@@ -35,8 +35,8 @@
 #include "../gc_memory/memory.h"
 #include "../main/ROM-Cache.h"
 #include "macros.h"
-#include "interupt.h"
-#include <ppu-types.h>
+#include "interrupt.h"
+#include <psl1ght/types.h>
 
 #ifdef PPC_DYNAREC
 #include "Invalid_Code.h"
@@ -163,25 +163,7 @@ static void SYNC()
    r4300.pc+=4;
 }
 
-//#define DUMP_ON_BREAK
-#ifdef DUMP_ON_BREAK
-#include <ogc/pad.h>
-#endif
 static void BREAK(){
-#ifdef DUMP_ON_BREAK
-#ifdef DEBUGON
-	_break(); return;
-#endif
-	printf("-- BREAK @ %08x: DUMPING N64 REGISTERS --\n", r4300.pc);
-	int i;
-	for(i=0; i<32; i+=4)
-		printf("r%2d: %08x  r%2d: %08x  r%2d: %08x  r%2d: %08x\n",
-		       i, (unsigned int)r4300.gpr[i], i+1, (unsigned int)r4300.gpr[i+1],
-		       i+2, (unsigned int)r4300.gpr[i+2], i+3, (unsigned int)r4300.gpr[i+3]);
-	printf("Press A to continue execution\n");
-	while(!(PAD_ButtonsHeld(0) & PAD_BUTTON_A));
-	while( (PAD_ButtonsHeld(0) & PAD_BUTTON_A));
-#endif
 }
 
 static void MFHI()

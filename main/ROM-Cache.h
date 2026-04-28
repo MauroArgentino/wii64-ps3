@@ -26,7 +26,7 @@
 #define ROM_CACHE_H
 
 #include "../fileBrowser/fileBrowser.h"
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 
 /* Rom Cache stuff */
 // Note: All length/size/offsets are in bytes
@@ -50,4 +50,3 @@ void byte_swap(char* buffer, unsigned int length);
 #define ROM_CACHE_INVALID_ROM -2
 
 #endif
-

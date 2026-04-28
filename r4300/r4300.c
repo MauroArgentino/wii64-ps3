@@ -32,11 +32,12 @@
 #include "../gc_memory/memory.h"
 #include "../main/ROM-Cache.h"
 #include "exception.h"
-#include "interupt.h"
+#include "interrupt.h"
 #include "macros.h"
 #include "recomp.h"
 #include "Invalid_Code.h"
 #include "ppc/Recompile.h"
+#include "ps3_dynarec.h"
 #include <malloc.h>
 #include <sysutil/sysutil.h>
 R4300 r4300;
@@ -188,11 +189,7 @@ void update_count()
 void init_blocks()
 {
    int i;
-   for (i=0; i<0x100000; i++)
-     {
-	invalid_code_set(i, 1);
-	blocks_set(i, NULL);
-     }
+   for (i=0; i<0x100000; i++) { invalid_code_set(i, 1); blocks_set(i, NULL); }
 #ifndef PPC_DYNAREC
    blocks[0xa4000000>>12] = malloc(sizeof(precomp_block));
    blocks[0xa4000000>>12]->code = NULL;
@@ -203,7 +200,6 @@ void init_blocks()
 #else
    PowerPC_block* temp_block = malloc(sizeof(PowerPC_block));
    blocks_set(0xa4000000>>12, temp_block);
-   //blocks[0xa4000000>>12]->code_addr = NULL;
    temp_block->funcs = NULL;
    temp_block->start_address = 0xa4000000;
    temp_block->end_address = 0xa4001000;
@@ -231,8 +227,14 @@ void go()
 	} else {
 		interpcore = 0;
 		dynacore = 1;
-		//printf("dynamic recompiler\n");
 		if(cpu_inited) {
+			// Solo inicializamos el DynaREC si realmente se va a usar
+			#ifdef PPC_DYNAREC
+				if (!init_dynarec_memory()) {
+					printf("Dynarec: Error crítico inicializando memoria ejecutable.\n");
+					return;
+				}
+			#endif
 			RecompCache_Init();
 			init_blocks();
 			cpu_inited = 0;
@@ -472,7 +474,7 @@ void cpu_init(void){
 
    r4300.last_pc = 0xa4000040;
    r4300.next_interrupt = 624999;
-   init_interupt();
+   init_interrupt();
 
    // I'm adding this from pure_interpreter()
    r4300.pc = 0xa4000040;
@@ -511,7 +513,7 @@ void cpu_deinit(void){
 			}
 		}
 	}
+	deinit_dynarec_memory();
 	if(PC) free(PC);
 	PC = NULL;
 }
-

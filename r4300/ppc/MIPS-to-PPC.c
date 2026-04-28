@@ -1777,21 +1777,15 @@ static int JR(MIPS_instr mips){
 #endif
 	genUpdateCount(0);
 
-#ifdef INTERPRET_JR
+	// En PS3, el registro r2 es el TOC. Asegurarse de que el Register-Cache 
+	// NO use r2 ni r13 para mapear registros MIPS.
 	genJumpTo(REG_LOCALRS, JUMPTO_REG);
-#else // INTERPRET_JR
-	// TODO: jr
-#endif
 
 	// Let's still recompile the delay slot in place in case its branched to
 	if(delaySlot){ if(is_j_dst()){ unget_last_src(); delaySlotNext = 2; } }
 	else nop_ignored();
 
-#ifdef INTERPRET_JR
-	return INTERPRETED;
-#else // INTERPRET_JR
-	return CONVER_ERROR;
-#endif
+	return CONVERT_SUCCESS;
 }
 
 static int JALR(MIPS_instr mips){
@@ -1832,21 +1826,13 @@ static int JALR(MIPS_instr mips){
 
 	flushRegisters();
 
-#ifdef INTERPRET_JALR
 	genJumpTo(REG_LOCALRS, JUMPTO_REG);
-#else // INTERPRET_JALR
-	// TODO: jalr
-#endif
 
 	// Let's still recompile the delay slot in place in case its branched to
 	if(delaySlot){ if(is_j_dst()){ unget_last_src(); delaySlotNext = 2; } }
 	else nop_ignored();
 
-#ifdef INTERPRET_JALR
-	return INTERPRETED;
-#else // INTERPRET_JALR
-	return CONVERT_ERROR;
-#endif
+	return CONVERT_SUCCESS;
 }
 
 static int SYSCALL(MIPS_instr mips){
@@ -4709,4 +4695,3 @@ static int mips_is_jump(MIPS_instr instr){
                 (opcode == MIPS_OPCODE_COP1 &&
                  format == MIPS_FRMT_BC)    );
 }
-

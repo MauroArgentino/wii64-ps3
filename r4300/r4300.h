@@ -32,7 +32,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include "../main/rom.h"
 #include "../gc_memory/tlb.h"
 #include "recomp.h"
@@ -121,4 +121,3 @@ void refresh_stat();
 #endif
 
 #endif
-

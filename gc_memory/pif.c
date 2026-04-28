@@ -28,7 +28,7 @@
 **/
 
 #include "../config.h"
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "../main/winlnxdefs.h"
@@ -37,7 +37,7 @@
 #include "pif.h"
 #include "pif2.h"
 #include "../r4300/r4300.h"
-#include "../r4300/interupt.h"
+#include "../r4300/interrupt.h"
 #include "../main/plugin.h"
 #include "../main/guifuncs.h"
 #include "../main/rom.h"

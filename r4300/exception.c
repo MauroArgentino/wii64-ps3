@@ -33,7 +33,7 @@
 #include "macros.h"
 #include "exception.h"
 #include "../gc_memory/memory.h"
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 
 #define doBreak()
 

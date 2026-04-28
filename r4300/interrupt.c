@@ -1,5 +1,5 @@
 /**
- * Mupen64 - interupt.c
+ * Mupen64 - interrupt.c
  * Copyright (C) 2002 Hacktarux
  *               2010 emu_kidid
  *
@@ -33,24 +33,24 @@
 #include <stdlib.h>
 #include "r4300.h"
 #include "macros.h"
-#include "interupt.h"
+#include "interrupt.h"
 #include "exception.h"
 #include "../config.h"
 #include "../main/plugin.h"
 #include "../main/guifuncs.h"
 #include "../main/savestates.h"
 #include "../gc_memory/memory.h"
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 
 static int SPECIAL_done = 0;
 int vi_field            = 0;
 u32 next_vi   = 0;
-static interupt_queue *q = NULL;
+static interrupt_queue *q = NULL;
 
 void clear_queue()
 {
   while(q != NULL) {
-    interupt_queue *aux = q->next;
+    interrupt_queue *aux = q->next;
     free(q);
     q = aux;
   }
@@ -58,7 +58,7 @@ void clear_queue()
 
 void print_queue()
 {
-  interupt_queue *aux;
+  interrupt_queue *aux;
   printf("------------------ %x\n", (unsigned int)Count);
   aux = q;
   while (aux != NULL) {
@@ -98,7 +98,7 @@ int before_event(u32 evt1, u32 evt2, int type2)
   }
 }
 
-void add_interupt_event(int type, u32 delay)
+void add_interrupt_event(int type, u32 delay)
 {
   u32 count = Count + delay;
   int special = 0;
@@ -114,9 +114,9 @@ void add_interupt_event(int type, u32 delay)
     //printf("two events of type %x in queue\n", type);
   }
    
-  interupt_queue *aux = q;
+  interrupt_queue *aux = q;
   if (q == NULL) {
-    q = malloc(sizeof(interupt_queue));
+    q = malloc(sizeof(interrupt_queue));
     q->next = NULL;
     q->count = count;
     q->type = type;
@@ -125,7 +125,7 @@ void add_interupt_event(int type, u32 delay)
   }
    
   if(before_event(count, q->count, q->type) && !special) {
-    q = malloc(sizeof(interupt_queue));
+    q = malloc(sizeof(interrupt_queue));
     q->next = aux;
     q->count = count;
     q->type = type;
@@ -138,21 +138,21 @@ void add_interupt_event(int type, u32 delay)
   }
 
   if (aux->next == NULL) {
-    aux->next = malloc(sizeof(interupt_queue));
+    aux->next = malloc(sizeof(interrupt_queue));
     aux = aux->next;
     aux->next = NULL;
     aux->count = count;
     aux->type = type;
   }
   else {
-    interupt_queue *aux2;
+    interrupt_queue *aux2;
     if (type != SPECIAL_INT) {
       while(aux->next != NULL && aux->next->count == count) {
         aux = aux->next;
       }
     }
     aux2 = aux->next;
-    aux->next = malloc(sizeof(interupt_queue));
+    aux->next = malloc(sizeof(interrupt_queue));
     aux = aux->next;
     aux->next = aux2;
     aux->count = count;
@@ -160,14 +160,14 @@ void add_interupt_event(int type, u32 delay)
   }
 }
 
-void add_interupt_event_count(int type, u32 count)
+void add_interrupt_event_count(int type, u32 count)
 {
-  add_interupt_event(type, (count - Count));
+  add_interrupt_event(type, (count - Count));
 }
 
-void remove_interupt_event()
+void remove_interrupt_event()
 {
-  interupt_queue *aux = q->next;
+  interrupt_queue *aux = q->next;
   if(q->type == SPECIAL_INT) {
     SPECIAL_done = 1;
   }
@@ -183,7 +183,7 @@ void remove_interupt_event()
 
 u32 get_event(int type)
 {
-  interupt_queue *aux = q;
+  interrupt_queue *aux = q;
   if (q == NULL) {
     return 0;
   }
@@ -201,7 +201,7 @@ u32 get_event(int type)
 
 void remove_event(int type)
 {
-  interupt_queue *aux = q;
+  interrupt_queue *aux = q;
   if (q == NULL) return;
   if (q->type == type) {
     aux = aux->next;
@@ -213,7 +213,7 @@ void remove_event(int type)
     aux = aux->next;
   }
   if (aux->next != NULL) { // it's a type int
-    interupt_queue *aux2 = aux->next->next;
+    interrupt_queue *aux2 = aux->next->next;
     free(aux->next);
     aux->next = aux2;
   }
@@ -221,7 +221,7 @@ void remove_event(int type)
 
 void translate_event_queue(u32 base)
 {
-  interupt_queue *aux;
+  interrupt_queue *aux;
   remove_event(COMPARE_INT);
   remove_event(SPECIAL_INT);
   aux=q;
@@ -229,15 +229,15 @@ void translate_event_queue(u32 base)
     aux->count = (aux->count - Count)+base;
     aux = aux->next;
   }
-  add_interupt_event_count(COMPARE_INT, Compare);
-  add_interupt_event_count(SPECIAL_INT, 0);
+  add_interrupt_event_count(COMPARE_INT, Compare);
+  add_interrupt_event_count(SPECIAL_INT, 0);
 }
 
 // save the queue (for save states)
 int save_eventqueue_infos(char *buf)
 {
   int len = 0;
-  interupt_queue *aux = q;
+  interrupt_queue *aux = q;
   if (q == NULL) {
     *((u32*)&buf[0]) = 0xFFFFFFFF;
     return 4;
@@ -260,23 +260,23 @@ void load_eventqueue_infos(char *buf)
   while (*((u32*)&buf[len]) != 0xFFFFFFFF) {
     type  = *((u32*)&buf[len]);
     count = *((u32*)&buf[len+4]);
-    add_interupt_event_count(type, count);
+    add_interrupt_event_count(type, count);
     len += 8;
   }
 }
 
-void init_interupt()
+void init_interrupt()
 {
   SPECIAL_done = 1;
   next_vi = r4300.next_interrupt = 5000;
   vi_register.vi_delay = next_vi;
   vi_field = 0;
   clear_queue();
-  add_interupt_event_count(VI_INT, next_vi);
-  add_interupt_event_count(SPECIAL_INT, 0);
+  add_interrupt_event_count(VI_INT, next_vi);
+  add_interrupt_event_count(SPECIAL_INT, 0);
 }
 
-void check_interupt()
+void check_interrupt()
 {
   if (MI_register.mi_intr_reg & MI_register.mi_intr_mask_reg) {
     Cause = (Cause | 0x400) & 0xFFFFFF83;
@@ -289,13 +289,13 @@ void check_interupt()
   }
   if (Status & Cause & 0xFF00) {
     if(q == NULL) {
-      q = malloc(sizeof(interupt_queue));
+      q = malloc(sizeof(interrupt_queue));
       q->next = NULL;
       q->count = Count;
       q->type = CHECK_INT;
     }
     else {
-      interupt_queue* aux = malloc(sizeof(interupt_queue));
+      interrupt_queue* aux = malloc(sizeof(interrupt_queue));
       aux->next = q;
       aux->count = Count;
       aux->type = CHECK_INT;
@@ -324,7 +324,7 @@ int chk_status(int chk) {
   return 1;
 }
 
-void gen_interupt()
+void gen_interrupt()
 {
   if (savestates_job & LOADSTATE) {
     savestates_load();
@@ -349,8 +349,8 @@ void gen_interupt()
       if (Count > 0x10000000) {
         return;
       }
-      remove_interupt_event();
-      add_interupt_event_count(SPECIAL_INT, 0);
+      remove_interrupt_event();
+      add_interrupt_event_count(SPECIAL_INT, 0);
       return;
     break;
     case VI_INT:
@@ -362,8 +362,8 @@ void gen_interupt()
       vi_register.vi_delay = (vi_register.vi_v_sync == 0) ? 500000 : ((vi_register.vi_v_sync + 1)*1500);
       next_vi += vi_register.vi_delay;
       vi_field = (vi_register.vi_status&0x40) ? 1-vi_field : 0; 
-      remove_interupt_event();
-      add_interupt_event_count(VI_INT, next_vi);
+      remove_interrupt_event();
+      add_interrupt_event_count(VI_INT, next_vi);
   
       MI_register.mi_intr_reg |= 0x08;
       if(!chk_status(1)) {
@@ -372,9 +372,9 @@ void gen_interupt()
     break;
   
     case COMPARE_INT:
-      remove_interupt_event();
+      remove_interrupt_event();
       Count+=2;
-      add_interupt_event_count(COMPARE_INT, Compare);
+      add_interrupt_event_count(COMPARE_INT, Compare);
       Count-=2;
   
       Cause = (Cause | 0x8000) & 0xFFFFFF83;
@@ -384,12 +384,12 @@ void gen_interupt()
     break;
   
     case CHECK_INT:
-      remove_interupt_event();
+      remove_interrupt_event();
     break;
   
     case SI_INT:
       PIF_RAMb[0x3F] = 0x0;
-      remove_interupt_event();
+      remove_interrupt_event();
       MI_register.mi_intr_reg |= 0x02;
       si_register.si_status |= 0x1000;
       if(!chk_status(1)) {
@@ -398,7 +398,7 @@ void gen_interupt()
     break;
   
     case PI_INT:
-      remove_interupt_event();
+      remove_interrupt_event();
       MI_register.mi_intr_reg |= 0x10;
       pi_register.read_pi_status_reg &= ~3;
       if(!chk_status(1)) {
@@ -409,14 +409,14 @@ void gen_interupt()
     case AI_INT:
       if (ai_register.ai_status & 0x80000000) { // full
         u32 ai_event = get_event(AI_INT);
-        remove_interupt_event();
+        remove_interrupt_event();
         ai_register.ai_status &= ~0x80000000;
         ai_register.current_delay = ai_register.next_delay;
         ai_register.current_len = ai_register.next_len;
-        add_interupt_event_count(AI_INT, ai_event+ai_register.next_delay);
+        add_interrupt_event_count(AI_INT, ai_event+ai_register.next_delay);
       }
       else {
-        remove_interupt_event();
+        remove_interrupt_event();
         ai_register.ai_status &= ~0x40000000;
       }
       MI_register.mi_intr_reg |= 0x04;
@@ -426,7 +426,7 @@ void gen_interupt()
     break;
   
     case SP_INT:
-      remove_interupt_event();
+      remove_interrupt_event();
       sp_register.sp_status_reg |= 0x303;
       sp_register.signal2 = 1;
       sp_register.broke = 1;
@@ -442,7 +442,7 @@ void gen_interupt()
     break;
   
     case DP_INT:
-      remove_interupt_event();
+      remove_interrupt_event();
       dpc_register.dpc_status &= ~2;
       dpc_register.dpc_status |= 0x81;
       MI_register.mi_intr_reg |= 0x20;
@@ -453,7 +453,7 @@ void gen_interupt()
     break;
 
     default:
-      remove_interupt_event();
+      remove_interrupt_event();
     break;
   }
   exception_general();

@@ -31,7 +31,7 @@
 #define ROM_H
 
 #include "../fileBrowser/fileBrowser.h"
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 
 int rom_read(fileBrowser_file* file);
 int fill_header();

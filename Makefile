@@ -23,7 +23,7 @@ include $(PSL1GHT)/ppu_rules
 #TARGET		:=	$(notdir $(CURDIR))
 TARGET		:=	ps364_glN64
 BUILD		:=	build
-SOURCES		:=	gc_audio gc_input gc_memory rsp_hle glN64_GX r4300 r4300/ppc main main/debug fileBrowser libgui menu DinaRec
+SOURCES		:=	gc_audio gc_input gc_memory rsp_hle glN64_GX r4300 r4300/ppc main main/debug fileBrowser libgui menu DinaRec mupen64_dynarec
 DATA		:=	data
 SHADERS		:=	shaders
 INCLUDES	:= 
@@ -33,11 +33,11 @@ INCLUDES	:=
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS		= -g -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) \
+CFLAGS		= -O3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ \
-			-DPPC -D__PPC__ -D_BIG_ENDIAN -DPS3 -D__LINUX__ -DPPC_DYNAREC -DUSE_RECOMP_CACHE #-DSHOW_DEBUG #-DWII -DHW_RVL
+			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__
 	  
-CXXFLAGS	=	$(CFLAGS)
+CXXFLAGS	=	$(CFLAGS) -fno-rtti -fno-exceptions
 
 LDFLAGS		=	$(MACHDEP) -Wl,-Map,$(notdir $@).map
 

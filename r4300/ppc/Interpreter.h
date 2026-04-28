@@ -23,34 +23,29 @@
 #ifndef INTERPRETER_H
 #define INTERPRETER_H
 
-/* decodeNInterpret(MIPS_instr, unsigned int PC):
-	1) Saves state
-	2) Calls prefetch_opcode(instr)               (Decodes)
-	3) Calls interp_ops[MIPS_GET_OPCODE(instr)]() (Interprets)
-	4) Restores state
- */
-unsigned int decodeNInterpret();
+// La declaración de decodeNInterpret se ha movido a Wrappers.h para evitar
+// conflictos con la firma requerida por el Recompilador (Dynarec).
 
 // These defines tell the recompiler to interpret
 //  rather than recompile the instruction
-#if 1
-#define INTERPRET_LB
-#define INTERPRET_LBU
-#define INTERPRET_LH
-#define INTERPRET_LHU
-#define INTERPRET_LW
-#define INTERPRET_LWU
-#define INTERPRET_LD
-#endif
+//#if 1
+//#define INTERPRET_LB
+//#define INTERPRET_LBU
+//#define INTERPRET_LH
+//#define INTERPRET_LHU
+//#define INTERPRET_LW
+//#define INTERPRET_LWU
+//#define INTERPRET_LD
+//#endif 
 #define INTERPRET_LWL
 #define INTERPRET_LWR
 
-#if 1
-#define INTERPRET_SB
-#define INTERPRET_SH
-#define INTERPRET_SW
-#define INTERPRET_SD
-#endif
+//#if 1 
+//#define INTERPRET_SB 
+//#define INTERPRET_SH 
+//#define INTERPRET_SW 
+//#define INTERPRET_SD 
+//#endif 
 #define INTERPRET_SWL
 #define INTERPRET_SWR
 
@@ -60,29 +55,29 @@ unsigned int decodeNInterpret();
 #define INTERPRET_SDL
 #define INTERPRET_SDR
 
-#if 1
-#define INTERPRET_LWC1
-#define INTERPRET_LDC1
-#define INTERPRET_SWC1
-#define INTERPRET_SDC1
-#endif
+//#if 1
+//#define INTERPRET_LWC1
+//#define INTERPRET_LDC1
+//#define INTERPRET_SWC1
+//#define INTERPRET_SDC1
+//#endif
 
-#define INTERPRET_DW
+//#define INTERPRET_DW
 
-#if 1
-#define INTERPRET_DADDIU
-#define INTERPRET_DSLLV
-#define INTERPRET_DSRLV
-#define INTERPRET_DSRAV
-#define INTERPRET_DADDU
-#define INTERPRET_DSUBU
-#define INTERPRET_DSLL
-#define INTERPRET_DSRL
-#define INTERPRET_DSRA
-#define INTERPRET_DSLL32
-#define INTERPRET_DSRL32
-#define INTERPRET_DSRA32
-#endif
+//#if 1
+//#define INTERPRET_DADDIU
+//#define INTERPRET_DSLLV
+//#define INTERPRET_DSRLV
+//#define INTERPRET_DSRAV
+//#define INTERPRET_DADDU
+//#define INTERPRET_DSUBU
+//#define INTERPRET_DSLL
+//#define INTERPRET_DSRL
+//#define INTERPRET_DSRA
+//#define INTERPRET_DSLL32
+//#define INTERPRET_DSRL32
+//#define INTERPRET_DSRA32
+//#endif
 
 #define INTERPRET_DMULT
 #define INTERPRET_DMULTU
@@ -91,26 +86,26 @@ unsigned int decodeNInterpret();
 
 //#define INTERPRET_HILO
 
-#if 1
-#define INTERPRET_MULT
-#define INTERPRET_MULTU
-#define INTERPRET_DIV
-#define INTERPRET_DIVU
-#endif
+//#if 1
+//#define INTERPRET_MULT
+//#define INTERPRET_MULTU
+//#define INTERPRET_DIV
+//#define INTERPRET_DIVU
+//#endif
 
-#if 1
-#define INTERPRET_SLT
-#define INTERPRET_SLTU
-#define INTERPRET_SLTI
-#define INTERPRET_SLTIU
-#endif
+//#if 1
+//#define INTERPRET_SLT
+//#define INTERPRET_SLTU
+//#define INTERPRET_SLTI
+//#define INTERPRET_SLTIU
+//#endif
 
-#define INTERPRET_J
-#define INTERPRET_JAL
-#define INTERPRET_JR
-#define INTERPRET_JALR
-#define INTERPRET_BC
-#define INTERPRET_BRANCH
+//#define INTERPRET_J
+//#define INTERPRET_JAL
+//#define INTERPRET_JR
+//#define INTERPRET_JALR
+//#define INTERPRET_BC
+//#define INTERPRET_BRANCH
 
 #define INTERPRET_SYSCALL
 #define INTERPRET_BREAK
@@ -129,16 +124,16 @@ unsigned int decodeNInterpret();
 #define INTERPRET_TLBWR
 #define INTERPRET_TLBP
 
-#define INTERPRET_FP
+//#define INTERPRET_FP
 
-#if 1
-#define INTERPRET_MFC1
-#define INTERPRET_DMFC1
-#define INTERPRET_CFC1
-#define INTERPRET_MTC1
-#define INTERPRET_DMTC1
-#define INTERPRET_CTC1
-#endif
+//#if 1
+//#define INTERPRET_MFC1
+//#define INTERPRET_DMFC1
+//#define INTERPRET_CFC1
+//#define INTERPRET_MTC1
+//#define INTERPRET_DMTC1
+//#define INTERPRET_CTC1
+//#endif
 
 #if 1
 #define INTERPRET_FP_S
@@ -197,4 +192,3 @@ unsigned int decodeNInterpret();
 #endif
 
 #endif
-

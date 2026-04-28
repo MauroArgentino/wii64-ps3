@@ -39,14 +39,14 @@
 #include "Saves.h"
 #include "../r4300/r4300.h"
 #include "../r4300/macros.h"
-#include "../r4300/interupt.h"
+#include "../r4300/interrupt.h"
 #include "../r4300/Invalid_Code.h"
 #include "pif.h"
 #include "flashram.h"
 #include "../main/plugin.h"
 #include "../main/guifuncs.h"
 #include "../main/ROM-Cache.h"
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 #include <assert.h>
 
 /* definitions of the rcp's structures and memory area */
@@ -655,7 +655,7 @@ static void update_MI_init_mode_reg()
    if (MI_register.w_mi_init_mode_reg & 0x800)
      {
 	MI_register.mi_intr_reg &= 0xFFFFFFDF;
-	check_interupt();
+	check_interrupt();
      }
    if (MI_register.w_mi_init_mode_reg & 0x1000)
      MI_register.RDRAM_reg_mode=0;
@@ -703,12 +703,12 @@ void update_SP()
    if (sp_register.w_sp_status_reg & 0x8)
      {
 	MI_register.mi_intr_reg &= 0xFFFFFFFE;
-	check_interupt();
+	check_interrupt();
      }
    if (sp_register.w_sp_status_reg & 0x10)
      {
 	MI_register.mi_intr_reg |= 1;
-	check_interupt();
+	check_interrupt();
      }
    if (sp_register.w_sp_status_reg & 0x20)
      sp_register.single_step = 0;
@@ -1027,9 +1027,9 @@ void write_nomemd()
 	//This as well as the 4Mb hack need to be done in a while loop which runs before bootup
 	//i.e. while (N64_ProgramCounter != rom[8]) executeN64(); patch();
 		
-	// Azimer - DK64 Hack to break out of infinite loop £
-	// I believe this memory location is some sort of copyright protection which £
-	// is written to using the RSP on bootup. The only issue I see is if it £
+	// Azimer - DK64 Hack to break out of infinite loop ï¿½
+	// I believe this memory location is some sort of copyright protection which ï¿½
+	// is written to using the RSP on bootup. The only issue I see is if it ï¿½
 	// affects any other roms?
 	 	 
 	if(strncmp(ROM_HEADER->nom, "DONKEY KONG 64", 14) == 0)

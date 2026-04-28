@@ -1,5 +1,5 @@
 /**
- * Wii64 - controller-PS3.c
+ * ps364 - controller-PS3.c
  * Copyright (C) 2007, 2008, 2009, 2010 Mike Slegeir
  * Copyright (C) 2007, 2008, 2009, 2010, 2011 sepp256
  * 
@@ -191,13 +191,11 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 }
 
 static void pause(int Control){
-	//PAD_ControlMotor(Control, PAD_MOTOR_STOP);
 }
 
 static void resume(int Control){ }
 
 static void rumble(int Control, int rumble){
-	//PAD_ControlMotor(Control, rumble ? PAD_MOTOR_RUMBLE : PAD_MOTOR_STOP);
 }
 
 static void configure(int Control, controller_config_t* config){

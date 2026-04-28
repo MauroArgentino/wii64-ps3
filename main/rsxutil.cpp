@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 
 #include <rsx/rsx.h>
 #include <sysutil/video.h>

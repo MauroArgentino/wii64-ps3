@@ -30,7 +30,7 @@
 #ifndef WINLNXDEFS_H
 #define WINLNXDEFS_H
 
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 typedef u32 BOOL;
 typedef u32 DWORD;
 typedef unsigned short WORD;

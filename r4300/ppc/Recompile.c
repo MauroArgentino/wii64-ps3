@@ -33,10 +33,11 @@
 #include <assert.h>
 #include "../../gc_memory/memory.h"
 #include "../Invalid_Code.h"
-#include "../interupt.h"
+#include "../interrupt.h"
 #include "Recompile.h"
 #include "../Recomp-Cache.h"
 #include "Wrappers.h"
+#include "../../ps3_dynarec.h"
 #include "../ARAM-blocks.h"
 
 
@@ -86,43 +87,6 @@ unsigned int get_src_pc(void){ return addr_first + ((src-1-src_first)<<2); }
 void set_next_dst(PowerPC_instr i){ *(ppc_dst++) = i; ++code_length; }
 // Adjusts the code_addr for the current instruction to account for flushes
 void reset_code_addr(void){ if(src<=src_last) code_addr[src-1-src_first] = ppc_dst; }
-
-void DCFlushRange(void* startaddr, unsigned int len){
-	if(len == 0) return;
-	__asm__ volatile (
-		"clrlwi.	5, %0, 27\n" 
-		"beq	1f\n" 
-		"addi	%1, %1, 0x20\n" 
-		"1:\n" 
-		"addi	%1, %1, 0x1f\n" 
-		"srwi	%1, %1, 5\n" 
-		"mtctr	%1\n" 
-		"2:\n" 
-		"dcbf	0, %0\n" 
-		"addi	%0, %0, 0x20\n" 
-		"bdnz	2b\n" 
-		"sync\n"
-		: : "b" (startaddr), "b" (len) : "5", "memory" );
-}
-
-void ICInvalidateRange(void* startaddr, unsigned int len)  {
-	if(len == 0) return;
-	__asm__ volatile (
-		"clrlwi.	5, %0, 27\n" 
-		"beq	1f\n" 
-		"addi	%1, %1, 0x20\n" 
-		"1:\n" 
-		"addi	%1, %1, 0x1f\n" 
-		"srwi	%1, %1, 5\n" 
-		"mtctr	%1\n" 
-		"2:\n" 
-		"icbi	0, %0\n" 
-		"addi	%0, %0, 0x20\n" 
-		"bdnz	2b\n" 
-		"sync\n" 
-		"isync\n"
-		: : "b" (startaddr), "b" (len) : "5", "memory" );
-}
 
 int add_jump(int old_jump, int is_j, int is_call){
 	int id = current_jump;
@@ -305,8 +269,7 @@ PowerPC_func* recompile_block(PowerPC_block* ppc_block, unsigned int addr){
 
 	// Since this is a fresh block of code,
 	// Make sure it wil show up in the ICache
-	DCFlushRange(func->code, code_length*sizeof(PowerPC_instr));
-	ICInvalidateRange(func->code, code_length*sizeof(PowerPC_instr));
+	flush_icache(func->code, code_length*sizeof(PowerPC_instr));
 
 	return func;
 }

@@ -39,7 +39,7 @@
 #include "../gc_memory/flashram.h"
 #include "../r4300/macros.h"
 #include "../r4300/r4300.h"
-#include "../r4300/interupt.h"
+#include "../r4300/interrupt.h"
 #include "wii64config.h"
 
 extern int *autoinc_save_slot;

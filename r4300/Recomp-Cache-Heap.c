@@ -23,12 +23,12 @@
 
 #include <sys/heap.h>
 #include <stdlib.h>
-#include "../gc_memory/MEM2.h"
 #include "r4300.h"
 #include "ppc/Recompile.h"
 #include "ppc/Wrappers.h"
 #include "Invalid_Code.h"
 #include "Recomp-Cache.h"
+#include "ps3_dynarec.h"
 #include "ARAM-blocks.h"
 
 typedef struct _meta_node {
@@ -117,8 +117,7 @@ static void unlink_func(PowerPC_func* func){
 		GEN_ORI(*(link->branch-10), 0, 0, 0);
 		GEN_ORI(*(link->branch-9), 0, 0, 0);
 		GEN_BLR(*link->branch, 1); // Set the linking branch to blrl
-		DCFlushRange(link->branch-10, 11*sizeof(PowerPC_instr));
-		ICInvalidateRange(link->branch-10, 11*sizeof(PowerPC_instr));
+		flush_icache(link->branch-10, 11*sizeof(PowerPC_instr));
 		
 		remove_func(&link->func->links_out, func);
 		MetaCache_Free(link);
@@ -301,8 +300,7 @@ void RecompCache_Link(PowerPC_func* src_func, PowerPC_instr* src_instr,
 	GEN_LIS(*(src_instr-10), DYNAREG_FUNC, (unsigned int)dst_func>>16);
 	GEN_ORI(*(src_instr-9), DYNAREG_FUNC,DYNAREG_FUNC, (unsigned int)dst_func);
 	GEN_B(*src_instr, (PowerPC_instr*)dst_instr-src_instr, 0, 0);
-	DCFlushRange(src_instr-10, 11*sizeof(PowerPC_instr));
-	ICInvalidateRange(src_instr-10, 11*sizeof(PowerPC_instr));
+	flush_icache(src_instr-10, 11*sizeof(PowerPC_instr));
 	
 //	end_section(LINK_SECTION);
 }
@@ -310,8 +308,9 @@ void RecompCache_Link(PowerPC_func* src_func, PowerPC_instr* src_instr,
 void RecompCache_Init(void){
 	if(!cache){
 		cache = malloc(sizeof(heap_cntrl));
-		heapInit(cache, malloc(RECOMP_CACHE_SIZE),
-		                RECOMP_CACHE_SIZE);
+		// En lugar de malloc, usamos el puntero de memoria ejecutable de PS3
+		void* executable_buffer = get_code_cache_ptr();
+		heapInit(cache, executable_buffer, RECOMP_CACHE_SIZE);
 	}
 	if(!meta_cache){
 		meta_cache = malloc(sizeof(heap_cntrl));
