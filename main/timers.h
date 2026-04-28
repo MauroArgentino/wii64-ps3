@@ -6,7 +6,7 @@ extern "C" {
 #endif
 #ifndef __TIMERS_H__
 #define __TIMERS_H__
-#include <ppu-types.h>
+#include <psl1ght/types.h>
 typedef struct {
    float	fps;			//Current fps
    float	vis;			//Current VI/s
@@ -27,4 +27,3 @@ void TimerUpdate(void);
 #ifdef __cplusplus
 }
 #endif
-

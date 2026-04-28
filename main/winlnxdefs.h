@@ -31,11 +31,22 @@
 #define WINLNXDEFS_H
 
 #include <psl1ght/types.h>
+
+#ifndef BOOL
 typedef u32 BOOL;
+#endif
+#ifndef DWORD
 typedef u32 DWORD;
+#endif
+#ifndef WORD
 typedef unsigned short WORD;
+#endif
+#ifndef BYTE
 typedef unsigned char BYTE;
+#endif
+#ifndef UINT
 typedef u32 UINT;
+#endif
 typedef unsigned long long DWORD64;
 
 typedef short SHORT;
