@@ -10,7 +10,7 @@
 #ifndef GLN64_H
 #define GLN64_H
 
-#ifndef __LINUX__
+#if !defined(__LINUX__) && !defined(PS3)
 #include <windows.h>
 //#include <commctrl.h>
 #else
@@ -20,13 +20,13 @@
 //#define DEBUG
 //#define RSPTHREAD
 
-#ifndef __LINUX__
+#if !defined(__LINUX__) && !defined(PS3)
 extern HWND			hWnd;
 //extern HWND			hFullscreen;
 extern HWND			hStatusBar;
 extern HWND			hToolBar;
 extern HINSTANCE	hInstance;
-#endif // !__LINUX__
+#endif // !__LINUX__ && !PS3
 
 extern char			pluginName[];
 
@@ -34,4 +34,3 @@ extern void (*CheckInterrupts)( void );
 extern char *screenDirectory;
 
 #endif
-

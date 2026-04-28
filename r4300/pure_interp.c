@@ -128,7 +128,7 @@ static void JR()
    r4300.delay_slot=0;
    r4300.pc = local_rs32;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void JALR()
@@ -149,7 +149,7 @@ static void JALR()
 	r4300.pc = local_rs32;
      }
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void SYSCALL()
@@ -558,7 +558,7 @@ static void BGEZ()
    if (local_rs >= 0)
      r4300.pc += (local_immediate-1)*4;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BLTZL()
@@ -591,7 +591,7 @@ static void BLTZL()
      }
    else r4300.pc+=8;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BGEZL()
@@ -624,7 +624,7 @@ static void BGEZL()
      }
    else r4300.pc+=8;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BLTZAL()
@@ -659,7 +659,7 @@ static void BLTZAL()
      }
    else printf("erreur dans bltzal\n");
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BGEZAL()
@@ -694,7 +694,7 @@ static void BGEZAL()
      }
    else printf("erreur dans bgezal\n");
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BLTZALL()
@@ -732,7 +732,7 @@ static void BLTZALL()
      }
    else printf("erreur dans bltzall\n");
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BGEZALL()
@@ -770,7 +770,7 @@ static void BGEZALL()
      }
    else printf("erreur dans bgezall\n");
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void (*interp_regimm[32])(void) =
@@ -1060,9 +1060,9 @@ static void ERET()
 	r4300.pc = EPC;
      }
    r4300.llbit = 0;
-   check_interupt();
+   check_interrupt();
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void (*interp_tlb[64])(void) =
@@ -1157,7 +1157,7 @@ static void MTC0()
 	r4300.pc+=4;
 	check_interupt();
 	update_count();
-	if (r4300.next_interrupt <= Count) gen_interupt();
+	if (r4300.next_interrupt <= Count) gen_interrupt();
 	r4300.pc-=4;
 	break;
       case 13:   // Cause
@@ -1306,7 +1306,7 @@ static void BC1FL()
    else
      r4300.pc+=8;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BC1TL()
@@ -1339,7 +1339,7 @@ static void BC1TL()
    else
      r4300.pc+=8;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void (*interp_cop1_bc[4])(void) =
@@ -2259,7 +2259,7 @@ static void JAL()
 	r4300.pc = naddr;
      }
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BEQ()
@@ -2290,7 +2290,7 @@ static void BEQ()
    if (local_rs == local_rt)
      r4300.pc += (local_immediate-1)*4;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BNE()
@@ -2321,7 +2321,7 @@ static void BNE()
    if (local_rs != local_rt)
      r4300.pc += (local_immediate-1)*4;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BLEZ()
@@ -2351,7 +2351,7 @@ static void BLEZ()
    if (local_rs <= 0)
      r4300.pc += (local_immediate-1)*4;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BGTZ()
@@ -2381,7 +2381,7 @@ static void BGTZ()
    if (local_rs > 0)
      r4300.pc += (local_immediate-1)*4;
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void ADDI()
@@ -2486,7 +2486,7 @@ static void BEQL()
 	update_count();
      }
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BNEL()
@@ -2524,7 +2524,7 @@ static void BNEL()
 	update_count();
      }
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BLEZL()
@@ -2561,7 +2561,7 @@ static void BLEZL()
 	update_count();
      }
    r4300.last_pc = r4300.pc;
-   if (r4300.next_interrupt <= Count) gen_interupt();
+   if (r4300.next_interrupt <= Count) gen_interrupt();
 }
 
 static void BGTZL()

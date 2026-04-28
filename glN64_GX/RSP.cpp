@@ -13,7 +13,7 @@
 #include <gccore.h>
 #endif // __GX__
 
-#ifndef __LINUX__
+#if !defined(__LINUX__) && !defined(PS3)
 # include <windows.h>
 #else
 # include "../main/winlnxdefs.h"

@@ -259,7 +259,7 @@ void dma_pi_write()
 
    pi_register.read_pi_status_reg |= 3;
    update_count();
-   add_interupt_event(PI_INT, longueur/8);
+   add_interrupt_event(PI_INT, longueur/8);
    return;
 }
 
@@ -309,7 +309,7 @@ void dma_si_write()
      PIF_RAM[i] = sl(rdram[si_register.si_dram_addr/4+i]);
    update_pif_write();
    update_count();
-   add_interupt_event(SI_INT, /*0x100*/0x900);
+   add_interrupt_event(SI_INT, /*0x100*/0x900);
 }
 
 void dma_si_read()
@@ -324,5 +324,5 @@ void dma_si_read()
    for (i=0; i<(64/4); i++)
      rdram[si_register.si_dram_addr/4+i] = sl(PIF_RAM[i]);
    update_count();
-   add_interupt_event(SI_INT, /*0x100*/0x900);
+   add_interrupt_event(SI_INT, /*0x100*/0x900);
 }
