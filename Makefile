@@ -23,10 +23,10 @@ include $(PSL1GHT)/ppu_rules
 #TARGET		:=	$(notdir $(CURDIR))
 TARGET		:=	ps364_glN64
 BUILD		:=	build
-SOURCES		:=	gc_audio gc_input gc_memory rsp_hle glN64_GX r4300 r4300/ppc main main/debug fileBrowser libgui menu DinaRec mupen64_dynarec
+SOURCES		:=	src/main src/core/n64_audio src/core/n64_input src/core/n64_memory src/core/rsp src/core/r4300 src/core/r4300/ppc src/ui src/ui/libgui src/ui/fileBrowser src/platform/ps3 src/video/glN64
 DATA		:=	data
-SHADERS		:=	shaders
-INCLUDES	:= 
+SHADERS		:=	src/platform/ps3/shaders
+INCLUDES	:= . $(SOURCES)
 #LIBRARIES	:= -LJ:/PS3/PSDK3v2/MinGW/Lib
 
 #---------------------------------------------------------------------------------
@@ -34,10 +34,11 @@ INCLUDES	:=
 #---------------------------------------------------------------------------------
 
 CFLAGS		= -O3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
-			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ \
+			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ -DNDEBUG -D_GLIBCXX_DEBUG=0 -U_GLIBCXX_DEBUG \
+			-include ../src/main/winlnxdefs.h \
 			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__
 	  
-CXXFLAGS	=	$(CFLAGS) -fno-rtti -fno-exceptions
+CXXFLAGS	=	$(CFLAGS) -fno-rtti -fno-exceptions -fpermissive
 
 LDFLAGS		=	$(MACHDEP) -Wl,-Map,$(notdir $@).map
 
@@ -99,7 +100,7 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 #---------------------------------------------------------------------------------
 # build a list of include paths
 #---------------------------------------------------------------------------------
-export INCLUDE	:=	$(foreach dir,$(INCLUDES), -I$(CURDIR)/$(dir)) \
+export INCLUDE	:=	$(foreach dir,$(INCLUDES), -I$(CURDIR)/../$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 					$(LIBPSL1GHT_INC) \
 					-I$(PORTLIBS)/include \
@@ -123,7 +124,8 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).self
+	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).self *.map
+	@rm -f $(foreach dir,$(SOURCES),$(dir)/*.o) $(foreach dir,$(SOURCES),$(dir)/*.d)
 
 #---------------------------------------------------------------------------------
 run:
