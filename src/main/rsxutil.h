@@ -16,4 +16,8 @@ void init_screen(void *host_addr,u32 size);
 void waitflip();
 void flip();
 
+void rsxSetAlphaTestEnable(gcmContextData *ctx, u32 enable);
+void rsxSetAlphaTestFunc(gcmContextData *ctx, u32 func);
+void rsxSetAlphaTestRef(gcmContextData *ctx, u32 ref);
+
 #endif

@@ -49,6 +49,7 @@ public:
 	void rotate(float degrees);
 	void loadModelView();
 	void loadOrthographic();
+	void loadPerspective(float fovy, float aspect, float near, float far);
 	void setDepth(float newDepth);
 	float getDepth();
 	void setColor(GXColor color);

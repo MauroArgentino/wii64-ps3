@@ -1,5 +1,5 @@
-#export PS3SDK=j:/PS3/PSDK3v2
-#export PATH=$(PS3SDK)/mingw/msys/1.0/bin:$PS3SDK/mingw/bin:$PS3SDK/ps3dev/bin:$PS3SDK/ps3dev/ppu/bin:$PS3SDK/ps3dev/spu/bin:$PS3SDK/mingw/Python27:$PATH
+export PS3SDK=c:/PSDK3v2
+export PATH := $(PS3SDK)/mingw/msys/1.0/bin:$(PS3SDK)/mingw/bin:$(PS3SDK)/ps3dev/bin:$(PS3SDK)/ps3dev/ppu/bin:$(PS3SDK)/ps3dev/spu/bin:$(PATH)
 #export PSL1GHT=J:/PS3/PSDK3v2/psl1ght
 #export PS3DEV=j:/PS3/PSDK3v2/ps3dev
 
@@ -28,6 +28,9 @@ DATA		:=	data
 SHADERS		:=	src/platform/ps3/shaders
 INCLUDES	:= . $(SOURCES)
 #LIBRARIES	:= -LJ:/PS3/PSDK3v2/MinGW/Lib
+
+# ID del contenido para el paquete de PS3 (Requerido para pkg_package)
+CONTENTID	:= UP0001-PS364GLN6_00-0000111122223333
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -65,7 +68,7 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
 					$(foreach dir,$(DATA),$(CURDIR)/$(dir)) \
 					$(foreach dir,$(SHADERS),$(CURDIR)/$(dir))
-
+export VPATH	:=	$(VPATH) $(CURDIR)/src/platform/ps3
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 #---------------------------------------------------------------------------------
@@ -119,12 +122,12 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).self *.map
+	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).self $(OUTPUT).pkg *.map
 	@rm -f $(foreach dir,$(SOURCES),$(dir)/*.o) $(foreach dir,$(SOURCES),$(dir)/*.d)
 
 #---------------------------------------------------------------------------------
@@ -134,15 +137,23 @@ run:
 #---------------------------------------------------------------------------------
 pkg:	$(BUILD) $(OUTPUT).pkg
 
+$(OUTPUT).pkg: $(OUTPUT).self
+	@echo "Generando PKG usando la carpeta 'pkg' de la raiz..."
+	@mkdir -p $(CURDIR)/pkg/USRDIR
+	@cp $< $(CURDIR)/pkg/USRDIR/EBOOT.BIN
+	@$(PKG) --contentid $(CONTENTID) $(CURDIR)/pkg/ $@
+
 #---------------------------------------------------------------------------------
 
 npdrm: $(BUILD)
-	@$(SELF_NPDRM) $(SCETOOL_FLAGS) --np-content-id=$(CONTENTID) --encrypt $(BUILDDIR)/$(basename $(notdir $(OUTPUT))).elf $(BUILDDIR)/../EBOOT.BIN
+	@$(SELF_NPDRM) $(SCETOOL_FLAGS) --np-content-id=$(CONTENTID) --encrypt $(OUTPUT).elf EBOOT.BIN
 
 #---------------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------------
 else
+
+export BUILDDIR	:=	$(CURDIR)
 
 DEPENDS	:=	$(OFILES:.o=.d)
 

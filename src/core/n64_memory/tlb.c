@@ -41,8 +41,8 @@
 #endif
 
 
-u32 tlb_LUT_r[0x100000];
-u32 tlb_LUT_w[0x100000];
+u32 *tlb_LUT_r = NULL;
+u32 *tlb_LUT_w = NULL;
 
 
 u32 virtual_to_physical_address(u32 addresse, int w)

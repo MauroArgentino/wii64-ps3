@@ -51,22 +51,22 @@ class VI
    // the plugin assume the class that's implementing these functions 
    // accept 16bpp 5551 mode, maybe conversion is needed on some systems
    // it's also assumed that it's initialized in window mode by default
-   virtual void setVideoMode(int w, int h) = 0;
+   virtual void setVideoMode(int w, int h);
 //   virtual void* getScreenPointer() = 0;
-   virtual void blit() = 0;
+   virtual void blit();
    
  public:
    VI(GFX_INFO);
    virtual ~VI();
    
-   virtual unsigned int* getScreenPointer() = 0;
-   virtual void setFB(unsigned int*, unsigned int*) = 0;
-   virtual void switchFullScreenMode() = 0;
-   virtual void switchWindowMode() = 0;
-   virtual void setGamma(float gamma) = 0;
-   virtual void showLoadProg(float) = 0;
-   virtual void updateDEBUG() = 0;
-   virtual void PreRetraceCallback(u32) = 0;
+   virtual unsigned int* getScreenPointer();
+   virtual void setFB(unsigned int*, unsigned int*);
+   virtual void switchFullScreenMode();
+   virtual void switchWindowMode();
+   virtual void setGamma(float gamma);
+   virtual void showLoadProg(float percent);
+   virtual void updateDEBUG();
+   virtual void PreRetraceCallback(u32 retraceCnt);
    void statusChanged();
    void widthChanged();
    void updateScreen();

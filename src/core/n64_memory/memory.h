@@ -57,9 +57,9 @@ extern u32 *SP_IMEM;
 extern u32 PIF_RAM[0x40/4];
 extern unsigned char *PIF_RAMb;
 #ifdef USE_EXPANSION
-	extern u32 rdram[0x800000/4];
+	extern u32 *rdram;
 #else
-	extern u32 rdram[0x800000/4/2];
+	extern u32 *rdram;
 #endif
 extern u32 address, word;
 extern unsigned char byte;

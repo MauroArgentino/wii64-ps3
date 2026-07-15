@@ -89,43 +89,21 @@ void VI_UpdateSize()
 void VI_UpdateScreen()
 {
 #ifdef PS3
-	//TODO: Implement in GCM
-//	glFinish();
-/*	if (renderCpuFramebuffer)
-	{
-		//Only render N64 framebuffer in RDRAM and not EFB
-	}*/
-
-	if (OGL.frameBufferTextures)
-	{
-	}
-	else
-	{
-		if (gSP.changed & CHANGED_COLORBUFFER)
-		{
-//			dbg_printf("VI_UpdateScreen -> flip\r\n");
-//			rsxFinish(context, OGL.finish_ref++);
-			VI_RSX_showFPS();
-			VI_RSX_showDEBUG();
-			flip();
-			gSP.changed &= ~CHANGED_COLORBUFFER;
-		}
-/*		if(VI.updateOSD && (gSP.changed & CHANGED_COLORBUFFER))
-		{
-			//VI_GX_cleanUp();
-			VI_RSX_showFPS();
-			//VI_GX_showDEBUG();
-			//GX_SetCopyClear ((GXColor){0,0,0,255}, 0xFFFFFF);
-			//GX_CopyDisp (VI.xfb[VI.which_fb]+GX_xfb_offset, GX_FALSE);
-			//GX_DrawDone(); //Wait until EFB->XFB copy is complete
-			VI.updateOSD = false;
-			//VI.enableLoadIcon = true;
-			//VI.EFBcleared = false;
-			VI.copy_fb = true;
-			gSP.changed &= ~CHANGED_COLORBUFFER;
-		}*/
-	}
-//	glFinish();
+	VI_RSX_showFPS();
+	VI_RSX_showDEBUG();
+	rsxSetBlendEnable(context, GCM_FALSE);
+	rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
+	rsxSetDepthTestEnable(context, GCM_TRUE);
+	rsxSetCullFaceEnable(context, GCM_TRUE);
+	// Restore OGL vertex/fragment programs and identity projection
+	// (IplFont::drawInit() changed projection to orthographic for OSD)
+	rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+	flip();
+	gSP.changed &= ~CHANGED_COLORBUFFER;
 #elif defined(__GX__)
 	if (renderCpuFramebuffer)
 	{

@@ -25,6 +25,7 @@
 #include "MenuManager.h"
 
 MenuContext *pMenuContext;
+extern "C" char menuActive;
 extern "C" void dbg_printf(const char *fmt,...);
 extern "C" uint16_t PAD_ButtonsHeld(int);
 extern "C" void resumeAudio();
@@ -110,6 +111,13 @@ bool MenuContext::isRunning()
 
 	bool msgVisible = menu::MessageBox::getInstance().getActive();
 
+    // Si el emulador ha marcado que el menú ya no está activo, detenemos el renderizado del GUI
+    if (menuActive == 0) {
+        g_mainMenu->setVisible(false);
+        mainFrame->setVisible(false);
+        return false; // Salimos del bucle del menú para dejar paso al juego
+    }
+
     // Si estamos en el menú principal y no hay mensajes, el foco debe ser del WiiMenu
     if (currentActiveFrame == mainFrame && !msgVisible) { // 'mainFrame' es el frame base, no el menú de canales
         if (!g_mainMenuInited) { // Renombrado
@@ -119,17 +127,21 @@ bool MenuContext::isRunning()
         if (menu::Focus::getInstance().getCurrentFrame() != g_mainMenu) { // Renombrado
             menu::Focus::getInstance().clearPrimaryFocus();
             menu::Focus::getInstance().setCurrentFrame(g_mainMenu); // Renombrado
+            g_mainMenu->reset(); // <--- IMPORTANTE: Limpia el estado al recuperar el foco
             // Ya no forzamos setDefaultFocus aquí; g_mainMenu lo gestiona internamente
             // en su función update() para recordar el último botón tocado.
             menu::Focus::getInstance().clearInputData(); // Limpia estados de botones previos
         }
         mainFrame->setVisible(false); // Oculta el mainFrame genérico
         g_mainMenu->setVisible(true); // Muestra el menú de canales
-        g_mainMenu->update(PAD_ButtonsHeld(0)); // Actualiza el menú de canales
+        g_mainMenu->update(0); // Actualiza el menú de canales (padInput ya no se usa directamente)
     } else {
         if (g_mainMenu) g_mainMenu->setVisible(false); // Oculta el menú de canales si no es el activo
         if (currentActiveFrame == mainFrame) mainFrame->setVisible(true);
     }
+
+    // Si el menú se desactivó (ej. al pulsar Jugar), salimos sin dibujar el frame final
+    if (menuActive == 0) return false;
 
 	draw();
 

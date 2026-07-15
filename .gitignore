@@ -1,6 +1,7 @@
 build/
 rom.z64
 *.elf
+*.pkg
 *.self
 *.log
 python2.7

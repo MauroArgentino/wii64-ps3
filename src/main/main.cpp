@@ -75,6 +75,11 @@ extern "C" {
 extern "C" void ps3_audio_init();
 extern "C" void ps3_audio_exit();
 
+extern "C" void pauseAudio(void);
+extern "C" void pauseInput(void);
+extern "C" void resumeAudio(void);
+extern "C" void resumeInput(void);
+
 int s, running;
 struct sockaddr_in server;
 #define TESTIP				"192.168.1.100"
@@ -231,7 +236,7 @@ int main(int argc, char* argv[]){
 	setRenderTarget(curr_fb);
 	atexit(program_exit_callback);
 	sysUtilRegisterCallback(0,sysutil_exit_callback,NULL);
-	ps3_audio_init();
+	//ps3_audio_init(); // Disabled: conflicts with audio.c port
 
 	//Initialize controls once before menu runs <- needed?
 	control_info_init();
@@ -246,7 +251,7 @@ int main(int argc, char* argv[]){
 #else
 	showFPSonScreen  = 1;
 #endif
-	Timers.limitVIs  = 0;
+	Timers.limitVIs  = 1;
 	saveEnabled      = 0; // Don't save game
 	autoSave         = 1;
 	dynacore         = 1;
@@ -297,7 +302,31 @@ int main(int argc, char* argv[]){
 	}
 
 	running = 1;
-	while (menu->isRunning() && running) {}
+	while (running) {
+		if (menuActive) {
+			// menu->isRunning() procesa el dibujo y la entrada del menú.
+			// Retornará 'false' cuando menuActive pase a 0.
+			if (!menu->isRunning()) {
+				if (menuActive == 1) running = 0; // Si sigue en 1, es que queremos salir
+			}
+		} else {
+			// El menú se ha desactivado, iniciamos la emulación real
+			resumeAudio();
+			resumeInput();
+
+			// Limpiamos ambos buffers (front y back) para quitar el menú de la vista
+			// Esto evita que veas la imagen "congelada" del homebrew.
+			menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xffff);
+			flip();
+			menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xffff);
+			flip();
+
+			go(); // Este bucle bloquea hasta que el usuario sale del juego (Menu Combo)
+			pauseInput();
+			pauseAudio();
+			menuActive = 1; // Al salir del juego, reactivamos el menú
+		}
+	}
 	delete menu;
 	return 0;
 }

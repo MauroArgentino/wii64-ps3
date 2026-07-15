@@ -723,7 +723,7 @@ void TextureCache_Destroy()
 	while (cache.bottom)
 		TextureCache_RemoveBottom();
 #ifdef PS3
-	//TODO: Implement for GCM
+	// RSX: No special textures to clean up like GX's noise/primDepth textures.
 #elif defined(__GX__)
 	//For now we're not using Noise textures.
 
@@ -767,6 +767,24 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 	GetTexelFunc	GetTexel;
 
 #ifndef __GX__
+#ifdef PS3
+	// PS3 RSX only supports A8R8G8B8 textures. Force 32-bit (RGBA8) path
+	// for ALL formats so the RSX upload block always gets correctly-sized u32 data.
+	texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
+	if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
+	{
+		if (texInfo->size == G_IM_SIZ_4b)
+			GetTexel = GetCI4IA_RGBA8888;
+		else
+			GetTexel = GetCI8IA_RGBA8888;
+	}
+	else
+	{
+		GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
+	}
+	glInternalFormat = GL_RGBA8;
+	glType = GL_UNSIGNED_BYTE;
+#else // !PS3
 	if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA8) || 
 		((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) || (cache.bitDepth == 2)) && (cache.bitDepth != 0))
 	{
@@ -808,7 +826,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 			glType = imageFormat[texInfo->size][texInfo->format].glType16;
 		}
 	}
-
+#endif // PS3
 	bpl = gSP.bgImage.width << gSP.bgImage.size >> 1;
 	numBytes = bpl * gSP.bgImage.height;
 	swapped = (u8*)malloc( numBytes );
@@ -1033,8 +1051,16 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 
 #ifdef PS3
 	//TODO: Implement 2xSaI
+	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
+	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
 	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128,texInfo->textureBytes);
-	memcpy( texInfo->rsxTextureBuffer, dest, texInfo->textureBytes );
+	{
+		u32 *src32 = dest;
+		u32 *dst32 = texInfo->rsxTextureBuffer;
+		u32 numTexels = texInfo->textureBytes / 4;
+		for (u32 k = 0; k < numTexels; k++)
+			dst32[k] = (src32[k] >> 8) | (src32[k] << 24);
+	}
 	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
 	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
 	texInfo->rsxTex.format		= texInfo->rsxFmt;
@@ -1120,6 +1146,24 @@ void TextureCache_Load( CachedTexture *texInfo )
 	GetTexelFunc	GetTexel;
 
 #ifndef __GX__
+#ifdef PS3
+	// PS3 RSX only supports A8R8G8B8 textures. Force 32-bit (RGBA8) path
+	// for ALL formats so the RSX upload block always gets correctly-sized u32 data.
+	texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
+	if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
+	{
+		if (texInfo->size == G_IM_SIZ_4b)
+			GetTexel = GetCI4IA_RGBA8888;
+		else
+			GetTexel = GetCI8IA_RGBA8888;
+	}
+	else
+	{
+		GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
+	}
+	glInternalFormat = GL_RGBA8;
+	glType = GL_UNSIGNED_BYTE;
+#else // !PS3
 	if (((imageFormat[texInfo->size][texInfo->format].autoFormat == GL_RGBA8) || 
 		((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16)) || (cache.bitDepth == 2)) && (cache.bitDepth != 0))
 	{
@@ -1161,6 +1205,7 @@ void TextureCache_Load( CachedTexture *texInfo )
 			glType = imageFormat[texInfo->size][texInfo->format].glType16;
 		}
 	}
+#endif // PS3
 	dest = (u32*)malloc( texInfo->textureBytes );
 #else // !__GX__
 	if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
@@ -1432,8 +1477,16 @@ void TextureCache_Load( CachedTexture *texInfo )
 
 #ifdef PS3
 	//TODO: Implement 2xSaI
+	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
+	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
 	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128,texInfo->textureBytes);
-	memcpy( texInfo->rsxTextureBuffer, dest, texInfo->textureBytes );
+	{
+		u32 *src32 = dest;
+		u32 *dst32 = texInfo->rsxTextureBuffer;
+		u32 numTexels = texInfo->textureBytes / 4;
+		for (u32 k = 0; k < numTexels; k++)
+			dst32[k] = (src32[k] >> 8) | (src32[k] << 24);
+	}
 	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
 	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
 	texInfo->rsxTex.format		= texInfo->rsxFmt;

@@ -141,11 +141,17 @@ static void genCmp64(int cr, int _ra, int _rb){
 
 static void genCall(void* func){
 	PowerPC_instr ppc;
+	// Cargamos la dirección del descriptor de función en r12
 	GEN_LIS(ppc, 12, ((unsigned int)func)>>16);
 	set_next_dst(ppc);
 	GEN_ORI(ppc, 12, 12, (unsigned int)func);
 	set_next_dst(ppc);
-	GEN_MTCTR(ppc, 12);
+
+	// En PS3 64-bit ABI, el primer doubleword del descriptor es la dirección real del código
+	GEN_LD(ppc, 0, 0, 12);
+	set_next_dst(ppc);
+
+	GEN_MTCTR(ppc, 0);
 	set_next_dst(ppc);
 	GEN_BCTRL(ppc);
 	set_next_dst(ppc);

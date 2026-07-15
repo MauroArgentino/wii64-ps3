@@ -35,6 +35,9 @@
 extern u32 display_width;
 extern u32 display_height;
 s32 globalTextureUnit_id;
+s32 vertexPosition_id;
+s32 vertexColor0_id;
+s32 vertexTexcoord_id;
 
 extern "C" unsigned int usleep(unsigned int us);
 void video_mode_init(GXRModeObj *rmode, unsigned int *fb1, unsigned int *fb2);
@@ -96,8 +99,11 @@ void Graphics::init()
 	projMatrix_id = rsxVertexProgramGetConst(vpo,"projMatrix");
 	modelViewMatrix_id = rsxVertexProgramGetConst(vpo,"modelViewMatrix");
 	vertexPosition_id = rsxVertexProgramGetAttrib(vpo,"vertexPosition");
+	::vertexPosition_id = vertexPosition_id;
 	vertexColor0_id = rsxVertexProgramGetAttrib(vpo,"vertexColor");
+	::vertexColor0_id = vertexColor0_id;
 	vertexTexcoord_id = rsxVertexProgramGetAttrib(vpo,"vertexTexcoord");
+	::vertexTexcoord_id = vertexTexcoord_id;
 
 	fp_ucode = rsxFragmentProgramGetUCode(fpo,&fpsize);
 	fp_buffer = (u32*)rsxMemalign(64,fpsize);
@@ -148,7 +154,9 @@ void Graphics::drawInit()
 	rsxSetScissor(context,x,y,w,h);
 
 	rsxSetDepthTestEnable(context,GCM_TRUE);
-	rsxSetDepthFunc(context,GCM_ALWAYS);//GCM_GEQUAL);//GCM_LESS
+	// Cambiamos GCM_ALWAYS por GCM_LEQUAL (Menor o Igual) que es el estándar 3D.
+	// Esto permite que el Z-Buffer funcione correctamente para el juego.
+	rsxSetDepthFunc(context,GCM_LEQUAL);
 	rsxSetShadeModel(context,GCM_SHADE_MODEL_SMOOTH);
 	rsxSetDepthWriteEnable(context,1);
 	rsxSetFrontFace(context,GCM_FRONTFACE_CCW);
@@ -158,14 +166,12 @@ void Graphics::drawInit()
 	//Clear color buffer
 	u32 color = 0;
 	rsxSetClearColor(context,color);
-//	rsxSetClearDepthValue(context,0xffff);
-	rsxSetClearDepthValue(context,0x0);
+	rsxSetClearDepthValue(context,0xffff);
 	rsxClearSurface(context,GCM_CLEAR_R |
 							GCM_CLEAR_G |
 							GCM_CLEAR_B |
 							GCM_CLEAR_A |
-							GCM_CLEAR_S |
-							GCM_CLEAR_Z);
+							GCM_CLEAR_Z | GCM_CLEAR_S); // Limpiar también Stencil
 
 	rsxZControl(context,0,1,1);
 
@@ -200,9 +206,9 @@ void Graphics::swapBuffers()
 void Graphics::clearEFB(GXColor color, u32 zvalue)
 {
 	//Clear color buffer
-	u32 color32 = ((u32)color.r<<24)|((u32)color.g<<16)|((u32)color.b<<8)|(u32)color.a;
+	u32 color32 = ((u32)color.r<<16)|((u32)color.g<<8)|(u32)color.b; // Asumiendo formato XRGB (0x00RRGGBB)
 	rsxSetClearColor(context,color32);
-	rsxSetClearDepthValue(context,0xffff);
+	rsxSetClearDepthValue(context,zvalue);
 	rsxClearSurface(context,GCM_CLEAR_R |
 							GCM_CLEAR_G |
 							GCM_CLEAR_B |
@@ -235,6 +241,15 @@ void Graphics::loadModelView()
 {
 	if (vpo && modelViewMatrix_id != -1) {
 		rsxSetVertexProgramParameter(context, vpo, modelViewMatrix_id, (float*)&modelViewMatrix);
+	}
+}
+
+void Graphics::loadPerspective(float fovy, float aspect, float near, float far)
+{
+	// Generamos la matriz de perspectiva para el mundo 3D de la N64
+	projMatrix = transpose(Matrix4::perspective(fovy * (M_PI / 180.0f), aspect, near, far));
+	if (vpo && projMatrix_id != -1) {
+		rsxSetVertexProgramParameter(context, vpo, projMatrix_id, (float*)&projMatrix);
 	}
 }
 

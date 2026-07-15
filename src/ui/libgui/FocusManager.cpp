@@ -114,7 +114,7 @@ void Focus::updateFocus()
 		if (currentButtonsPS3 ^ previousButtonsPS3[i])
 		{
 			u16 currentButtonsDownPS3 = (currentButtonsPS3 ^ previousButtonsPS3[i]) & currentButtonsPS3;
-			switch (currentButtonsDownPS3 & 0xf000) {
+			switch (currentButtonsDownPS3 & (PS3_BTN_UP | PS3_BTN_DOWN | PS3_BTN_LEFT | PS3_BTN_RIGHT)) {
 			case PS3_BTN_LEFT:
 				focusDirection = DIRECTION_LEFT;
 				break;
@@ -235,6 +235,16 @@ void Focus::updateFocus()
 #endif
 	}
 #endif //__GX__
+}
+
+void Focus::moveFocus(int direction)
+{
+	if (!focusActive || freezeAction) return;
+
+	if (primaryFocusOwner) 
+		primaryFocusOwner = primaryFocusOwner->updateFocus(direction, 0);
+	else if (currentFrame) 
+		primaryFocusOwner = currentFrame->updateFocus(direction, 0);
 }
 
 void Focus::addComponent(Component* component)

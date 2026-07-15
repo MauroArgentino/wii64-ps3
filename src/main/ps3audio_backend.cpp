@@ -10,6 +10,16 @@ static u32 s_portNum;
 
 extern "C" char menuActive; // Variable global del emulador que indica si el menú está abierto
 
+// Implementación temporal (stubs) para satisfacer el enlazador.
+// TODO: Conectar con el buffer circular de audio en src/core/n64_audio/
+extern "C" uint32_t Audio_GetAvailableSamples() {
+    return 0; 
+}
+
+extern "C" void Audio_GetNextBlock(float* buffer, uint32_t numSamples) {
+    // Aquí se debería copiar y convertir el audio de 16-bit del N64 a float para PS3
+}
+
 static void audio_thread(void* arg)
 {
     audioPortParam portParam;
@@ -41,12 +51,17 @@ static void audio_thread(void* arg)
         u32 blockIdx = (u32)event.data_1;
         float* targetBuffer = (float*)((uint8_t*)audioData + (blockIdx * blockSize));
 
-        if (menuActive) {
+        if (menuActive == 1) {
             // Si el menú está activo, nuestro sintetizador llena el buffer
             g_menuAudioSynthesizer.process(targetBuffer, AUDIO_BLOCK_SAMPLES);
         } else {
-            // Si no, silencio (o el audio del juego si decides mezclarlo aquí)
-            memset(targetBuffer, 0, blockSize);
+            // Cuando el juego corre, intentamos obtener audio del núcleo N64
+            // Si el núcleo no tiene suficientes muestras, silenciamos para evitar ruidos
+            if (Audio_GetAvailableSamples() >= AUDIO_BLOCK_SAMPLES) {
+                Audio_GetNextBlock(targetBuffer, AUDIO_BLOCK_SAMPLES);
+            } else {
+                memset(targetBuffer, 0, blockSize);
+            }
         }
     }
 

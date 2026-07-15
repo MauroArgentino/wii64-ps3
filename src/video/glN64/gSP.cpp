@@ -1050,7 +1050,7 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 				OGL_AddTriangle( clippedVertices, 0, 2, 3 );
 
 #ifdef PS3
-			//TODO: Implement for GCM
+			// RSX polygon offset: not in PSL1GHT API, skipped
 #else //PS3
 			glDisable( GL_POLYGON_OFFSET_FILL );
 #endif //!PS3
@@ -1062,7 +1062,7 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 				OGL_AddTriangle( nearVertices, 0, 2, 3 );
 
 #ifdef PS3
-			//TODO: Implement for GCM
+			// RSX polygon offset: not in PSL1GHT API, skipped
 #else //PS3
 			if (gDP.otherMode.depthMode == ZMODE_DEC)
 				glEnable( GL_POLYGON_OFFSET_FILL );
@@ -2020,7 +2020,17 @@ void gSPObjSprite( u32 sp )
 	gSPTexture( 1.0f, 1.0f, 0, 0, TRUE );
 
 #ifdef PS3
-	//Implement for GCM
+	// Sprites MUST render with orthographic projection (matching the GL path).
+	rsxSetCullFaceEnable(context, GCM_FALSE);
+	OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, VI.height, 0.0f, 0.0f, 32767.0f));
+	rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+	{
+		f32 vp_scale[4] = { display_width * 0.5f, display_height * -0.5f, 0.5f, 0.0f };
+		f32 vp_offset[4] = { display_width * 0.5f, display_height * 0.5f, 0.5f, 0.0f };
+		rsxSetViewport(context, 0, 0, display_width, display_height, 0.0f, 1.0f, vp_scale, vp_offset);
+	}
 #elif defined(__GX__)
 	//TODO: Implement this in GX??
 # ifdef SHOW_DEBUG
@@ -2036,7 +2046,13 @@ void gSPObjSprite( u32 sp )
 	OGL_AddTriangle( gSP.vertices, 0, 2, 3 );
 	OGL_DrawTriangles();
 #ifdef PS3
-	//Implement for GCM
+	// Restore identity projection so subsequent 3D draws are not affected.
+	OGL.projMatrix = Matrix4::identity();
+	rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+	OGL_UpdateCullFace();
+	OGL_UpdateViewport();
 #elif defined(__GX__)
 	//TODO: Implement this in GX??
 #else // __GX__

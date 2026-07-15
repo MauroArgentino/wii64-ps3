@@ -265,27 +265,13 @@ void Func_PlayGame()
 	menu::Cursor::getInstance().setFreezeAction(false);
 	menu::Focus::getInstance().setFreezeAction(false);
 */
-	menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0x000000);
 
-#ifndef PS3
-	pauseRemovalThread();
-#endif
-	resumeAudio();
-	resumeInput();
+	// Limpiamos el buffer gráfico para quitar el menú de la pantalla
+	menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xffff);
+	menu::Gui::getInstance().gfx->swapBuffers();
+
+	// Cambiamos el estado para que el bucle de main.cpp tome el control
 	menuActive = 0;
-#ifdef DEBUGON
-	_break();
-#endif
-	go();
-#ifdef DEBUGON
-	_break();
-#endif
-	menuActive = 1;
-	pauseInput();
-	pauseAudio();
-#ifndef PS3
-  continueRemovalThread();
-#endif
 	
   if(autoSave==AUTOSAVE_ENABLE) {
     if(flashramWritten || sramWritten || eepromWritten || mempakWritten) {  //something needs saving

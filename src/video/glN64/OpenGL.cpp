@@ -66,10 +66,10 @@
 extern "C" { void _break(); }
 #endif
 
-#ifdef __GX__
+#if defined(__GX__) || defined(PS3)
 extern char glN64_useFrameBufferTextures;
 extern char glN64_use2xSaiTextures;
-#endif // __GX__
+#endif // __GX__ PS3
 
 GLInfo OGL;
 
@@ -664,7 +664,45 @@ void OGL_UpdateCullFace()
 void OGL_UpdateViewport()
 {
 #ifdef PS3
-	//TODO: Implement for GCM
+	// Implementar viewport del N64 para RSX/GCM
+	// OGL.scaleX/scaleY mapean coordenadas N64 a coordenadas de pantalla RSX
+	float vp_x = gSP.viewport.x * OGL.scaleX;
+	float vp_y = gSP.viewport.y * OGL.scaleY;
+	float vp_w = gSP.viewport.width * OGL.scaleX;
+	float vp_h = gSP.viewport.height * OGL.scaleY;
+	
+	// Ensure minimum size to avoid division by zero
+	if (vp_w < 1.0f) vp_w = 1.0f;
+	if (vp_h < 1.0f) vp_h = 1.0f;
+	
+	float near = gSP.viewport.nearz;
+	float far = gSP.viewport.farz;
+	if (near < 0.0f) near = 0.0f;
+	if (far > 1.0f) far = 1.0f;
+	if (near >= far) far = near + 0.001f;
+	
+	// RSX viewport: scale and offset transform NDC [-1,1] -> screen coordinates
+	// scale[0] = width/2  (X scale from NDC to screen)
+	// scale[1] = -height/2 (Y scale, inverted because RSX Y is top-down)
+	// scale[2] = (max-min)/2 (Z scale)
+	// offset[0] = x + width/2  (X translation)
+	// offset[1] = y + height/2 (Y translation)
+	// offset[2] = (max+min)/2  (Z translation)
+	float scale[4], offset[4];
+	scale[0] = vp_w * 0.5f;
+	scale[1] = vp_h * -0.5f;
+	scale[2] = (far - near) * 0.5f;
+	scale[3] = 0.0f;
+	offset[0] = vp_x + vp_w * 0.5f;
+	offset[1] = vp_y + vp_h * 0.5f;
+	offset[2] = (far + near) * 0.5f;
+	offset[3] = 0.0f;
+	
+	rsxSetViewport(context, (u16)vp_x, (u16)vp_y, 
+	               (u16)vp_w, (u16)vp_h, 
+	               near, far, scale, offset);
+	rsxSetViewportClip(context, 0, display_width, display_height);
+	
 #elif defined(__GX__)
 	GX_SetViewport((f32) (OGL.GXorigX + gSP.viewport.x * OGL.GXscaleX),(f32) (OGL.GXorigY + gSP.viewport.y * OGL.GXscaleY),
 		(f32) (gSP.viewport.width * OGL.GXscaleX),(f32) (gSP.viewport.height * OGL.GXscaleY), 0.0f, 1.0f);
@@ -678,10 +716,10 @@ void OGL_UpdateViewport()
 void OGL_UpdateDepthUpdate()
 {
 #ifdef PS3
-//	if (gDP.otherMode.depthUpdate)
+	if (gDP.otherMode.depthUpdate)
 		rsxSetDepthWriteEnable(context,GCM_TRUE);
-//	else
-//		rsxSetDepthWriteEnable(context,GCM_FALSE);
+	else
+		rsxSetDepthWriteEnable(context,GCM_FALSE);
 #elif defined(__GX__)
 	//This should now be taken care of in OGL_UpdateStates()
 #else // __GX__
@@ -703,7 +741,7 @@ void OGL_UpdateStates()
 	{
 		OGL_UpdateCullFace();
 #ifdef PS3
-		//TODO: Implement for GCM
+		// RSX fog enable: not in PSL1GHT API, skipped
 #elif defined(__GX__)
 		if ((gSP.geometryMode & G_FOG) && OGL.fog)
 			OGL.GXfogType = GX_FOG_ORTHO_LIN;
@@ -735,7 +773,7 @@ void OGL_UpdateStates()
 
 		OGL_UpdateDepthUpdate();
 
-		//TODO: Implement for GCM
+		// RSX polygon offset: not in PSL1GHT API, skipped
 /*		if (gDP.otherMode.depthMode == ZMODE_DEC)
 			glEnable( GL_POLYGON_OFFSET_FILL );
 		else
@@ -809,7 +847,34 @@ void OGL_UpdateStates()
 #endif // !__GX__
 
 #ifdef PS3
-	//TODO: Implement for GCM
+	if ((gDP.changed & CHANGED_ALPHACOMPARE) || (gDP.changed & CHANGED_RENDERMODE))
+	{
+		if ((gDP.otherMode.alphaCompare == G_AC_THRESHOLD) && !(gDP.otherMode.alphaCvgSel))
+		{
+			rsxSetAlphaTestEnable(context, GCM_TRUE);
+			rsxSetAlphaTestFunc(context, (gDP.blendColor.a > 0.0f) ?
+				0x0206 /*NV40TCL_ALPHA_TEST_FUNC_GEQUAL*/ :
+				0x0204 /*NV40TCL_ALPHA_TEST_FUNC_GREATER*/);
+			rsxSetAlphaTestRef(context, (u32)(gDP.blendColor.a * 255));
+		}
+		else if (gDP.otherMode.cvgXAlpha)
+		{
+			rsxSetAlphaTestEnable(context, GCM_TRUE);
+			rsxSetAlphaTestFunc(context, 0x0206 /*NV40TCL_ALPHA_TEST_FUNC_GEQUAL*/);
+			rsxSetAlphaTestRef(context, 128);
+		}
+		else if (gDP.otherMode.alphaCompare == G_AC_DITHER)
+		{
+			// No polygon stipple on PS3: accept any fragment with alpha > 0
+			rsxSetAlphaTestEnable(context, GCM_TRUE);
+			rsxSetAlphaTestFunc(context, 0x0206 /*GEQUAL*/);
+			rsxSetAlphaTestRef(context, 0);
+		}
+		else
+		{
+			rsxSetAlphaTestEnable(context, GCM_FALSE);
+		}
+	}
 #elif defined(__GX__)
 	//GX alpha compare update
 
@@ -892,7 +957,17 @@ void OGL_UpdateStates()
 #endif //!__GX__
 
 #ifdef PS3
-		//TODO: Implement for GCM
+	// Scissor para RSX/GCM
+	if ((gDP.changed & CHANGED_SCISSOR) || (gSP.changed & CHANGED_VIEWPORT))
+	{
+		float ulx = max(0.0f, gDP.scissor.ulx * OGL.scaleX);
+		float uly = max(0.0f, gDP.scissor.uly * OGL.scaleY);
+		float lrx = min(display_width, gDP.scissor.lrx * OGL.scaleX);
+		float lry = min(display_height, gDP.scissor.lry * OGL.scaleY);
+		
+		if (lrx > ulx && lry > uly)
+			rsxSetScissor(context, (u32)ulx, (u32)uly, (u32)(lrx - ulx), (u32)(lry - uly));
+	}
 #elif defined(__GX__)
 	if ((gDP.changed & CHANGED_SCISSOR) || (gSP.changed & CHANGED_VIEWPORT))
 	{
@@ -964,9 +1039,8 @@ void OGL_UpdateStates()
 	}
 
 #ifdef PS3
-		//TODO: Implement for GCM
+	// RSX fog color: not in PSL1GHT API, skipped
 #elif defined(__GX__)
-	if ((gDP.changed & CHANGED_FOGCOLOR) && OGL.fog) 
 	{
 		OGL.GXfogColor.r = (u8) (gDP.fogColor.r*255);
 		OGL.GXfogColor.g = (u8) (gDP.fogColor.g*255);
@@ -993,7 +1067,51 @@ void OGL_UpdateStates()
 #endif // !__GX__
 
 #ifdef PS3
-		//TODO: Implement for GCM
+	// Blending para RSX/GCM
+	if ((gDP.changed & CHANGED_RENDERMODE) || (gDP.changed & CHANGED_CYCLETYPE))
+	{
+		u32 srcFunc = GCM_ONE;
+		u32 dstFunc = GCM_ZERO;
+		bool blendEnable = false;
+
+		// N64 blender is active in 1CYCLE/2CYCLE modes.
+		// forceBlender forces actual blending in COPY/FILL modes.
+		if ((gDP.otherMode.cycleType == G_CYC_1CYCLE ||
+		     gDP.otherMode.cycleType == G_CYC_2CYCLE ||
+		     gDP.otherMode.forceBlender) &&
+		    (gDP.otherMode.cycleType != G_CYC_COPY) &&
+		    (gDP.otherMode.cycleType != G_CYC_FILL) &&
+		    !(gDP.otherMode.alphaCvgSel))
+		{
+			// alphaCvgSel: blend factor should be polygon coverage, not texel alpha.
+			// Without polygon stipple on PS3, we can't emulate this — disable blend.
+			blendEnable = true;
+			switch (gDP.otherMode.l >> 16)
+			{
+				case 0x0448: case 0x055A:
+					srcFunc = GCM_ONE; dstFunc = GCM_ONE; break;
+				case 0x0C08: case 0x0F0A:
+					srcFunc = GCM_ONE; dstFunc = GCM_ZERO; break;
+				case 0xC810: case 0xC811: case 0x0C18: case 0x0C19:
+				case 0x0050: case 0x0055:
+					srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA; break;
+				case 0x0FA5: case 0x5055:
+					srcFunc = GCM_ZERO; dstFunc = GCM_ONE; break;
+				default:
+					// Most N64 modes are opaque — passthrough, not alpha blend.
+					srcFunc = GCM_ONE; dstFunc = GCM_ZERO; break;
+			}
+		}
+		if (gDP.otherMode.cycleType == G_CYC_FILL)
+		{
+			blendEnable = true;
+			srcFunc = GCM_SRC_ALPHA;
+			dstFunc = GCM_ONE_MINUS_SRC_ALPHA;
+		}
+		rsxSetBlendEnable(context, blendEnable ? GCM_TRUE : GCM_FALSE);
+		if (blendEnable)
+			rsxSetBlendFunc(context, srcFunc, dstFunc, GCM_ONE, GCM_ZERO);
+	}
 #elif defined(__GX__)
 	u8 GXblenddstfactor, GXblendsrcfactor, GXblendmode;
 
@@ -1556,8 +1674,7 @@ void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color )
 	OGL_UpdateStates();
 
 #ifdef PS3
-	//TODO: Implement for GCM
-	//glDisable( GL_SCISSOR_TEST ); <- TODO
+	rsxSetScissor(context, 0, 0, display_width, display_height);
 	rsxSetCullFaceEnable(context,GCM_FALSE);
 	OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, 0.0f, VI.height, 1.0f, -1.0f ));
 //	OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, VI.height, 0.0f, 1.0f, -1.0f ));
@@ -1565,8 +1682,11 @@ void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color )
 	rsxLoadVertexProgram(context,OGL.vpo,OGL.vp_ucode);
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.projMatrix_id,(float*)&OGL.projMatrix);
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.modelViewMatrix_id,(float*)&OGL.modelViewMatrix);
-	//glViewport( 0, OGL.heightOffset, OGL.width, OGL.height ); <- TODO
-	//glDepthRange( 0.0f, 1.0f ); <- TODO
+	{
+		f32 vp_scale[4] = { display_width * 0.5f, display_height * -0.5f, 0.5f, 0.0f };
+		f32 vp_offset[4] = { display_width * 0.5f, display_height * 0.5f, 0.5f, 0.0f };
+		rsxSetViewport(context, 0, 0, display_width, display_height, 0.0f, 1.0f, vp_scale, vp_offset);
+	}
 
 	float z = (gDP.otherMode.depthSource == G_ZS_PRIM) ? gDP.primDepth.z : gSP.viewport.nearz;
 
@@ -1696,21 +1816,26 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 #endif //__GX__
 	GLVertex rect[2] =
 	{	//TODO: This may fail for G_ZS_PRIM... log and fix, maybe with guOrtho
-		{ ulx, uly, gDP.otherMode.depthSource == G_ZS_PRIM ? gDP.primDepth.z : gSP.viewport.nearz, 1.0f, { /*gDP.blendColor.r, gDP.blendColor.g, gDP.blendColor.b, gDP.blendColor.a */1.0f, 1.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, uls, ult, uls, ult, 0.0f },
-		{ lrx, lry, gDP.otherMode.depthSource == G_ZS_PRIM ? gDP.primDepth.z : gSP.viewport.nearz, 1.0f, { /*gDP.blendColor.r, gDP.blendColor.g, gDP.blendColor.b, gDP.blendColor.a*/1.0f, 1.0f, 1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, lrs, lrt, lrs, lrt, 0.0f },
+		{ ulx, uly, gDP.otherMode.depthSource == G_ZS_PRIM ? gDP.primDepth.z : gSP.viewport.nearz, 1.0f, { /*gDP.blendColor.r, gDP.blendColor.g, gDP.blendColor.b, gDP.blendColor.a */1.0f, 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, uls, ult, uls, ult, 0.0f },
+		{ lrx, lry, gDP.otherMode.depthSource == G_ZS_PRIM ? gDP.primDepth.z : gSP.viewport.nearz, 1.0f, { /*gDP.blendColor.r, gDP.blendColor.g, gDP.blendColor.b, gDP.blendColor.a*/1.0f, 1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, lrs, lrt, lrs, lrt, 0.0f },
 	};
 
 	OGL_UpdateStates();
 
 #ifdef PS3
-	//TODO: Implement for GCM
 	rsxSetCullFaceEnable(context,GCM_FALSE);
+	rsxSetScissor(context, (u32)(gDP.scissor.ulx * OGL.scaleX), (u32)(gDP.scissor.uly * OGL.scaleY),
+		(u32)((gDP.scissor.lrx - gDP.scissor.ulx) * OGL.scaleX),
+		(u32)((gDP.scissor.lry - gDP.scissor.uly) * OGL.scaleY));
 	OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, VI.height, 0.0f, 1.0f, -1.0f ));
-	//Load Vertex Program with new matrix
 	rsxLoadVertexProgram(context,OGL.vpo,OGL.vp_ucode);
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.projMatrix_id,(float*)&OGL.projMatrix);
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.modelViewMatrix_id,(float*)&OGL.modelViewMatrix);
-	//glViewport( 0, OGL.heightOffset, OGL.width, OGL.height ); <- TODO
+	{
+		f32 vp_scale[4] = { display_width * 0.5f, display_height * -0.5f, 0.5f, 0.0f };
+		f32 vp_offset[4] = { display_width * 0.5f, display_height * 0.5f, 0.5f, 0.0f };
+		rsxSetViewport(context, 0, 0, display_width, display_height, 0.0f, 1.0f, vp_scale, vp_offset);
+	}
 #elif defined(__GX__)
 	//Note: Scissoring may need to be reworked here
 	float ulx1 = max(OGL.GXorigX + gDP.scissor.ulx * OGL.GXscaleX, 0);
@@ -1771,7 +1896,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 		}
 
 #ifdef PS3
-	//TODO: Implement for GCM?
+	// RSX: Texture wrap modes set at upload time via rsxSetTextureAddress, not per-draw.
 #elif defined(__GX__)
 		if ((rect[0].s0 >= 0.0f) && (rect[1].s0 <= cache.current[0]->width))
 			OGL.GXforceClampS0 = true;
@@ -1835,7 +1960,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 		}
 
 #ifdef PS3
-	//TODO: Implement for GCM?
+	// RSX: Texture wrap modes set at upload time via rsxSetTextureAddress, not per-draw.
 #elif defined(__GX__)
 		if ((rect[0].s1 == 0.0f) && (rect[1].s1 <= cache.current[1]->width))
 			OGL.GXforceClampS1 = true;
@@ -1858,9 +1983,9 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 	}
 
 #ifdef PS3
-	//TODO: Implement for GCM
+	// Texture filter modes para RSX/GCM
+	// Handled in TextureCache_Update via rsxSetTextureControl/rsxSetTextureFilter
 #elif defined(__GX__)
-	//TODO: Set LOD texture filter modes here.
 	if ((gDP.otherMode.cycleType == G_CYC_COPY) && !OGL.forceBilinear)
 		OGL.GXuseMinMagNearest = true;
 
@@ -1920,9 +2045,6 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 #ifdef PS3
 //	dbg_printf("OGL_TexRect V1=[%f,%f], V2=[%f,%f], z=%f, col=%f, %f, %f, %f\r\n", rect[0].x, rect[0].y, rect[1].x, rect[1].y, rect[0].z,
 //		rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
-	//TODO: Implement for GCM
-	//TODO: Secondary Color?
-	//TODO: Multitexture
 	rsxDrawVertexBegin(context,GCM_TYPE_QUADS);
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
 		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[0].t0);
@@ -2084,9 +2206,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 void OGL_ClearDepthBuffer()
 {
 #ifdef PS3
-//	dbg_printf("OGL_ClearDepthBuffer\r\n");
-	//TODO: Implement for GCM
-	//glDisable( GL_SCISSOR_TEST ); <- TODO
+	rsxSetScissor(context, 0, 0, display_width, display_height);
 
 	OGL_UpdateStates();
 	rsxSetDepthWriteEnable(context,GCM_TRUE);
@@ -2095,7 +2215,9 @@ void OGL_ClearDepthBuffer()
 
 	OGL_UpdateDepthUpdate();
 
-	//glEnable( GL_SCISSOR_TEST ); <- TODO
+	rsxSetScissor(context, (u32)(gDP.scissor.ulx * OGL.scaleX), (u32)(gDP.scissor.uly * OGL.scaleY),
+		(u32)((gDP.scissor.lrx - gDP.scissor.ulx) * OGL.scaleX),
+		(u32)((gDP.scissor.lry - gDP.scissor.uly) * OGL.scaleY));
 #elif defined(__GX__)
 	//Note: OGL_UpdateDepthUpdate() should not need to be called b/c DepthMask is set in OGL_UpdateStates()
 	OGL.GXclearDepthBuffer = true;
@@ -2116,16 +2238,16 @@ void OGL_ClearDepthBuffer()
 void OGL_ClearColorBuffer( float *color )
 {
 #ifdef PS3
-//	dbg_printf("OGL_ClearColorBuffer color = %f, %f, %f, %f\r\n", color[0], color[1], color[2], color[3]);
-	//TODO: Implement for GCM
-	//glDisable( GL_SCISSOR_TEST ); <- TODO
+	rsxSetScissor(context, 0, 0, display_width, display_height);
 
-	u32 clearColor = (((u32)(color[0]*255)&0xFF)<<24)|(((u32)(color[1]*255)&0xFF)<<16)|
-		(((u32)(color[2]*255)&0xFF)<<8)|(((u32)(color[3]*255)&0xFF)<<0);
+	u32 clearColor = (((u32)(color[0]*255)&0xFF)<<16)|(((u32)(color[1]*255)&0xFF)<<8)|
+		(((u32)(color[2]*255)&0xFF)<<0);
 	rsxSetClearColor(context,clearColor);
 	rsxClearSurface(context,GCM_CLEAR_R | GCM_CLEAR_G | GCM_CLEAR_B | GCM_CLEAR_A );
 
-	//glEnable( GL_SCISSOR_TEST ); <- TODO
+	rsxSetScissor(context, (u32)(gDP.scissor.ulx * OGL.scaleX), (u32)(gDP.scissor.uly * OGL.scaleY),
+		(u32)((gDP.scissor.lrx - gDP.scissor.ulx) * OGL.scaleX),
+		(u32)((gDP.scissor.lry - gDP.scissor.uly) * OGL.scaleY));
 #elif defined(__GX__)
 	OGL.GXclearColor.r = (u8) (color[0]*255);
 	OGL.GXclearColor.g = (u8) (color[1]*255);
@@ -2328,8 +2450,12 @@ void OGL_RSXinitDlist()
 									   GCM_USER_CLIP_PLANE_DISABLE,
 									   GCM_USER_CLIP_PLANE_DISABLE);
 
+	// Sync render settings from menu
+	OGL.frameBufferTextures = glN64_useFrameBufferTextures;
+	OGL.enable2xSaI = glN64_use2xSaiTextures;
+
 	//Turn off Blending
-	rsxSetBlendEnable(context, GCM_TRUE);
+	rsxSetBlendEnable(context, GCM_FALSE);
 	rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
 
 	OGL.shader_mode = SHADER_PASSCOLOR;
@@ -2350,7 +2476,7 @@ void OGL_RSXinitDlist()
 		{
 //			OGL.FBtex[ind++] = 0x8000 | ((j/10)%0x1f); //Horizontal blue stripes
 //			OGL.FBtex[ind++] = 0x8000 | ((j/10)%0x1f) | (((i/10)%0x1f)<<5); //Horizontal blue+ vertical green stripes
-			OGL.FBtex[ind++] = 0xFFFF; //White
+            OGL.FBtex[ind++] = 0x0000; //Black (transparent)
 		}
 	}
 

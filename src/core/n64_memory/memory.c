@@ -64,13 +64,15 @@ DPS_register dps_register;
 // TODO: We only need 8MB when it's used, it'll save
 //         memory when we can alloc only 4MB
 #ifdef USE_EXPANSION
-	u32 rdram[0x800000/4];
+	u32 *rdram = NULL;
 	#define MEMMASK 0x7FFFFF
+	#define RDRAM_SIZE (0x800000)
 #else
-	u32 rdram[0x800000/4/2];
+	u32 *rdram = NULL;
 	#define MEMMASK 0x3FFFFF
+	#define RDRAM_SIZE (0x800000/2)
 #endif
-unsigned char *rdramb = (unsigned char *)(rdram);
+unsigned char *rdramb = NULL;
 u32 SP_DMEM[0x1000/4*2];
 u32 *SP_IMEM = SP_DMEM+0x1000/4;
 unsigned char *SP_DMEMb = (unsigned char *)(SP_DMEM);
@@ -208,6 +210,16 @@ extern void dbg_printf(const char *fmt,...);
 int init_memory()
 {
    int i;
+
+   // Allocate large arrays from heap to reduce BSS
+   if (!rdram) {
+      rdram = (u32 *)malloc(RDRAM_SIZE);
+      rdramb = (unsigned char *)rdram;
+   }
+   if (!tlb_LUT_r) {
+      tlb_LUT_r = (u32 *)malloc(0x100000 * sizeof(u32));
+      tlb_LUT_w = (u32 *)malloc(0x100000 * sizeof(u32));
+   }
    
    //swap rom
    //unsigned long *roml;
@@ -639,6 +651,9 @@ void free_memory()
 	saveMempak();
 	saveSram();
 	saveFlashram();*/
+	if (rdram) { free(rdram); rdram = NULL; rdramb = NULL; }
+	if (tlb_LUT_r) { free(tlb_LUT_r); tlb_LUT_r = NULL; }
+	if (tlb_LUT_w) { free(tlb_LUT_w); tlb_LUT_w = NULL; }
 }
 
 static void update_MI_init_mode_reg()

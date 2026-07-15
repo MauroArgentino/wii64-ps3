@@ -6,7 +6,7 @@
 #include "Gfx_#1.3.h"
 #include "rsp.h"
 
-#include "vi_GX.h"
+#include "vi.h"
 
 static GFX_INFO gfxInfo;
 
@@ -264,7 +264,7 @@ EXPORT void CALL RomClosed (void)
 *******************************************************************/ 
 EXPORT void CALL RomOpen (void)
 {
-   vi = new VI_GX(gfxInfo);
+   vi = new VI(gfxInfo);
    //VIDEO_SetPreRetraceCallback(gfx_PreRetraceCallback);
 }
 
@@ -316,4 +316,3 @@ EXPORT void CALL ViWidthChanged (void)
 {
    vi->widthChanged();
 }
-

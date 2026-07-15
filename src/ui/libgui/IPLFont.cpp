@@ -621,49 +621,66 @@ void IplFont::drawString(int x, int y, char *string, float scale, bool centered)
 	}
 
 //	int ox = x;
+	char* current_char = string;
+	int current_x = x; // Usamos una variable local para la posición X actual
 	
-//	while (*string && (x < (ox + back_framewidth)))
-	while (*string)
+	while (*current_char)
 	{
 		//blit_char(axfb,whichfb,x, y, *string, norm_blit ? blit_lookup_norm : blit_lookup);
-		unsigned char c = *string;
-		int i;
+		unsigned char c = *current_char;
+		
+		int char_width = (int)(fontChars.font_size[c] * scale);
+		int char_height = (int)(fontChars.fheight * scale);
+
+		// Calcular coordenadas de textura para el carácter actual
+		float tex_s_start = (float)fontChars.s[c] / 512.0f;
+		float tex_t_start = (float)fontChars.t[c] / 512.0f;
+		float tex_s_end = (float)(fontChars.s[c] + fontChars.font_size[c]) / 512.0f;
+		float tex_t_end = (float)(fontChars.t[c] + fontChars.fheight) / 512.0f;
+
 #ifdef __GX__
 		GX_Begin(GX_QUADS, GX_VTXFMT1, 4);
-		for (i=0; i<4; i++) {
-			int s = (i & 1) ^ ((i & 2) >> 1) ? fontChars.font_size[c] : 1;
-			int t = (i & 2) ? fontChars.fheight : 1;
-			float s0 = ((float) (fontChars.s[c] + s))/512;
-			float t0 = ((float) (fontChars.t[c] + t))/512;
-			s = (int) s * scale;
-			t = (int) t * scale;
-			GX_Position3s16(x + s, y + t, 0);
+			// Top-left
+			GX_Position3f32(current_x, y, 0);
 			GX_Color4u8(fontColor.r, fontColor.g, fontColor.b, fontColor.a);
-//			GX_Color4u8(fontState->colour.r, fontState->colour.g, fontState->colour.b, fontState->colour.a);
-//			GX_TexCoord2f32(((float) (fontChars.s[c] + s))/512, ((float) (fontChars.t[c] + t))/512);
-//			GX_TexCoord2u16(fontChars.s[c] + s, fontChars.t[c] + t);
-			GX_TexCoord2f32(s0, t0);
+			GX_TexCoord2f32(tex_s_start, tex_t_start);
+			// Top-right
+			GX_Position3f32(current_x + char_width, y, 0);
+			GX_Color4u8(fontColor.r, fontColor.g, fontColor.b, fontColor.a);
+			GX_TexCoord2f32(tex_s_end, tex_t_start);
+			// Bottom-right
+			GX_Position3f32(current_x + char_width, y + char_height, 0);
+			GX_Color4u8(fontColor.r, fontColor.g, fontColor.b, fontColor.a);
+			GX_TexCoord2f32(tex_s_end, tex_t_end);
+			// Bottom-left
+			GX_Position3f32(current_x, y + char_height, 0);
+			GX_Color4u8(fontColor.r, fontColor.g, fontColor.b, fontColor.a);
+			GX_TexCoord2f32(tex_s_start, tex_t_end);
 		}
 		GX_End();
 #else //__GX__
 		rsxDrawVertexBegin(context,GCM_TYPE_QUADS);
-		for (i=0; i<4; i++) {
-			int s = (i & 1) ^ ((i & 2) >> 1) ? fontChars.font_size[c] : 1;
-			int t = (i & 2) ? fontChars.fheight : 1;
-			float s0 = ((float) (fontChars.s[c] + s))/512;
-			float t0 = ((float) (fontChars.t[c] + t))/512;
-			s = (int) s * scale;
-			t = (int) t * scale;
-			rsxDrawVertex4f(context, vertexColor0_id, (float)fontColor.r/255.0f, (float)fontColor.g/255.0f, 
-				(float)fontColor.b/255.0f, (float)fontColor.a/255.0f);
-			rsxDrawVertex2f(context, vertexTexcoord_id, s0, t0);
-			rsxDrawVertex4f(context, vertexPosition_id, (float) (x + s),(float) (y + t), 0.0f, 1.0f);
-		}
+			// Top-left
+			rsxDrawVertex4f(context, vertexColor0_id, (float)fontColor.r/255.0f, (float)fontColor.g/255.0f, (float)fontColor.b/255.0f, (float)fontColor.a/255.0f);
+			rsxDrawVertex2f(context, vertexTexcoord_id, tex_s_start, tex_t_start);
+			rsxDrawVertex4f(context, vertexPosition_id, (float)current_x, (float)y, 0.0f, 1.0f);
+			// Top-right
+			rsxDrawVertex4f(context, vertexColor0_id, (float)fontColor.r/255.0f, (float)fontColor.g/255.0f, (float)fontColor.b/255.0f, (float)fontColor.a/255.0f);
+			rsxDrawVertex2f(context, vertexTexcoord_id, tex_s_end, tex_t_start);
+			rsxDrawVertex4f(context, vertexPosition_id, (float)(current_x + char_width), (float)y, 0.0f, 1.0f);
+			// Bottom-right
+			rsxDrawVertex4f(context, vertexColor0_id, (float)fontColor.r/255.0f, (float)fontColor.g/255.0f, (float)fontColor.b/255.0f, (float)fontColor.a/255.0f);
+			rsxDrawVertex2f(context, vertexTexcoord_id, tex_s_end, tex_t_end);
+			rsxDrawVertex4f(context, vertexPosition_id, (float)(current_x + char_width), (float)(y + char_height), 0.0f, 1.0f);
+			// Bottom-left
+			rsxDrawVertex4f(context, vertexColor0_id, (float)fontColor.r/255.0f, (float)fontColor.g/255.0f, (float)fontColor.b/255.0f, (float)fontColor.a/255.0f);
+			rsxDrawVertex2f(context, vertexTexcoord_id, tex_s_start, tex_t_end);
+			rsxDrawVertex4f(context, vertexPosition_id, (float)current_x, (float)(y + char_height), 0.0f, 1.0f);
 		rsxDrawVertexEnd(context);
 #endif //!__GX__
 
-		x += (int) fontChars.font_size[c] * scale;
-		string++;
+		current_x += char_width;
+		current_char++;
 	}
 
 }

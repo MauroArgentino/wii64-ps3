@@ -56,8 +56,8 @@ typedef struct _tlb
    u32 phys_odd;
 } tlb;
 
-extern u32 tlb_LUT_r[0x100000];
-extern u32 tlb_LUT_w[0x100000];
+extern u32 *tlb_LUT_r;
+extern u32 *tlb_LUT_w;
 void tlb_mem2_init();
 u32 virtual_to_physical_address(u32 addresse, int w);
 int probe_nop(u32 address);

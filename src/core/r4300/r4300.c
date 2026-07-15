@@ -49,7 +49,7 @@ tlb tlb_e[32];
 u32 dyna_interp = 0;
 unsigned long long int debug_count = 0;
 precomp_instr *PC = NULL;
-PowerPC_block *blocks[0x100000];
+PowerPC_block **blocks = NULL;
 PowerPC_block *actual;
 int rounding_mode = 0x33F, trunc_mode = 0xF3F, round_mode = 0x33F,
     ceil_mode = 0xB3F, floor_mode = 0x73F;
@@ -189,6 +189,10 @@ void update_count()
 void init_blocks()
 {
    int i;
+   if (!blocks) {
+      blocks = (PowerPC_block **)calloc(0x100000, sizeof(PowerPC_block *));
+   }
+   invalid_code_alloc();
    for (i=0; i<0x100000; i++) { invalid_code_set(i, 1); blocks_set(i, NULL); }
 #ifndef PPC_DYNAREC
    blocks[0xa4000000>>12] = malloc(sizeof(precomp_block));
@@ -219,27 +223,38 @@ void go()
 {
 	r4300.stop = 0;
 	
+	printf("[GO] go() called, dynacore=%d, pc=0x%08x, cpu_inited=%d\n", 
+	       dynacore, r4300.pc, cpu_inited);
+	
 	if(dynacore == 2) {
 		dynacore = 0;
 		interpcore = 1;
+		printf("[GO] Starting pure interpreter\n");
 		pure_interpreter();
 		dynacore = 2;
+		printf("[GO] Pure interpreter returned, stop=%d\n", r4300.stop);
 	} else {
 		interpcore = 0;
 		dynacore = 1;
 		if(cpu_inited) {
 			// Solo inicializamos el DynaREC si realmente se va a usar
 			#ifdef PPC_DYNAREC
+				printf("[GO] Initializing dynarec memory...\n");
 				if (!init_dynarec_memory()) {
-					printf("Dynarec: Error crítico inicializando memoria ejecutable.\n");
+					printf("[GO] Dynarec: Error crítico inicializando memoria ejecutable.\n");
 					return;
 				}
+				printf("[GO] Dynarec memory initialized OK\n");
 			#endif
 			RecompCache_Init();
+			printf("[GO] RecompCache_Init done\n");
 			init_blocks();
+			printf("[GO] init_blocks done\n");
 			cpu_inited = 0;
 		}
+		printf("[GO] Starting dynarec at pc=0x%08x\n", r4300.pc);
 		dynarec(r4300.pc);
+		printf("[GO] Dynarec returned, pc=0x%08x, stop=%d\n", r4300.pc, r4300.stop);
 	}
 	debug_count += Count;
 }
@@ -513,6 +528,8 @@ void cpu_deinit(void){
 			}
 		}
 	}
+	if (blocks) { free(blocks); blocks = NULL; }
+	invalid_code_free();
 	deinit_dynarec_memory();
 	if(PC) free(PC);
 	PC = NULL;

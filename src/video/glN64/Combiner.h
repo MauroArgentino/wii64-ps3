@@ -366,7 +366,6 @@ extern struct CombinerInfo
 			constant.b = 0.0f; \
 			break; \
 	} \
-\
 	switch (alpha) \
 	{ \
 		case PRIMITIVE_ALPHA: \

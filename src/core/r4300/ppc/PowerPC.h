@@ -122,6 +122,7 @@ PowerPC_instr Instruction(int opcode, ...);
 #define PPC_OPCODE_X           31
 #define PPC_OPCODE_XL          19
 #define PPC_OPCODE_WTF         4
+#define PPC_OPCODE_LD          58
 
 #define PPC_OPCODE_ADDI        14
 #define PPC_OPCODE_ADDIC       12
@@ -475,6 +476,13 @@ PowerPC_instr Instruction(int opcode, ...);
 	  PPC_SET_RD    (ppc, (rd)); \
 	  PPC_SET_RA    (ppc, (ra)); \
 	  PPC_SET_IMMED (ppc, (immed)); }
+
+#define GEN_LD(ppc,rt,immed,ra) \
+	{ ppc = NEW_PPC_INSTR(); \
+	  PPC_SET_OPCODE(ppc, PPC_OPCODE_LD); \
+	  PPC_SET_RD    (ppc, (rt)); \
+	  PPC_SET_RA    (ppc, (ra)); \
+	  ppc |= ((immed) & 0xFFFC); }
 
 #define GEN_LHZ(ppc,rd,immed,ra) \
 	{ ppc = NEW_PPC_INSTR(); \

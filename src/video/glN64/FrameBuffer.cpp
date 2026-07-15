@@ -208,7 +208,8 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 				break;
 			}
 #ifdef PS3
-			//TODO: Implement for GCM
+			// RSX: No direct equivalent of GX_CopyTex / glCopyTexSubImage2D.
+			// Framebuffer-to-texture copy not yet implemented for RSX.
 #elif defined(__GX__)
 			//Note: texture realWidth and realHeight should be multiple of 2!
 			GX_SetTexCopySrc(OGL.GXorigX, OGL.GXorigY,(u16) current->texture->realWidth,(u16) current->texture->realHeight);
@@ -321,7 +322,8 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 	cache.cachedBytes += current->texture->textureBytes;
 
 #ifdef PS3
-	//TODO: Implement for GCM
+	// RSX: No direct equivalent of GX_CopyTex / glCopyTexImage2D.
+	// Framebuffer-to-texture copy not yet implemented for RSX.
 #elif defined(__GX__)
 	//Note: texture realWidth and realHeight should be multiple of 2!
 	GX_SetTexCopySrc((u16) OGL.GXorigX, (u16) OGL.GXorigY,(u16) current->texture->realWidth,(u16) current->texture->realHeight);
@@ -372,7 +374,11 @@ void FrameBuffer_RenderBuffer( u32 address )
 			glEnable( GL_TEXTURE_2D );*/
 
 #ifdef PS3
-			//TODO: Implement for GCM
+			// RSX render state for framebuffer copy quad
+			rsxSetBlendEnable(context, GCM_FALSE);
+			rsxSetDepthTestEnable(context, GCM_FALSE);
+			rsxSetDepthWriteEnable(context, GCM_FALSE);
+			rsxSetCullFaceEnable(context, GCM_FALSE);
 #elif defined(__GX__)
 			GX_SetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_CLEAR); 
 			GX_SetAlphaCompare(GX_ALWAYS,0,GX_AOP_AND,GX_ALWAYS,0);
@@ -386,7 +392,7 @@ void FrameBuffer_RenderBuffer( u32 address )
 			GX_LoadProjectionMtx(GXprojection, GX_ORTHOGRAPHIC); 
 			GX_LoadPosMtxImm(OGL.GXmodelViewIdent,GX_PNMTX0);
 			GX_SetViewport((f32) 0,(f32) 0,(f32) OGL.width,(f32) OGL.height, 0.0f, 1.0f);
-			GX_SetScissor((u32) 0,(u32) 0,(u32) OGL.width,(u32) OGL.height);	//Set to the same size as the viewport.
+			GX_SetScissor((u32) 0,(u32) 0,(u32) OGL.width,(u32) OGL.height);
 
 			float u1, v1;
 
@@ -509,7 +515,11 @@ void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
 			Combiner_SetCombine( EncodeCombineMode( 0, 0, 0, TEXEL0, 0, 0, 0, 1, 0, 0, 0, TEXEL0, 0, 0, 0, 1 ) );
 			
 #ifdef PS3
-			//TODO: Implement for GCM
+			// RSX render state for framebuffer copy quad (color buffer path)
+			rsxSetBlendEnable(context, GCM_FALSE);
+			rsxSetDepthTestEnable(context, GCM_FALSE);
+			rsxSetDepthWriteEnable(context, GCM_FALSE);
+			rsxSetCullFaceEnable(context, GCM_FALSE);
 #elif defined(__GX__)
 			GX_SetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_CLEAR); 
 			GX_SetAlphaCompare(GX_ALWAYS,0,GX_AOP_AND,GX_ALWAYS,0);

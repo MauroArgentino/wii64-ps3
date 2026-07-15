@@ -40,7 +40,7 @@
 #ifdef PS3
 #include <rsx/rsx.h>
 #include <sysutil/video.h>
-#include "../main/rsxutil.h"
+#include "../../main/rsxutil.h"
 
 #include <vectormath/cpp/vectormath_aos.h>
 using namespace Vectormath::Aos;
@@ -49,11 +49,38 @@ using namespace Vectormath::Aos;
 #include "combined_shader_fpo.h"
 #endif //PS3
 
+#ifdef PS3
+// Variables estáticas para evitar fugas de memoria en cada frame
+static u32 *fp_buffer = NULL;
+static u32 fp_offset;
+static rsxVertexProgram *vpo = NULL;
+static rsxFragmentProgram *fpo = NULL;
+static void *vp_ucode = NULL; // Add this
+static s32 projMatrix_id, modelViewMatrix_id, vertexPosition_id, vertexColor0_id, vertexTexcoord_id, textureUnit_id, mode_id;
+#endif
 
 VI::VI(GFX_INFO info) : gfxInfo(info), bpp(0)
 {
 #ifdef PS3
 	FBtex = (u16*)rsxMemalign(128,(640*480*2));
+    // Inicializamos el shader una sola vez para SoftGFX
+    vpo = (rsxVertexProgram*)combined_shader_vpo;
+    fpo = (rsxFragmentProgram*)combined_shader_fpo;
+    vp_ucode = rsxVertexProgramGetUCode(vpo); // Initialize vp_ucode
+    projMatrix_id = rsxVertexProgramGetConst(vpo,"projMatrix");
+    modelViewMatrix_id = rsxVertexProgramGetConst(vpo,"modelViewMatrix");
+    vertexPosition_id = rsxVertexProgramGetAttrib(vpo,"vertexPosition");
+    vertexColor0_id = rsxVertexProgramGetAttrib(vpo,"vertexColor");
+    vertexTexcoord_id = rsxVertexProgramGetAttrib(vpo,"vertexTexcoord");
+    
+    u32 fpsize = 0;
+    u32 *fp_ucode = rsxFragmentProgramGetUCode(fpo, &fpsize);
+    fp_buffer = (u32*)rsxMemalign(64, fpsize);
+    memcpy(fp_buffer, fp_ucode, fpsize);
+    rsxAddressToOffset(fp_buffer, &fp_offset);
+
+    mode_id = rsxFragmentProgramGetConst(fpo, "mode");
+    textureUnit_id = rsxFragmentProgramGetAttrib(fpo, "texture");
 #else //PS3
 	FBtex = (u16*) memalign(32,640*480*2);
 #endif //!PS3
@@ -62,11 +89,25 @@ VI::VI(GFX_INFO info) : gfxInfo(info), bpp(0)
 VI::~VI()
 {
 #ifdef PS3
-	rsxFree(FBtex);
+	if (FBtex) rsxFree(FBtex);
+    if (fp_buffer) rsxFree(fp_buffer);
+    fp_buffer = NULL;
 #else //PS3
 	free(FBtex);
 #endif //!PS3
 }
+
+// Implementaciones básicas de los stubs para que la clase no sea abstracta
+void VI::setVideoMode(int w, int h) {}
+void VI::blit() { updateScreen(); }
+unsigned int* VI::getScreenPointer() { return (unsigned int*)FBtex; }
+void VI::setFB(unsigned int* fb1, unsigned int* fb2) {}
+void VI::switchFullScreenMode() {}
+void VI::switchWindowMode() {}
+void VI::setGamma(float gamma) {}
+void VI::showLoadProg(float percent) {}
+void VI::updateDEBUG() {}
+void VI::PreRetraceCallback(u32 retraceCnt) {}
 
 void VI::statusChanged()
 {
@@ -135,7 +176,7 @@ unsigned int convert_pixels(short src1, short src2){
 
 #ifdef PS3
 extern u32 *color_buffer[2];
-extern VideoResolution res;
+extern videoResolution res;
 #endif //PS3
 
 void VI::updateScreen()
@@ -162,175 +203,45 @@ void VI::updateScreen()
    py=0.0f;
 
 #ifdef DEBUGON
-   _break();
+   // _break(); // Opcional para depuración
 #endif
-   //printf("Beginning to copy framebuffer... N64FB offset = %08x", *gfxInfo.VI_ORIGIN_REG & 0x7FFFFF);
-   //printf("\nmin: (%d,%d) max: (%d,%d), GCFB = %08x, N64FB = %08x\n",
-   //        minx, miny, maxx, maxy, buf16, im16);
-   //printf("scale_x = %f, scale_y = %f\n", scale_x, scale_y);
-   //fflush(stdout);
-   // Here I'm disabling antialiasing to try to track down the bug
-/*   if (TRUE || (*gfxInfo.VI_STATUS_REG & 0x30) == 0x30) // not antialiased
-     {
-     	//printf(" Not antialiased ");
-     	//fflush(stdout);
-	for (int j=0; j<480; j++)
-	  {
-	     if (j < miny || j > maxy)
-	       for (int i=0; i<640/2; i++)
-		 buf16[j*640/2+i] = 0;
-	     else
-	       {
-		  px=0.0f;
-		  for (int i=0; i<640/2; i++)
-		    {
-		       if (i < minx || i > maxx)
-			 buf16[j*640/2+i] = 0;
-		       else
-			 {
-			    short pix1 = im16[((int)py*(*gfxInfo.VI_WIDTH_REG)+(int)px)]>>1;
-			    px += scale_x;
-			    short pix2 = im16[((int)py*(*gfxInfo.VI_WIDTH_REG)+(int)px)]>>1;
-			    px += scale_x;
-			    buf16[j*640/2+i] = convert_pixels(pix1, pix2);
-			 }
-			//printf(" (%d,%d) ", i, j); fflush(stdout);
-		    }
-		  py += scale_y;
-	       }
-	  }
-     }
-   else
-     {
-     	//printf(" Antialiased ");
-     	//fflush(stdout);
-	for (int j=0; j<480; j++)
-	  {
-	     if (j < miny || j > maxy)
-	       for (int i=0; i<640; i++)
-		 buf16[j*640+i] = 0;
-	     else
-	       {
-		  px=0;
-		  for (int i=0; i<640; i++)
-		    {
-		       if (i < minx || i > maxx)
-			 buf16[j*640+i] = 0;
-		       else
-			 {
-			    bool xint = (px - (int)px) == 0.0f, yint = (py - (int)py) == 0.0f;
-			    if (xint && yint)
-			      {
-				 buf16[j*640+i] = 
-				   im16[((int)py*(*gfxInfo.VI_WIDTH_REG)+(int)px)^S16]>>1;
-			      }
-			    else if (yint)
-			      {
-				 Color16 l,r;
-				 int w = *gfxInfo.VI_WIDTH_REG;
-				 l=im16[((int)py*w+(int)px)^S16];
-				 r=im16[((int)py*w+(int)(px+1.0f))^S16];
-				 buf16[j*640+i] = 
-				   (int)(l*(1.0f-(px-(int)px))+r*(px-(int)px))>>1;
-			      }
-			    else if (xint)
-			      {
-				 Color16 t,b;
-				 int w = *gfxInfo.VI_WIDTH_REG;
-				 t=im16[((int)py*w+(int)px)^S16];
-				 b=im16[((int)(py+1)*w+(int)px)^S16];
-				 buf16[j*640+i] = 
-				   (int)(t*(1-(py-(int)py))+b*(py-(int)py))>>1;
-			      }
-			    else
-			      {
-				 Color16 t,b,l,r;
-				 int w = *gfxInfo.VI_WIDTH_REG;
-				 l=im16[((int)py*w+(int)px)^S16];
-				 r=im16[((int)py*w+(int)(px+1))^S16];
-				 t=l*(1-(px-(int)px))+r*(px-(int)px);
-				 l=im16[((int)(py+1)*w+(int)px)^S16];
-				 r=im16[((int)(py+1)*w+(int)(px+1))^S16];
-				 b=l*(1-(px-(int)px))+r*(px-(int)px);
-				 buf16[j*640+i] = 
-				   (int)(t*(1-(py-(int)py))+b*(py-(int)py))>>1;
-			      }
-			    px += scale_x;
-			 }
-		    }
-		  py += scale_y;
-	       }
-	  }
-     }*/
+
+    // Conversión de píxeles: N64 (Big Endian) a PS3 (A1R5G5B5)
+    for (int j=0; j<480; j++)
+    {
+        for (int i=0; i<640; i++)
+        {
+            if (j < miny || j > maxy) {
+                FBtex[ind++] = 0;
+            } else {
+                px = scale_x * i;
+                py = scale_y * j;
+                if (i < minx || i > maxx) {
+                    FBtex[ind++] = 0;
+                } else {
+                    // N64 RGBA5551 a PS3 ARGB1555 (Opaque)
+                    FBtex[ind++] = 0x8000 | (im16[((int)py * (*gfxInfo.VI_WIDTH_REG) + (int)px)] >> 1);
+                }
+            }
+        }
+    }
 
 #ifdef PS3
-	//init shader:
-	u32 fpsize = 0;
-	u32 fp_offset;
-	u32 *fp_buffer = NULL;
-
-	s32 projMatrix_id = -1;
-	s32 modelViewMatrix_id = -1;
-	s32 vertexPosition_id = -1;
-	s32 vertexColor0_id = -1;
-	s32 vertexTexcoord_id = -1;
-	s32 textureUnit_id = -1;
-	s32 mode_id = -1;
-
-	void *vp_ucode = NULL;
-	rsxVertexProgram *vpo = (rsxVertexProgram*)combined_shader_vpo;
-
-	void *fp_ucode = NULL;
-	rsxFragmentProgram *fpo = (rsxFragmentProgram*)combined_shader_fpo;
-
-	vp_ucode = rsxVertexProgramGetUCode(vpo);
-	projMatrix_id = rsxVertexProgramGetConst(vpo,"projMatrix");
-	modelViewMatrix_id = rsxVertexProgramGetConst(vpo,"modelViewMatrix");
-	vertexPosition_id = rsxVertexProgramGetAttrib(vpo,"vertexPosition");
-	vertexColor0_id = rsxVertexProgramGetAttrib(vpo,"vertexColor");
-	vertexTexcoord_id = rsxVertexProgramGetAttrib(vpo,"vertexTexcoord");
-
-	fp_ucode = rsxFragmentProgramGetUCode(fpo,&fpsize);
-	fp_buffer = (u32*)rsxMemalign(64,fpsize);
-	memcpy(fp_buffer,fp_ucode,fpsize);
-	rsxAddressToOffset(fp_buffer,&fp_offset);
-
-	mode_id = rsxFragmentProgramGetConst(fpo,"mode");
-	textureUnit_id = rsxFragmentProgramGetAttrib(fpo,"texture");
-
-	for (int j=0; j<480; j++)
-	{
-		for (int i=0; i<640; i++)
-		{
-			if (j < miny || j > maxy)
-				FBtex[ind++] = 0;
-			else
-			{
-				px = scale_x*i;
-				py = scale_y*j;
-				if (i < minx || i > maxx)
-					FBtex[ind++] = 0;
-				else
-					FBtex[ind++] = 0x8000 | (im16[((int)py*(*gfxInfo.VI_WIDTH_REG)+(int)px)]>>1); //convert R5G5B5A1 to A1R5G5B5
-			}
-		}
-	}
-
 	//setup texture
 	u32 width = 640;
 	u32 height = 480;
 	u32 pitch = (width*2);
-	gcmTexture texture;
+	gcmTexture n64_framebuffer_texture; // Renamed to avoid conflict with local 'texture'
 	u32 texture_offset;
 	rsxAddressToOffset(FBtex,&texture_offset);
-
+	
 	rsxInvalidateTextureCache(context,GCM_INVALIDATE_TEXTURE);
-
-	texture.format		= (GCM_TEXTURE_FORMAT_A1R5G5B5 | GCM_TEXTURE_FORMAT_LIN); //CELL_GCM_TEXTURE_R5G5B5A1=(0x97)
-	texture.mipmap		= 1;
-	texture.dimension	= GCM_TEXTURE_DIMS_2D;
-	texture.cubemap		= GCM_FALSE;
-	texture.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
+	
+	n64_framebuffer_texture.format		= (GCM_TEXTURE_FORMAT_A1R5G5B5 | GCM_TEXTURE_FORMAT_LIN); //CELL_GCM_TEXTURE_R5G5B5A1=(0x97)
+	n64_framebuffer_texture.mipmap		= 1;
+	n64_framebuffer_texture.dimension	= GCM_TEXTURE_DIMS_2D;
+	n64_framebuffer_texture.cubemap		= GCM_FALSE;
+	n64_framebuffer_texture.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
 						   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
 						   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
 						   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
@@ -338,13 +249,13 @@ void VI::updateScreen()
 						   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
 						   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
 						   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-	texture.width		= width;
-	texture.height		= height;
-	texture.depth		= 1;
-	texture.location	= GCM_LOCATION_RSX;
-	texture.pitch		= pitch;
-	texture.offset		= texture_offset;
-	rsxLoadTexture(context,textureUnit_id,&texture);
+	n64_framebuffer_texture.width		= width;
+	n64_framebuffer_texture.height		= height;
+	n64_framebuffer_texture.depth		= 1;
+	n64_framebuffer_texture.location	= GCM_LOCATION_RSX;
+	n64_framebuffer_texture.pitch		= pitch;
+	n64_framebuffer_texture.offset		= texture_offset;
+	rsxLoadTexture(context,textureUnit_id,&n64_framebuffer_texture);
 	rsxTextureControl(context,textureUnit_id,GCM_TRUE,0<<8,12<<8,GCM_TEXTURE_MAX_ANISO_1);
 	rsxTextureFilter(context,textureUnit_id,GCM_TEXTURE_LINEAR,GCM_TEXTURE_LINEAR,GCM_TEXTURE_CONVOLUTION_QUINCUNX);
 	rsxTextureWrapMode(context,textureUnit_id,GCM_TEXTURE_CLAMP_TO_EDGE,GCM_TEXTURE_CLAMP_TO_EDGE,GCM_TEXTURE_CLAMP_TO_EDGE,0,GCM_TEXTURE_ZFUNC_LESS,0);
@@ -357,27 +268,27 @@ void VI::updateScreen()
 
 	rsxSetColorMaskMRT(context,0);
 
-	u16 x,y,w,h;
+	u16 rsx_x,rsx_y,rsx_w,rsx_h; // Renamed to avoid conflict with local 'x', 'y'
 	f32 min, max;
 	f32 scale[4],offset[4];
-
-	x = 0;
-	y = 0;
-	w = display_width;
-	h = display_height;
+	
+	rsx_x = 0;
+	rsx_y = 0;
+	rsx_w = display_width;
+	rsx_h = display_height;
 	min = 0.0f;
 	max = 1.0f;
-	scale[0] = w*0.5f;
-	scale[1] = h*-0.5f;
+	scale[0] = rsx_w*0.5f;
+	scale[1] = rsx_h*-0.5f;
 	scale[2] = (max - min)*0.5f;
 	scale[3] = 0.0f;
-	offset[0] = x + w*0.5f;
-	offset[1] = y + h*0.5f;
+	offset[0] = rsx_x + rsx_w*0.5f;
+	offset[1] = rsx_y + rsx_h*0.5f;
 	offset[2] = (max + min)*0.5f;
 	offset[3] = 0.0f;
 
-	rsxSetViewport(context,x, y, w, h, min, max, scale, offset);
-	rsxSetScissor(context,x,y,w,h);
+	rsxSetViewport(context,rsx_x, rsx_y, rsx_w, rsx_h, min, max, scale, offset);
+	rsxSetScissor(context,rsx_x,rsx_y,rsx_w,rsx_h);
 
 	rsxSetDepthTestEnable(context,GCM_TRUE);
 	rsxSetDepthFunc(context,GCM_LESS);
@@ -386,15 +297,15 @@ void VI::updateScreen()
 	rsxSetFrontFace(context,GCM_FRONTFACE_CCW);
 
 	//inline const Matrix4 Matrix4::orthographic( float left, float right, float bottom, float top, float zNear, float zFar )
-	Matrix4 projMatrix,viewMatrix,modelMatrix,modelViewMatrix;
+	Matrix4 local_projMatrix,local_viewMatrix,local_modelMatrix,local_modelViewMatrix; // Renamed to avoid conflict with static globals
 	Point3 eye_pos = Point3(0.0f,0.0f,20.0f);
 	Point3 eye_dir = Point3(0.0f,0.0f,0.0f);
 	Vector3 up_vec = Vector3(0.0f,1.0f,0.0f);
 
-	projMatrix = transpose(Matrix4::orthographic(0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f ));
-	viewMatrix = Matrix4::lookAt(eye_pos,eye_dir,up_vec);
-	modelMatrix = Matrix4::identity();
-	modelViewMatrix = viewMatrix*modelMatrix;
+	local_projMatrix = transpose(Matrix4::orthographic(0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f ));
+	local_viewMatrix = Matrix4::lookAt(eye_pos,eye_dir,up_vec);
+	local_modelMatrix = Matrix4::identity();
+	local_modelViewMatrix = local_viewMatrix*local_modelMatrix;
 
 	u32 color = 0;
 	rsxSetClearColor(context,color);
@@ -409,14 +320,14 @@ void VI::updateScreen()
 	rsxZControl(context,0,1,1);
 
 	//Turn off Blending
-	rsxSetBlendEnable(context, GCM_FALSE);
+	rsxSetBlendEnable(context, GCM_TRUE); // Enable blending for textured quad
 
 	for(int i=0;i<8;i++)
 		rsxSetViewportClip(context,i,display_width,display_height);
 
 	rsxLoadVertexProgram(context,vpo,vp_ucode);
-	rsxSetVertexProgramParameter(context,vpo,projMatrix_id,(float*)&projMatrix);
-	rsxSetVertexProgramParameter(context,vpo,modelViewMatrix_id,(float*)&modelViewMatrix);
+	rsxSetVertexProgramParameter(context,vpo,projMatrix_id,(float*)&local_projMatrix);
+	rsxSetVertexProgramParameter(context,vpo,modelViewMatrix_id,(float*)&local_modelViewMatrix);
 
 	float shader_mode = 1; //SHADER_PASSTEX
 	rsxSetFragmentProgramParameter(context,fpo,mode_id,&shader_mode,fp_offset);
@@ -450,11 +361,9 @@ void VI::updateScreen()
 
 	rsxDrawVertexEnd(context);
 
-	flip();
-
-	//free RSX buffers
-	if (fp_buffer) rsxFree(fp_buffer);
-
+    // Ya no hacemos flip() aquí para que VI::updateScreen sea consistente.
+    // El flip() real lo hace VI::updateScreen al final.
+    flip();
 #if 0
 	//PS3 - Copy N64 framebuffer directly to RSX framebuffer using the PPU.
 	//N64 Framebuffer is in RGB5A1 format. Write it directly to the current RSX framebuffer.

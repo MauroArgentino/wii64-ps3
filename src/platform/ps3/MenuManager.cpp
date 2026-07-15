@@ -1,26 +1,22 @@
-#include "MenuManager.h" // Renombrado
+#include "../../ui/MenuManager.h" // Renombrado
 #include <ppu-types.h>
 #include <stdio.h>
-#include <rsx/commands.h>
 #include <math.h>
 #include "../../video/glN64/OpenGL.h" // Imaginando la nueva ruta limpia
-#include "../../platform/ps3/PS3Graphics.h"
-#ifdef __GX__
-#include "../libgui/GraphicsGX.h"
-#else
-#include "../libgui/GraphicsRSX.h"
-#endif
-#include "../libgui/FocusManager.h" // Se añade para la definición completa de menu::Focus
-#include "../libgui/IPLFont.h"
-#include "../libgui/GuiResources.h"
-#include "../libgui/Image.h" // Asumiendo que Image es genérico
-#include "MenuElementStyle.h" // Renombrado
+#include "../../ui/libgui/GraphicsRSX.h" // Incluir GraphicsRSX directamente para PS3
+#include "../../ui/Language.h"           // Necesario para menu::Language
+#include "../../ui/libgui/FocusManager.h" // Se añade para la definición completa de menu::Focus
+#include "../../ui/libgui/IPLFont.h"      // Necesario para menu::IPLFont
+#include "../../ui/libgui/GuiResources.h"
+#include "../../ui/libgui/Image.h"        // Asumiendo que Image es genérico
+#include "../../ui/MenuElementStyle.h"    // Renombrado
 
 #ifndef GX_TEXMAP0
 #define GX_TEXMAP0 0
 #endif
 
 extern gcmContextData *context;
+extern "C" char menuActive;
 
 // Funciones externas de MainFrame.cpp para las acciones
 void Func_LoadROM();
@@ -129,8 +125,19 @@ void MenuManager::init() {
     setDefaultFocus(buttonComponents[0]);
 }
 
+void MenuManager::reset() {
+    // Limpiar estados de botones para evitar bloqueos al volver de una ROM
+    isTransitioning = false;
+    transitionProgress = 0.0f;
+    transitionedButtonIndex = -1;
+    lastInput = 0; // Forzamos un reset del estado del pad
+    if (!buttonComponents.empty()) {
+        setDefaultFocus(buttonComponents[0]);
+    }
+}
+
 static float pulse = 0.0f;
-void MenuManager::update(uint32_t padInput) {
+void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa directamente
     if (isTransitioning) {
         transitionProgress += 0.04f; // Velocidad de la transición
         if (transitionProgress >= 1.0f) {
@@ -147,12 +154,30 @@ void MenuManager::update(uint32_t padInput) {
     pulse += 0.05f; // Más lento para mayor fluidez
     if (pulse > 6.28f) pulse = 0.0f; // Resetear ciclo de 2*PI
 
-    // Detectar solo botones que acaban de ser presionados (no mantenidos)
-    uint32_t buttonsDown = (padInput ^ lastInput) & padInput;
-    lastInput = padInput;
+    // Leer entrada del pad para PS3 directamente (para detectar la pulsación de la 'X')
+    uint32_t currentInput = 0;
+    padInfo padinfo;
+    padData paddata;
+    ioPadGetInfo(&padinfo);
+    for(int i=0; i<7; i++){
+        if(padinfo.status[i]){
+            ioPadGetData(i, &paddata);
+            if (paddata.len > 0) {
+                currentInput |= ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
+            }
+        }
+    }
+    uint32_t buttonsDown = (currentInput ^ lastInput) & currentInput;
+    lastInput = currentInput;
 
-    // Ejecutar acción si se presiona X (PS3_BTN_CROSS es 0x40 en el mapeo de bits)
-    if (buttonsDown & 0x40) {
+    // Enviar comandos de dirección al gestor de foco
+    if (buttonsDown & PS3_BTN_UP)    menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_UP);
+    if (buttonsDown & PS3_BTN_DOWN)  menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_DOWN);
+    if (buttonsDown & PS3_BTN_LEFT)  menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_LEFT);
+    if (buttonsDown & PS3_BTN_RIGHT) menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_RIGHT);
+
+    // Ejecutar acción si se presiona EQUIS
+    if (buttonsDown & PS3_BTN_CROSS) {
         for (size_t i = 0; i < buttonComponents.size(); ++i) {
             if (buttonComponents[i]->getFocus()) {
                 isTransitioning = true;
@@ -184,7 +209,67 @@ void MenuManager::drawChildren(menu::Graphics& gfx) {
         buttonComponents[transitionedButtonIndex]->drawComponent(gfx);
     } else {
         menu::Frame::drawChildren(gfx);
+
+        // Mostrar descripción del canal seleccionado en la parte inferior
+        for (int i = 0; i < (int)buttonComponents.size(); ++i) {
+            if (buttonComponents[i]->getFocus() && channels[i].visible && channels[i].id != "EMPTY") {
+                std::string langStr = currentLanguage.get(channels[i].titleKey);
+                const char* description = NULL;
+
+                // Si el sistema devuelve la misma clave, significa que no encontró la traducción
+                if (langStr != channels[i].titleKey && !langStr.empty()) {
+                    description = langStr.c_str();
+                } else {
+                    // Fallback manual en español
+                    if      (channels[i].id == "LOAD_ROM") description = "Cargar ROM";
+                    else if (channels[i].id == "SETTINGS") description = "Opciones";
+                    else if (channels[i].id == "SAVES")    description = "Gestionar Saves";
+                    else if (channels[i].id == "RESUME")   description = "Reanudar Juego"; // Corregido el typo
+                    else if (channels[i].id == "CREDITS")  description = "Créditos";
+                    else if (channels[i].id == "EXIT")     description = "Salir";
+                }
+
+                if (description && description[0] != '\0') {
+                    // Usamos coordenadas 640x480 que es lo que el motor GUI espera
+                    // Inicializar la fuente con el color de la sombra
+                    menu::IplFont::getInstance().drawInit((GXColor){0,0,0,255});
+                    // Sombra (Negra)
+                    menu::IplFont::getInstance().drawString(322, 442, (char*)description, 0.85f, true);
+                    // Inicializar la fuente con el color del texto principal
+                    menu::IplFont::getInstance().drawInit((GXColor){255,255,255,255});
+                    // Texto (Blanco)
+                    menu::IplFont::getInstance().drawString(320, 440, (char*)description, 0.85f, true);
+                }
+                break;
+            }
+        }
     }
+
+    // --- Validación Visual de Mando (Debug Overlay) ---
+    char debugBuf[256];
+    std::string activeButtons = "";
+    if (lastInput & PS3_BTN_UP)       activeButtons += "UP ";
+    if (lastInput & PS3_BTN_DOWN)     activeButtons += "DOWN ";
+    if (lastInput & PS3_BTN_LEFT)     activeButtons += "LEFT ";
+    if (lastInput & PS3_BTN_RIGHT)    activeButtons += "RIGHT ";
+    if (lastInput & PS3_BTN_CROSS)    activeButtons += "X ";
+    if (lastInput & PS3_BTN_CIRCLE)   activeButtons += "O ";
+    if (lastInput & PS3_BTN_SQUARE)   activeButtons += "[] ";
+    if (lastInput & PS3_BTN_TRIANGLE) activeButtons += "/\\ ";
+    if (lastInput & PS3_BTN_START)    activeButtons += "START ";
+    if (lastInput & PS3_BTN_SELECT)   activeButtons += "SELECT ";
+    if (lastInput & PS3_BTN_L1)       activeButtons += "L1 ";
+    if (lastInput & PS3_BTN_R1)       activeButtons += "R1 ";
+    if (lastInput & PS3_BTN_L2)       activeButtons += "L2 ";
+    if (lastInput & PS3_BTN_R2)       activeButtons += "R2 ";
+
+    snprintf(debugBuf, sizeof(debugBuf), "PAD: %04X [%s]", lastInput, activeButtons.c_str());
+
+    // Dibujar información de depuración en la esquina superior izquierda
+    menu::IplFont::getInstance().drawInit((GXColor){0, 0, 0, 255});
+    menu::IplFont::getInstance().drawString(22, 22, debugBuf, 0.45f, false);
+    menu::IplFont::getInstance().drawInit((GXColor){0, 255, 255, 255}); // Cyan
+    menu::IplFont::getInstance().drawString(20, 20, debugBuf, 0.45f, false);
 }
 
 ChannelButton::ChannelButton(const MenuChannel& data, float x, float y, float w, float h) // Renombrado
@@ -193,7 +278,7 @@ ChannelButton::ChannelButton(const MenuChannel& data, float x, float y, float w,
     setVisible(true);
 }
 
-void WiiButton::updateAnimation(float pulse, float transitionProg) {
+void ChannelButton::updateAnimation(float pulse, float transitionProg) {
     transitionProgress = transitionProg;
     if (transitionProgress > 0.0f) return; // Prioridad a la transición
 

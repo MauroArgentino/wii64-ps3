@@ -24,7 +24,6 @@
 #include "GuiTypes.h"
 
 //Custom Defines for PS3 buttons
-// 0: UP, 1: DOWN
 #define PS3_BTN_LEFT		(1<<15)
 #define PS3_BTN_DOWN		(1<<14)
 #define PS3_BTN_RIGHT		(1<<13)
@@ -56,6 +55,8 @@ public:
 	void clearInputData();
 	void clearPrimaryFocus();
 	void setFreezeAction(bool freezeAction);
+	void moveFocus(int direction);
+
 	enum FocusDirection
 	{
 		DIRECTION_NONE=0,
