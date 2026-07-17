@@ -1,57 +1,71 @@
 #ifndef MENUAUDIOSYNTHESIZER_H
 #define MENUAUDIOSYNTHESIZER_H
 
-#include <vector>
 #include <stdint.h>
 #include <ppu-types.h>
 #include <math.h>
 
-#define WII_SAMPLE_RATE 48000
-#define MAX_VOICES 16
+#define MENU_SAMPLE_RATE 48000
+#define MAX_VOICES 24
 #define SINE_TABLE_SIZE 2048
+#define NUM_PAD_VOICES 6
 
-enum WaveType { WAVE_SINE, WAVE_TRIANGLE };
-
-struct AudioVoice {
+struct SynthVoice {
     bool active;
-    WaveType type;
+    bool isPad;        // Voz perpetua del pad base (nunca muere)
     float freq;
     float phase;
-    float step;       // Incremento de fase pre-calculado
+    float step;
     float volume;
     float currentVol;
-    float attackStep;
-    float decayRate;
+    float targetVol;
+    float attackRate;
+    float releaseRate;
     uint32_t samplesLeft;
     uint32_t delaySamples;
+    // LFO para esta voz
+    float lfoPhase;
+    float lfoStep;
+    float lfoDepth;
 };
 
-class MenuAudioSynthesizer { // Renombrado
+class MenuAudioSynthesizer {
 public:
-   MenuAudioSynthesizer();
+    MenuAudioSynthesizer();
     ~MenuAudioSynthesizer();
 
     void init();
-    void startIntro();
+    void stop();
     void process(float* buffer, uint32_t numSamples);
-    void updateLogic(); // Llamar desde el hilo principal (update del menú)
 
 private:
-    AudioVoice voices[MAX_VOICES];
+    SynthVoice voices[MAX_VOICES];
     uint64_t sampleCounter;
-    uint64_t nextEvolutionSamples;
+    uint64_t nextChordChange;
     float sineTable[SINE_TABLE_SIZE];
-    bool isPlaying;
-    bool introFinished;
 
-    void playNote(float freq, float delaySec, float durationSec, float vol, WaveType type);
-    void generateEvolution();
-    
-    // Generadores de ondas
+    // Estado del pad continuo
+    float padLfoPhase;
+    float padLfoStep;
+
+    // Estado de la intro
+    float introProgress;   // 0.0 a 1.0
+    bool introComplete;
+
+    // Chords para evolucion
+    int currentChord;
+    float chordCrossfade;
+    float prevChordVol;
+    float nextChordVol;
+
+    void initPadVoices();
+    void playAmbientNote(float freq, float delaySec, float durationSec, float vol);
+    void changeChord();
+
     float lookupSine(float phase);
-    float calculateTriangle(float phase);
+    void generateSineTable();
 };
 
-// Instancia global para facilitar el acceso desde el hilo de audio
-extern MenuAudioSynthesizer g_menuAudioSynthesizer; // Renombrado
-#endif // MENUAUDIOSYNTHESIZER_H
+extern MenuAudioSynthesizer g_menuAudioSynthesizer;
+
+#endif

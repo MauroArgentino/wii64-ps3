@@ -7,28 +7,20 @@
 static sys_ppu_thread_t s_audio_tid;
 static bool s_audio_run = false;
 static u32 s_portNum;
+static bool s_port_open = false;
 
-extern "C" char menuActive; // Variable global del emulador que indica si el menú está abierto
-
-// Implementación temporal (stubs) para satisfacer el enlazador.
-// TODO: Conectar con el buffer circular de audio en src/core/n64_audio/
-extern "C" uint32_t Audio_GetAvailableSamples() {
-    return 0; 
-}
-
-extern "C" void Audio_GetNextBlock(float* buffer, uint32_t numSamples) {
-    // Aquí se debería copiar y convertir el audio de 16-bit del N64 a float para PS3
-}
+extern char menuActive;
 
 static void audio_thread(void* arg)
 {
     audioPortParam portParam;
     portParam.numChannels = AUDIO_PORT_2CH;
-    portParam.numBlocks = AUDIO_BLOCK_16; // Más bloques para evitar cortes
-    portParam.attrib = 0x1000; // Atributo EXT (usado por Hermes para estabilidad)
-    portParam.level = 1.0f;    // Nivel de salida nominal
+    portParam.numBlocks = AUDIO_BLOCK_8;
+    portParam.attrib = 0x1000;
+    portParam.level = 1.0f;
 
     if (audioPortOpen(&portParam, &s_portNum) != 0) return;
+    s_port_open = true;
 
     audioPortConfig portConfig;
     audioGetPortConfig(s_portNum, &portConfig);
@@ -43,32 +35,29 @@ static void audio_thread(void* arg)
     float* audioData = (float*)(uintptr_t)portConfig.audioDataStart;
     u32 blockSize = AUDIO_BLOCK_SAMPLES * 2 * sizeof(float);
 
+    g_menuAudioSynthesizer.init();
+
     while (s_audio_run) {
         sys_event_t event;
         sysEventQueueReceive(eventQ, &event, 0);
 
-        // event.data_1 contiene el índice del bloque que RSX/Audio terminó de leer
         u32 blockIdx = (u32)event.data_1;
         float* targetBuffer = (float*)((uint8_t*)audioData + (blockIdx * blockSize));
 
         if (menuActive == 1) {
-            // Si el menú está activo, nuestro sintetizador llena el buffer
             g_menuAudioSynthesizer.process(targetBuffer, AUDIO_BLOCK_SAMPLES);
         } else {
-            // Cuando el juego corre, intentamos obtener audio del núcleo N64
-            // Si el núcleo no tiene suficientes muestras, silenciamos para evitar ruidos
-            if (Audio_GetAvailableSamples() >= AUDIO_BLOCK_SAMPLES) {
-                Audio_GetNextBlock(targetBuffer, AUDIO_BLOCK_SAMPLES);
-            } else {
-                memset(targetBuffer, 0, blockSize);
-            }
+            memset(targetBuffer, 0, blockSize);
         }
     }
+
+    g_menuAudioSynthesizer.stop();
 
     audioPortStop(s_portNum);
     audioRemoveNotifyEventQueue(key);
     audioPortClose(s_portNum);
     sysEventQueueDestroy(eventQ, 0);
+    s_port_open = false;
     sysThreadExit(0);
 }
 
@@ -77,14 +66,13 @@ extern "C" void ps3_audio_init()
     if (s_audio_run) return;
     audioInit();
     s_audio_run = true;
-    // Prioridad 100 es segura y suficiente para audio en PS3 sin bloquear el sistema
-    sysThreadCreate(&s_audio_tid, audio_thread, NULL, 100, 64*1024, THREAD_JOINABLE, (char*)"WiiAudioThread");
+    sysThreadCreate(&s_audio_tid, audio_thread, NULL, 100, 64*1024, THREAD_JOINABLE, (char*)"MenuAudioThread");
 }
 
 extern "C" void ps3_audio_exit()
 {
+    if (!s_audio_run) return;
     s_audio_run = false;
     u64 ret;
     sysThreadJoin(s_audio_tid, &ret);
-    audioQuit();
 }

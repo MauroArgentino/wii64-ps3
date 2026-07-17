@@ -236,7 +236,7 @@ int main(int argc, char* argv[]){
 	setRenderTarget(curr_fb);
 	atexit(program_exit_callback);
 	sysUtilRegisterCallback(0,sysutil_exit_callback,NULL);
-	//ps3_audio_init(); // Disabled: conflicts with audio.c port
+	ps3_audio_init();
 
 	//Initialize controls once before menu runs <- needed?
 	control_info_init();
