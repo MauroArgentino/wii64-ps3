@@ -175,6 +175,7 @@ struct GLInfo
 	//Temporary
 	u32 finish_ref;
 	u16* FBtex;
+	BOOL frameReady;
 #endif //PS3
 #if defined(__GX__)||defined(PS3)	//Variables specific to GX
 	int		GXorigX, GXorigY;

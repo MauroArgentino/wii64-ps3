@@ -89,6 +89,8 @@ void VI_UpdateSize()
 void VI_UpdateScreen()
 {
 #ifdef PS3
+	if (!OGL.frameReady)
+		return;
 	VI_RSX_showFPS();
 	VI_RSX_showDEBUG();
 	rsxSetBlendEnable(context, GCM_FALSE);
@@ -103,6 +105,7 @@ void VI_UpdateScreen()
 	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
 	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
 	flip();
+	OGL.frameReady = 0;
 	gSP.changed &= ~CHANGED_COLORBUFFER;
 #elif defined(__GX__)
 	if (renderCpuFramebuffer)

@@ -71,6 +71,11 @@ extern char glN64_useFrameBufferTextures;
 extern char glN64_use2xSaiTextures;
 #endif // __GX__ PS3
 
+#ifdef PS3
+extern u32 curr_fb;
+void setRenderTarget(u32 index);
+#endif
+
 GLInfo OGL;
 
 #if !defined(__LINUX__) && !defined(PS3)
@@ -2381,12 +2386,14 @@ void OGL_ReadScreen( void **dest, long *width, long *height )
 #ifdef PS3
 void OGL_RSXinitDlist()
 {
+	OGL.frameReady = 1;
 #ifdef SHOW_DEBUG
 	static int count=0;
 	sprintf(txtbuffer,"Dlist count %d", count++);
 	DEBUG_print(txtbuffer,DBG_RSPINFO1);
 #endif
 //	dbg_printf("OGL_RSXinitDlist\r\n");
+	setRenderTarget(curr_fb);
 	rsxInvalidateTextureCache(context,GCM_INVALIDATE_TEXTURE);
 
 	//setup draw environment:

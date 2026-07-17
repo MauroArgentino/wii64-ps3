@@ -154,17 +154,16 @@ void flip()
 	else gcmResetFlipStatus();
 
 	gcmSetFlip(context,curr_fb);
-	rsxFlushBuffer(context);
-
 	gcmSetWaitFlip(context);
 
 	curr_fb ^= 1;
 	setRenderTarget(curr_fb);
 
-	// Clear the new back buffer immediately
 	rsxSetClearColor(context, 0);
 	rsxClearSurface(context, GCM_CLEAR_R | GCM_CLEAR_G | GCM_CLEAR_B |
 	                         GCM_CLEAR_A | GCM_CLEAR_S | GCM_CLEAR_Z);
+
+	rsxFlushBuffer(context);
 
 	first_fb = 0;
 }
