@@ -21,8 +21,8 @@
 #include "IPLFont.h"
 #include "../../main/wii64config.h"
 
-extern u32 display_width;
-extern u32 display_height;
+// display_width/display_height are now macros in rsxutil.h
+// (Video_Resolution.width/height from Tiny3D)
 
 #ifdef HW_RVL
 #include "../gc_memory/MEM2.h"

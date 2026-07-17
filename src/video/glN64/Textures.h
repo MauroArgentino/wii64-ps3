@@ -41,8 +41,8 @@ struct CachedTexture
 	u16			*GXtexture;
 	u8			GXtexfmt;
 	u32			GXrealWidth, GXrealHeight;	// Actual dimensions of GX texture
-	u32			VIcount;
 #endif // __GX__
+	u32			VIcount;
 
 	GLuint	glName;
 	u32		address;

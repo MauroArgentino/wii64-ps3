@@ -269,13 +269,25 @@ void OGL_InitStates()
 	OGL.vertexColor0_id = rsxVertexProgramGetAttrib(OGL.vpo,"vertexColor");
 	OGL.vertexTexcoord_id = rsxVertexProgramGetAttrib(OGL.vpo,"vertexTexcoord");
 
+	printf("[OGL] OGL_InitStates start\n"); fflush(stdout);
 	OGL.fp_ucode = rsxFragmentProgramGetUCode(OGL.fpo,&OGL.fpsize);
+	printf("[OGL] GetUCode done, fpsize=%d\n", OGL.fpsize); fflush(stdout);
 	OGL.fp_buffer = (u32*)rsxMemalign(64,OGL.fpsize);
-	memcpy(OGL.fp_buffer,OGL.fp_ucode,OGL.fpsize);
-	rsxAddressToOffset(OGL.fp_buffer,&OGL.fp_offset);
+	printf("[OGL] fp_buffer=%08x\n", (u32)OGL.fp_buffer); fflush(stdout);
+	if (!OGL.fp_buffer) {
+		printf("[OGL] FATAL: fp_buffer is NULL! fpsize=%d\n", OGL.fpsize); fflush(stdout);
+		OGL.fp_buffer = (u32*)0;
+		OGL.fp_offset = 0;
+	} else {
+		memcpy(OGL.fp_buffer,OGL.fp_ucode,OGL.fpsize);
+		rsxAddressToOffset(OGL.fp_buffer,&OGL.fp_offset);
+		printf("[OGL] fp_offset=0x%x\n", OGL.fp_offset); fflush(stdout);
+	}
 
 	OGL.mode_id = rsxFragmentProgramGetConst(OGL.fpo,"mode");
+	printf("[OGL] mode_id=%d\n", OGL.mode_id); fflush(stdout);
 	OGL.textureUnit_id = rsxFragmentProgramGetAttrib(OGL.fpo,"texture");
+	printf("[OGL] OGL_InitStates DONE\n"); fflush(stdout);
 #elif defined(__GX__)
 	// TODO: Init GX variables here...
 #else // __GX__
@@ -536,8 +548,17 @@ bool OGL_Start()
 	SDL_WM_SetCaption( pluginName, pluginName );
 #endif // __LINUX__
 #else // !__GX__ !PS3
+	// Save heap position BEFORE any OGL RSX allocations.
+	// This allows rsxutil_restore_heap() in OGL_Stop to reclaim all
+	// OGL RSX memory while preserving Tiny3D + menu resources below
+	// the save point.
+	rsxutil_save_heap();
 	//Dummy Texture (remove later)
 	OGL.FBtex = (u16*)rsxMemalign(128,(640*480*2));
+	printf("[OGL] FBtex=%08x (need %d bytes)\n", (u32)OGL.FBtex, 640*480*2); fflush(stdout);
+	if (!OGL.FBtex) {
+		printf("[OGL] FATAL: FBtex is NULL! Pool exhausted?\n"); fflush(stdout);
+	}
 	//Set 'window height' to efb dimensions based on actual display resolution
 	OGL.width = display_width;
 	OGL.height = display_height;
@@ -593,11 +614,13 @@ void OGL_Stop()
 	TextureCache_Destroy();
 
 #ifdef PS3
-	if (OGL.fp_buffer)
-		rsxFree(OGL.fp_buffer);
-	//Dummy Texture (remove later)
-	if (OGL.FBtex)
-		rsxFree(OGL.FBtex);
+	// rsxFree is a no-op in Tiny3D's bump allocator.  Instead of freeing
+	// individual pointers, restore the entire heap to reclaim all OGL RSX
+	// memory at once (FBtex, fp_buffer, texture cache allocations).
+	// NULL all pointers to avoid dangling references.
+	OGL.fp_buffer = NULL;
+	OGL.FBtex = NULL;
+	rsxutil_restore_heap();
 #endif // PS3
 
 #if !(defined(__GX__)||defined(PS3))
@@ -702,7 +725,18 @@ void OGL_UpdateViewport()
 	               (u16)vp_w, (u16)vp_h, 
 	               near, far, scale, offset);
 	rsxSetViewportClip(context, 0, display_width, display_height);
-	
+	{
+		static int vp_log = 0;
+		if (vp_log < 10) {
+			printf("[OGL] VP: xy=(%.1f,%.1f) wh=(%.1f,%.1f) near=%.2f far=%.2f gSP.vp: x=%.1f y=%.1f w=%.1f h=%.1f scaleX=%.2f scaleY=%.2f disp=%dx%d\n",
+				vp_x, vp_y, vp_w, vp_h, near, far,
+				gSP.viewport.x, gSP.viewport.y, gSP.viewport.width, gSP.viewport.height,
+				OGL.scaleX, OGL.scaleY, display_width, display_height);
+			fflush(stdout);
+			vp_log++;
+		}
+	}
+
 #elif defined(__GX__)
 	GX_SetViewport((f32) (OGL.GXorigX + gSP.viewport.x * OGL.GXscaleX),(f32) (OGL.GXorigY + gSP.viewport.y * OGL.GXscaleY),
 		(f32) (gSP.viewport.width * OGL.GXscaleX),(f32) (gSP.viewport.height * OGL.GXscaleY), 0.0f, 1.0f);
@@ -1031,7 +1065,7 @@ void OGL_UpdateStates()
 		}
 		else
 		{
-#ifndef PS3  //TEMPORARY
+#ifndef PS3 // PS3 has single texture sampler - dummy T1 would overwrite T0
 			TextureCache_ActivateDummy( 1 );
 #endif
 		}
@@ -1371,16 +1405,37 @@ void OGL_DrawTriangles()
 	}
 
 #ifdef PS3
-//	dbg_printf("OGL_DrawTris: numTri %d, numVert %d, useT0 %d, useT1 %d\n", OGL.numTriangles, OGL.numVertices, combiner.usesT0, combiner.usesT1);
-	//Update MV & P Matrices - needed?
-	//set vertex description - already done by shader
+	{
+		static int draw_tri_call_count = 0;
+		draw_tri_call_count++;
+		if (draw_tri_call_count <= 5 || (draw_tri_call_count % 500 == 0)) {
+			printf("[OGL] DrawTri #%d: nTri=%d nVert=%d mode=%.0f T0=%d T1=%d\n",
+				draw_tri_call_count, OGL.numTriangles, OGL.numVertices,
+				OGL.shader_mode, combiner.usesT0, combiner.usesT1);
+			if (OGL.numVertices > 0) {
+				printf("[OGL]   v0: pos=(%.2f,%.2f,%.2f,%.2f) col=(%.2f,%.2f,%.2f,%.2f) st=(%.2f,%.2f)\n",
+					OGL.vertices[0].x, OGL.vertices[0].y, OGL.vertices[0].z, OGL.vertices[0].w,
+					OGL.vertices[0].color.r, OGL.vertices[0].color.g, OGL.vertices[0].color.b, OGL.vertices[0].color.a,
+					OGL.vertices[0].s0, OGL.vertices[0].t0);
+			}
+			fflush(stdout);
+		}
+	}
+
+	// CPU already transforms vertices to clip space via TransformVertex(combined matrix).
+	// The vertex shader must use identity matrices so clip-space coords pass through unchanged.
+	OGL.projMatrix = Matrix4::identity();
+	OGL.modelViewMatrix = Matrix4::identity();
+	rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
 
 	rsxDrawVertexBegin(context,GCM_TYPE_TRIANGLES);
 	for (int i = 0; i < OGL.numVertices; i++) {
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, OGL.vertices[i].color.r, OGL.vertices[i].color.g, 
 			OGL.vertices[i].color.b, OGL.vertices[i].color.a);
-		//TODO: Add 2nd Tex Coord
-		//rsxDrawVertex2f(context, OGL.vertexTexcoord_id, OGL.vertices[i].s1,OGL.vertices[i].t1);
 		if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, OGL.vertices[i].s0,OGL.vertices[i].t0);
 		else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, OGL.vertices[i].s1,OGL.vertices[i].t1);
 		else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
@@ -2381,6 +2436,7 @@ void OGL_ReadScreen( void **dest, long *width, long *height )
 #ifdef PS3
 void OGL_RSXinitDlist()
 {
+	printf("[OGL] OGL_RSXinitDlist start\n"); fflush(stdout);
 #ifdef SHOW_DEBUG
 	static int count=0;
 	sprintf(txtbuffer,"Dlist count %d", count++);
@@ -2460,6 +2516,10 @@ void OGL_RSXinitDlist()
 
 	OGL.shader_mode = SHADER_PASSCOLOR;
 
+	// CPU transforms vertices to clip space, so shader must use identity matrices
+	OGL.projMatrix = Matrix4::identity();
+	OGL.modelViewMatrix = Matrix4::identity();
+
 	//Load Vertex and Fragment Programs
 	rsxLoadVertexProgram(context,OGL.vpo,OGL.vp_ucode);
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.projMatrix_id,(float*)&OGL.projMatrix);
@@ -2467,17 +2527,20 @@ void OGL_RSXinitDlist()
 
 	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.mode_id,&OGL.shader_mode,OGL.fp_offset);
 	rsxLoadFragmentProgramLocation(context,OGL.fpo,OGL.fp_offset,GCM_LOCATION_RSX);
+	printf("[OGL] RSXinitDlist: shader loaded OK\n"); fflush(stdout);
 
 	//Temporary Dummy Texture
-	int ind = 0;
-	for (int j=0; j<480; j++)
-	{
-		for (int i=0; i<640; i++)
+	if (OGL.FBtex) {
+		int ind = 0;
+		for (int j=0; j<480; j++)
 		{
-//			OGL.FBtex[ind++] = 0x8000 | ((j/10)%0x1f); //Horizontal blue stripes
-//			OGL.FBtex[ind++] = 0x8000 | ((j/10)%0x1f) | (((i/10)%0x1f)<<5); //Horizontal blue+ vertical green stripes
-            OGL.FBtex[ind++] = 0x0000; //Black (transparent)
+			for (int i=0; i<640; i++)
+			{
+				OGL.FBtex[ind++] = 0x0000; //Black (transparent)
+			}
 		}
+	} else {
+		printf("[OGL] RSXinitDlist: FBtex is NULL, skipping dummy texture\n"); fflush(stdout);
 	}
 
 	//setup texture
@@ -2485,12 +2548,14 @@ void OGL_RSXinitDlist()
 	u32 height = 480;
 	u32 pitch = (width*2);
 	gcmTexture texture;
-	u32 texture_offset;
-	rsxAddressToOffset(OGL.FBtex,&texture_offset);
+	u32 texture_offset = 0;
+	if (OGL.FBtex) {
+		rsxAddressToOffset(OGL.FBtex,&texture_offset);
+	}
 
 	rsxInvalidateTextureCache(context,GCM_INVALIDATE_TEXTURE);
 
-	texture.format		= (GCM_TEXTURE_FORMAT_A1R5G5B5 | GCM_TEXTURE_FORMAT_LIN); //CELL_GCM_TEXTURE_R5G5B5A1=(0x97)
+	texture.format		= (GCM_TEXTURE_FORMAT_A1R5G5B5 | GCM_TEXTURE_FORMAT_LIN);
 	texture.mipmap		= 1;
 	texture.dimension	= GCM_TEXTURE_DIMS_2D;
 	texture.cubemap		= GCM_FALSE;
@@ -2512,6 +2577,7 @@ void OGL_RSXinitDlist()
 	rsxTextureControl(context,OGL.textureUnit_id,GCM_TRUE,0<<8,12<<8,GCM_TEXTURE_MAX_ANISO_1);
 	rsxTextureFilter(context,OGL.textureUnit_id,GCM_TEXTURE_LINEAR,GCM_TEXTURE_LINEAR,GCM_TEXTURE_CONVOLUTION_QUINCUNX);
 	rsxTextureWrapMode(context,OGL.textureUnit_id,GCM_TEXTURE_CLAMP_TO_EDGE,GCM_TEXTURE_CLAMP_TO_EDGE,GCM_TEXTURE_CLAMP_TO_EDGE,0,GCM_TEXTURE_ZFUNC_LESS,0);
+	printf("[OGL] OGL_RSXinitDlist END\n"); fflush(stdout);
 }
 #endif // PS3
 #ifdef __GX__

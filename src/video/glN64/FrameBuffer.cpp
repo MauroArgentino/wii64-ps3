@@ -25,6 +25,9 @@
 #include "RSP.h"
 #include "RDP.h"
 #include "Textures.h"
+#include "VI.h"
+#include <stdio.h>
+#include <string.h>
 #include "Combiner.h"
 #include "Types.h"
 
@@ -131,7 +134,7 @@ FrameBuffer *FrameBuffer_AddTop()
 	FrameBuffer *newtop = (FrameBuffer*)malloc( sizeof( FrameBuffer ) );
 
 	newtop->texture = TextureCache_AddTop();
-#ifdef __GX__
+#if defined(__GX__) || defined(PS3)
 	newtop->texture->VIcount = 0;
 #endif //__GX__
 
@@ -173,7 +176,7 @@ void FrameBuffer_MoveToTop( FrameBuffer *newtop )
 	frameBuffer.top = newtop;
 
 	TextureCache_MoveToTop( newtop->texture );
-#ifdef __GX__
+#if defined(__GX__) || defined(PS3)
 	newtop->texture->VIcount = 0;
 #endif //__GX__
 }
@@ -208,8 +211,36 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 				break;
 			}
 #ifdef PS3
-			// RSX: No direct equivalent of GX_CopyTex / glCopyTexSubImage2D.
-			// Framebuffer-to-texture copy not yet implemented for RSX.
+			// RSX: Re-copy RDRAM framebuffer data to existing RSX texture
+			// with nearest-neighbor upscale from N64 native to display resolution
+			if (current->texture->rsxTextureBuffer) {
+				u8 *src = &RDRAM[current->startAddress];
+				u32 *dst = current->texture->rsxTextureBuffer;
+				u32 texRW = current->texture->realWidth;
+				u32 texW = current->texture->width;
+				u32 texH = current->texture->height;
+				u32 srcW = current->width;
+				u32 srcH = current->height;
+				u32 srcSize = current->size;
+				for (u32 y = 0; y < texH; y++) {
+					u32 srcY = (y * srcH) / texH;
+					for (u32 x = 0; x < texW; x++) {
+						u32 srcX = (x * srcW) / texW;
+						u32 pixel;
+						if (srcSize == 3) {
+							pixel = ((u32*)src)[srcY * srcW + srcX];
+						} else {
+							u16 p = ((u16*)src)[srcY * srcW + srcX];
+							u8 r = ((p >> 11) & 0x1F) << 3;
+							u8 g = ((p >> 6) & 0x1F) << 3;
+							u8 b = ((p >> 1) & 0x1F) << 3;
+							u8 a = (p & 1) ? 0xFF : 0;
+							pixel = (r << 24) | (g << 16) | (b << 8) | a;
+						}
+						dst[y * texRW + x] = (pixel >> 8) | (pixel << 24);
+					}
+				}
+			}
 #elif defined(__GX__)
 			//Note: texture realWidth and realHeight should be multiple of 2!
 			GX_SetTexCopySrc(OGL.GXorigX, OGL.GXorigY,(u16) current->texture->realWidth,(u16) current->texture->realHeight);
@@ -322,8 +353,74 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 	cache.cachedBytes += current->texture->textureBytes;
 
 #ifdef PS3
-	// RSX: No direct equivalent of GX_CopyTex / glCopyTexImage2D.
-	// Framebuffer-to-texture copy not yet implemented for RSX.
+	// RSX: Allocate RSX texture memory and copy RDRAM framebuffer data
+	// with nearest-neighbor upscale from N64 native to display resolution
+	{
+		current->texture->rsxTextureBuffer = (u32*)rsxMemalign(128, current->texture->textureBytes);
+		if (current->texture->rsxTextureBuffer) {
+			u8 *src = &RDRAM[current->startAddress];
+			u32 *dst = current->texture->rsxTextureBuffer;
+			u32 texRW = current->texture->realWidth;
+			u32 texW = current->texture->width;
+			u32 texH = current->texture->height;
+			u32 srcW = current->width;
+			u32 srcH = current->height;
+			u32 srcSize = current->size;
+
+			// Zero-fill the RSX buffer (handles padding in realWidth)
+			memset(dst, 0, current->texture->textureBytes);
+
+			// Nearest-neighbor upscale: for each display-resolution pixel,
+			// find the corresponding N64-native pixel
+			for (u32 y = 0; y < texH; y++) {
+				u32 srcY = (y * srcH) / texH;
+				for (u32 x = 0; x < texW; x++) {
+					u32 srcX = (x * srcW) / texW;
+					u32 pixel;
+					if (srcSize == 3) {
+						pixel = ((u32*)src)[srcY * srcW + srcX];
+					} else {
+						u16 p = ((u16*)src)[srcY * srcW + srcX];
+						u8 r = ((p >> 11) & 0x1F) << 3;
+						u8 g = ((p >> 6) & 0x1F) << 3;
+						u8 b = ((p >> 1) & 0x1F) << 3;
+						u8 a = (p & 1) ? 0xFF : 0;
+						pixel = (r << 24) | (g << 16) | (b << 8) | a;
+					}
+					// Byte-swap: 0xRRGGBBAA -> 0xAARRGGBB for RSX A8R8G8B8
+					dst[y * texRW + x] = (pixel >> 8) | (pixel << 24);
+				}
+			}
+
+			// Set up RSX texture descriptor
+			current->texture->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
+			rsxAddressToOffset(current->texture->rsxTextureBuffer, &current->texture->rsxTextureOffset);
+			current->texture->rsxTex.format = current->texture->rsxFmt;
+			current->texture->rsxTex.mipmap = 1;
+			current->texture->rsxTex.dimension = GCM_TEXTURE_DIMS_2D;
+			current->texture->rsxTex.cubemap = GCM_FALSE;
+			current->texture->rsxTex.remap = ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
+				(GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+				(GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+				(GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+				(GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
+				(GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+				(GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+				(GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
+			current->texture->rsxTex.width = current->texture->realWidth;
+			current->texture->rsxTex.height = current->texture->realHeight;
+			current->texture->rsxTex.depth = 1;
+			current->texture->rsxTex.location = GCM_LOCATION_RSX;
+			current->texture->rsxTex.pitch = (current->texture->realWidth * 4 + 127) & ~127;
+			current->texture->rsxTex.offset = current->texture->rsxTextureOffset;
+			printf("[FB] SaveBuffer NEW %dx%d (size=%d) -> RSX %dx%d texBytes=%d\n",
+				srcW, srcH, srcSize, texRW, current->texture->realHeight, current->texture->textureBytes);
+			fflush(stdout);
+		} else {
+			printf("[FB] SaveBuffer FAILED to alloc RSX texture (%d bytes)\n", current->texture->textureBytes);
+			fflush(stdout);
+		}
+	}
 #elif defined(__GX__)
 	//Note: texture realWidth and realHeight should be multiple of 2!
 	GX_SetTexCopySrc((u16) OGL.GXorigX, (u16) OGL.GXorigY,(u16) current->texture->realWidth,(u16) current->texture->realHeight);
@@ -379,8 +476,40 @@ void FrameBuffer_RenderBuffer( u32 address )
 			rsxSetDepthTestEnable(context, GCM_FALSE);
 			rsxSetDepthWriteEnable(context, GCM_FALSE);
 			rsxSetCullFaceEnable(context, GCM_FALSE);
+			{
+				OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, VI.height, 0.0f, 1.0f, -1.0f));
+				rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+				rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+				rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+				rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+				rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+				f32 vp_scale[4] = { display_width * 0.5f, display_height * -0.5f, 0.5f, 0.0f };
+				f32 vp_offset[4] = { display_width * 0.5f, display_height * 0.5f, 0.5f, 0.0f };
+				rsxSetViewport(context, 0, 0, display_width, display_height, 0.0f, 1.0f, vp_scale, vp_offset);
+				rsxSetViewportClip(context, 0, display_width, display_height);
+
+				float u1 = (float)current->texture->width / (float)current->texture->realWidth;
+				float v1 = (float)current->texture->height / (float)current->texture->realHeight;
+
+				rsxDrawVertexBegin(context, GCM_TYPE_QUADS);
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, 0.0f, 0.0f, 0.0f, 1.0f);
+
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, u1, 0.0f);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, (float)current->texture->width, 0.0f, 0.0f, 1.0f);
+
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, u1, v1);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, (float)current->texture->width, (float)current->texture->height, 0.0f, 1.0f);
+
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, v1);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, 0.0f, (float)current->texture->height, 0.0f, 1.0f);
+				rsxDrawVertexEnd(context);
+			}
 #elif defined(__GX__)
-			GX_SetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_CLEAR); 
 			GX_SetAlphaCompare(GX_ALWAYS,0,GX_AOP_AND,GX_ALWAYS,0);
 			GX_SetZMode(GX_DISABLE,GX_ALWAYS,GX_FALSE);
 			GX_SetCullMode (GX_CULL_NONE);
@@ -515,11 +644,44 @@ void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
 			Combiner_SetCombine( EncodeCombineMode( 0, 0, 0, TEXEL0, 0, 0, 0, 1, 0, 0, 0, TEXEL0, 0, 0, 0, 1 ) );
 			
 #ifdef PS3
-			// RSX render state for framebuffer copy quad (color buffer path)
+			// RSX: Draw framebuffer restore quad (same as RenderBuffer)
 			rsxSetBlendEnable(context, GCM_FALSE);
 			rsxSetDepthTestEnable(context, GCM_FALSE);
 			rsxSetDepthWriteEnable(context, GCM_FALSE);
 			rsxSetCullFaceEnable(context, GCM_FALSE);
+			{
+				OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, VI.height, 0.0f, 1.0f, -1.0f));
+				rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+				rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+				rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+				rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+				rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+				f32 vp_scale[4] = { display_width * 0.5f, display_height * -0.5f, 0.5f, 0.0f };
+				f32 vp_offset[4] = { display_width * 0.5f, display_height * 0.5f, 0.5f, 0.0f };
+				rsxSetViewport(context, 0, 0, display_width, display_height, 0.0f, 1.0f, vp_scale, vp_offset);
+				rsxSetViewportClip(context, 0, display_width, display_height);
+
+				float u1 = (float)current->texture->width / (float)current->texture->realWidth;
+				float v1 = (float)current->texture->height / (float)current->texture->realHeight;
+
+				rsxDrawVertexBegin(context, GCM_TYPE_QUADS);
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, 0.0f, 0.0f, 0.0f, 1.0f);
+
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, u1, 0.0f);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, (float)current->texture->width, 0.0f, 0.0f, 1.0f);
+
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, u1, v1);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, (float)current->texture->width, (float)current->texture->height, 0.0f, 1.0f);
+
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, v1);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, 0.0f, (float)current->texture->height, 0.0f, 1.0f);
+				rsxDrawVertexEnd(context);
+			}
 #elif defined(__GX__)
 			GX_SetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_CLEAR); 
 			GX_SetAlphaCompare(GX_ALWAYS,0,GX_AOP_AND,GX_ALWAYS,0);
@@ -683,7 +845,7 @@ void FrameBuffer_ActivateBufferTexture( s16 t, FrameBuffer *buffer )
 	TextureCache_ActivateTexture( t, buffer->texture );
 }
 
-#ifdef __GX__
+#if defined(__GX__) || defined(PS3)
 void FrameBuffer_IncrementVIcount()
 {
 	FrameBuffer *buffer = frameBuffer.top;

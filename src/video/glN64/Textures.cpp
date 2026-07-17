@@ -464,8 +464,8 @@ void TextureCache_Init()
 	cache.dummy->frameBufferTexture = FALSE;
 	cache.dummy->width = 2;
 	cache.dummy->height = 2;
-	cache.dummy->realWidth = 0;
-	cache.dummy->realHeight = 0;
+	cache.dummy->realWidth = 2;
+	cache.dummy->realHeight = 2;
 	cache.dummy->maskS = 0;
 	cache.dummy->maskT = 0;
 	cache.dummy->scaleS = 0.5f;
@@ -503,7 +503,7 @@ void TextureCache_Init()
 	cache.dummy->rsxTex.height		= cache.dummy->height;
 	cache.dummy->rsxTex.depth		= 1;
 	cache.dummy->rsxTex.location	= GCM_LOCATION_RSX;
-	cache.dummy->rsxTex.pitch		= cache.dummy->width*4;
+	cache.dummy->rsxTex.pitch		= (cache.dummy->width * 4 + 127) & ~127;
 	cache.dummy->rsxTex.offset		= cache.dummy->rsxTextureOffset;
 #elif defined(__GX__)
 	//Dummy texture doesn't seem to be needed, so don't load into GX for now.
@@ -1079,7 +1079,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 	texInfo->rsxTex.height		= texInfo->realHeight;
 	texInfo->rsxTex.depth		= 1;
 	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= texInfo->realWidth*4;
+	texInfo->rsxTex.pitch		= (texInfo->realWidth * 4 + 127) & ~127;
 	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	free( swapped );
 	free( dest );
@@ -1505,7 +1505,7 @@ void TextureCache_Load( CachedTexture *texInfo )
 	texInfo->rsxTex.height		= texInfo->realHeight;
 	texInfo->rsxTex.depth		= 1;
 	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= texInfo->realWidth*4;
+	texInfo->rsxTex.pitch		= (texInfo->realWidth * 4 + 127) & ~127;
 	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	free( dest );
 #elif defined(__GX__)

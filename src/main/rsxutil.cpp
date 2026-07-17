@@ -1,203 +1,67 @@
+// rsxutil.cpp - Thin compatibility layer between Tiny3D and existing code.
+// Tiny3D owns RSX initialization, buffer management, and flip logic.
+// This file provides the flip wrapper, RSX memory heap management, and
+// a bump allocator that bypasses the prebuilt libtiny3d.a allocator.
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <malloc.h>
-#include <ppu-types.h>
-
-#include <rsx/rsx.h>
-#include <rsx/nv40.h>
-#include <sysutil/video.h>
-
+#include <tiny3d.h>
+#include <rsx/gcm_sys.h>
 #include "rsxutil.h"
 
-#define GCM_LABEL_INDEX		255
+// GCM context pointer - set once after tiny3d_Init() in main.cpp.
+gcmContextData *gcm_context = NULL;
 
-videoResolution res;
-gcmContextData *context = NULL;
+// GCM configuration - refreshed from gcmGetConfiguration() after Tiny3D init.
+// The prebuilt libtiny3d.a may use a different gcmConfiguration struct layout,
+// causing its internal allocator to read wrong values and always return NULL.
+// We use this copy with the CORRECT struct layout from current PSL1GHT headers.
+gcmConfiguration gcm_cfg;
 
-u32 curr_fb = 0;
-u32 first_fb = 1;
+// Saved heap position from the bump allocator.
+static void *heap_save = NULL;
 
-u32 display_width;
-u32 display_height;
-
-u32 depth_pitch;
-u32 depth_offset;
-u32 *depth_buffer;
-
-u32 color_pitch;
-u32 color_offset[2];
-u32 *color_buffer[2];
-
-static u32 sLabelVal = 1;
-
-static void waitFinish()
-{
-	rsxSetWriteBackendLabel(context,GCM_LABEL_INDEX,sLabelVal);
-
-	rsxFlushBuffer(context);
-
-	while(*(vu32*)gcmGetLabelAddress(GCM_LABEL_INDEX)!=sLabelVal)
-		usleep(30);
-
-	++sLabelVal;
+// Refresh gcm_cfg from the hardware. Call AFTER tiny3d_Init() has set up GCM.
+void rsxutil_refresh_cfg(void) {
+	gcmGetConfiguration(&gcm_cfg);
+	printf("[RSX] cfg refreshed: localAddr=%08x localSize=%08x (%dMB)\n",
+		(u32)(u64)gcm_cfg.localAddress, gcm_cfg.localSize,
+		gcm_cfg.localSize/(1024*1024));
+	fflush(stdout);
 }
 
-static void waitRSXIdle()
-{
-	rsxSetWriteBackendLabel(context,GCM_LABEL_INDEX,sLabelVal);
-	rsxSetWaitLabel(context,GCM_LABEL_INDEX,sLabelVal);
-
-	++sLabelVal;
-
-	waitFinish();
+// Save current bump allocator position.
+void rsxutil_save_heap(void) {
+	heap_save = heap_pointer;
+	u32 used = (u32)((u64)heap_pointer - (u64)gcm_cfg.localAddress);
+	u32 remain = gcm_cfg.localSize - used;
+	printf("[RSX] heap saved: pos=%08x\n", (u32)heap_save);
+	printf("[RSX] RSX local: base=%08x size=%08x (%dMB)\n",
+		(u32)(u64)gcm_cfg.localAddress, gcm_cfg.localSize,
+		gcm_cfg.localSize/(1024*1024));
+	printf("[RSX] Used: %08x (%dKB), remaining: %08x (%dKB)\n",
+		used, used/1024, remain, remain/1024);
+	fflush(stdout);
 }
 
-void setRenderTarget(u32 index)
-{
-	gcmSurface sf;
-
-	sf.colorFormat		= GCM_TF_COLOR_X8R8G8B8;
-	sf.colorTarget		= GCM_TF_TARGET_0;
-	sf.colorLocation[0]	= GCM_LOCATION_RSX;
-	sf.colorOffset[0]	= color_offset[index];
-	sf.colorPitch[0]	= color_pitch;
-
-	sf.colorLocation[1]	= GCM_LOCATION_RSX;
-	sf.colorLocation[2]	= GCM_LOCATION_RSX;
-	sf.colorLocation[3]	= GCM_LOCATION_RSX;
-	sf.colorOffset[1]	= 0;
-	sf.colorOffset[2]	= 0;
-	sf.colorOffset[3]	= 0;
-	sf.colorPitch[1]	= 64;
-	sf.colorPitch[2]	= 64;
-	sf.colorPitch[3]	= 64;
-
-	sf.depthFormat		= GCM_TF_ZETA_Z16;
-	sf.depthLocation	= GCM_LOCATION_RSX;
-	sf.depthOffset		= depth_offset;
-	sf.depthPitch		= depth_pitch;
-
-	sf.type				= GCM_TF_TYPE_LINEAR;
-	sf.antiAlias		= GCM_TF_CENTER_1;
-
-	sf.width			= display_width;
-	sf.height			= display_height;
-	sf.x				= 0;
-	sf.y				= 0;
-
-	rsxSetSurface(context,&sf);
-}
-
-void init_screen(void *host_addr,u32 size)
-{
-	context = rsxInit(CB_SIZE,size,host_addr);
-
-	videoState state;
-	videoGetState(0,0,&state);
-
-	videoConfiguration vconfig;
-	memset(&vconfig,0,sizeof(videoConfiguration));
-
-	videoGetResolution(state.displayMode.resolution,&res);
-	
-	videoResolution res_1080;
-	// Attempt to set 1920x1080 resolution for the menu.
-	if (videoGetResolution(VIDEO_RESOLUTION_1080, &res_1080) == 0) {
-		// 1080p is supported, use it.
-		vconfig.resolution = VIDEO_RESOLUTION_1080;
-		display_width = 1920;
-		display_height = 1080;
-	} else {
-		// 1080p is not supported, fall back to the detected resolution
-		vconfig.resolution = state.displayMode.resolution;
-		display_width = res.width;
-		display_height = res.height;
+// Restore bump allocator to saved position.
+void rsxutil_restore_heap(void) {
+	if (heap_save) {
+		printf("[RSX] heap restored: %08x -> %08x (reclaimed %dKB)\n",
+			(u32)heap_pointer, (u32)heap_save,
+			(int)((u32)heap_pointer - (u32)heap_save)/1024);
+		heap_pointer = heap_save;
 	}
-
-	vconfig.format = VIDEO_BUFFER_FORMAT_XRGB;
-	vconfig.pitch = display_width*sizeof(u32);
-
-	waitRSXIdle();
-
-	videoConfigure(0,&vconfig,NULL,0);
-	videoGetState(0,0,&state);
-
-	gcmSetFlipMode(GCM_FLIP_VSYNC);
-
-	color_pitch = display_width*sizeof(u32);
-	color_buffer[0] = (u32*)rsxMemalign(64,(display_height*color_pitch));
-	color_buffer[1] = (u32*)rsxMemalign(64,(display_height*color_pitch));
-
-	rsxAddressToOffset(color_buffer[0],&color_offset[0]);
-	rsxAddressToOffset(color_buffer[1],&color_offset[1]);
-
-	gcmSetDisplayBuffer(0,color_offset[0],color_pitch,display_width,display_height);
-	gcmSetDisplayBuffer(1,color_offset[1],color_pitch,display_width,display_height);
-
-	depth_pitch = display_width*sizeof(u32);
-	depth_buffer = (u32*)rsxMemalign(64,(display_height*depth_pitch)*2);
-	rsxAddressToOffset(depth_buffer,&depth_offset);
 }
 
-void waitflip()
-{
-	while(gcmGetFlipStatus()!=0)
-		usleep(200);
-	gcmResetFlipStatus();
-}
-
-void flip()
-{
-	if(!first_fb) waitflip();
-	else gcmResetFlipStatus();
-
-	gcmSetFlip(context,curr_fb);
-	rsxFlushBuffer(context);
-
-	gcmSetWaitFlip(context);
-
-	curr_fb ^= 1;
-	setRenderTarget(curr_fb);
-
-	// Clear the new back buffer immediately
-	rsxSetClearColor(context, 0);
-	rsxClearSurface(context, GCM_CLEAR_R | GCM_CLEAR_G | GCM_CLEAR_B |
-	                         GCM_CLEAR_A | GCM_CLEAR_S | GCM_CLEAR_Z);
-
-	first_fb = 0;
-}
-
-// Alpha test via raw NV40 register writes
-// Replicate internal RSX macros since they are not in public headers
-#define RSX_METHOD_ALPHA(method)    (((u32)1 << 18) | (method))
-#define RSX_CTX_BEGIN(ctx,n)        do{ if(((ctx)->current+(n))>(ctx)->end) { s32 _r=rsxContextCallback((ctx),(n)); if(_r!=0) return; } }while(0)
-#define RSX_CTX_PTR(ctx)            ((ctx)->current)
-#define RSX_CTX_END(ctx,n)          (ctx)->current += (n)
-
-extern "C" s32 rsxContextCallback(gcmContextData *context, u32 count);
-
-void rsxSetAlphaTestEnable(gcmContextData *ctx, u32 enable)
-{
-	RSX_CTX_BEGIN(ctx, 2);
-	RSX_CTX_PTR(ctx)[0] = RSX_METHOD_ALPHA(NV40TCL_ALPHA_TEST_ENABLE);
-	RSX_CTX_PTR(ctx)[1] = enable;
-	RSX_CTX_END(ctx, 2);
-}
-
-void rsxSetAlphaTestFunc(gcmContextData *ctx, u32 func)
-{
-	RSX_CTX_BEGIN(ctx, 2);
-	RSX_CTX_PTR(ctx)[0] = RSX_METHOD_ALPHA(NV40TCL_ALPHA_TEST_FUNC);
-	RSX_CTX_PTR(ctx)[1] = func;
-	RSX_CTX_END(ctx, 2);
-}
-
-void rsxSetAlphaTestRef(gcmContextData *ctx, u32 ref)
-{
-	RSX_CTX_BEGIN(ctx, 2);
-	RSX_CTX_PTR(ctx)[0] = RSX_METHOD_ALPHA(NV40TCL_ALPHA_TEST_REF);
-	RSX_CTX_PTR(ctx)[1] = ref;
-	RSX_CTX_END(ctx, 2);
+// Existing code calls flip() with no args.
+// Tiny3D provides tiny3d_Flip() which handles:
+//   - Tiny3d_End() (flush pending polygons)
+//   - waitFlip() (wait for previous flip)
+//   - gcmSetFlip + rsxFlushBuffer
+//   - Buffer index swap
+//   - setupRenderTarget for new back buffer
+//   - Tiny3D state reset (shaders, vertex buffer, etc.)
+void flip() {
+	tiny3d_Flip();
 }

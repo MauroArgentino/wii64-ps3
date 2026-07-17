@@ -31,9 +31,8 @@
 #define M_PI 3.14159265358979323846f
 #endif
 
-//TODO: fix Image to not need this
-extern u32 display_width;
-extern u32 display_height;
+// display_width/display_height are now macros in rsxutil.h
+// (Video_Resolution.width/height from Tiny3D)
 s32 globalTextureUnit_id;
 s32 vertexPosition_id;
 s32 vertexColor0_id;

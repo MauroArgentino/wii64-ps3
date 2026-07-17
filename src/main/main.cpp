@@ -70,6 +70,7 @@ extern "C" {
 #include <io/pad.h>
 #include <sysutil/video.h>
 #include <rsx/rsx.h>
+#include <tiny3d.h>
 #include "rsxutil.h"
 
 extern "C" void ps3_audio_init();
@@ -229,11 +230,13 @@ int main(int argc, char* argv[]){
 	Initialise();
 
 	udp_setup();
-	void *host_addr = memalign(1024*1024,HOST_SIZE);
 
-	init_screen(host_addr,HOST_SIZE);
+	// Initialize Tiny3D - handles RSX init, video setup, buffer allocation
+	tiny3d_Init(8<<20);
+	gcm_context = (gcmContextData *) tiny3d_Get_GCM_Context();
+	rsxutil_refresh_cfg();  // Read GCM config with current PSL1GHT struct layout
+
 	ioPadInit(7);
-	setRenderTarget(curr_fb);
 	atexit(program_exit_callback);
 	sysUtilRegisterCallback(0,sysutil_exit_callback,NULL);
 	//ps3_audio_init(); // Disabled: conflicts with audio.c port

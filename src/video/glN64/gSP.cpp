@@ -972,6 +972,12 @@ void gSPInterpolateVertex( SPVertex *dest, f32 percent, SPVertex *first, SPVerte
 
 void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 {
+	{
+	static int tri_call_count = 0;
+	if (tri_call_count < 10)
+		printf("[TRI] gSPTriangle v0=%d v1=%d v2=%d flag=%d\n", v0, v1, v2, flag);
+	tri_call_count++;
+	}
 	if ((v0 < 80) && (v1 < 80) && (v2 < 80))
 	{
 #ifndef __GX__
@@ -994,7 +1000,16 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 			((gSP.vertices[v0].zClip < -0.1f) &&
 			 (gSP.vertices[v1].zClip < -0.1f) &&
 			 (gSP.vertices[v2].zClip < -0.1f)))
-			 return;
+		{
+			static int clip_reject_count = 0;
+			if (clip_reject_count < 5)
+				printf("[TRI] CLIPPED v0=(%.2f,%.2f,%.2f,w=%.2f) v1=(%.2f,%.2f,%.2f,w=%.2f) v2=(%.2f,%.2f,%.2f,w=%.2f)\n",
+					gSP.vertices[v0].x, gSP.vertices[v0].y, gSP.vertices[v0].z, gSP.vertices[v0].w,
+					gSP.vertices[v1].x, gSP.vertices[v1].y, gSP.vertices[v1].z, gSP.vertices[v1].w,
+					gSP.vertices[v2].x, gSP.vertices[v2].y, gSP.vertices[v2].z, gSP.vertices[v2].w);
+			clip_reject_count++;
+			return;
+		}
 
 		// NoN work-around, clips triangles, and draws the clipped-off parts with clamped z
 		if (GBI.current->NoN &&

@@ -338,6 +338,15 @@ void RSP_ProcessDList()
 		GBI.cmd[RSP.cmd]( w0, w1 );
 	}
 
+	// Flush any remaining buffered triangles at end of display list
+#ifdef PS3
+	if (OGL.numTriangles > 0)
+		OGL_DrawTriangles();
+#elif defined(__GX__)
+	if (OGL.numTriangles > 0)
+		OGL_DrawTriangles();
+#endif
+
 /*	if (OGL.frameBufferTextures && gDP.colorImage.changed)
 	{
 		FrameBuffer_SaveBuffer( gDP.colorImage.address, gDP.colorImage.size, gDP.colorImage.width, gDP.colorImage.height );

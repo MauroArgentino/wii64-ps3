@@ -88,3 +88,34 @@ Flow: `main()` -> RSX/pad init -> `MenuContext` menu loop -> user picks ROM -> `
 - `AUDIO_BLOCK_SAMPLES = 256`, `NUM_BUFFERS = 8`
 - Each block = 256 × 2 channels × sizeof(float) = 2048 bytes
 - Port always plays at 48kHz
+
+## RSX memory heap save/restore (as of 2026-07-16)
+
+### Problem
+Tiny3D bump allocator only grows. rsxFree is no-op. After ~4 OGL_Start/OGL_Stop cycles, RSX local memory exhausted → all tiny3d_AllocTexture calls return NULL → crash at memcpy(NULL, ...).
+
+### Fix
+- `rsxutil_save_heap()` called at start of OGL_Start (before FBtex allocation)
+- `rsxutil_restore_heap()` called at end of OGL_Stop (after NULL pointers)
+- `heap_pointer` is global in Tiny3D mm.c, accessible via extern
+- Saves after menu allocs (preserved), restores before next OGL cycle
+
+### Status
+Awaiting build + test by user. This should fix the allocation failure crash.
+
+## FrameBuffer texture system for RSX (as of 2026-07-16)
+
+### Problem
+`FrameBuffer_SaveBuffer`, `FrameBuffer_RenderBuffer`, `FrameBuffer_RestoreBuffer` were all empty stubs on PS3. `VI_UpdateScreen` skipped all FB management calls. Games using framebuffer textures (SMW64 file select, etc.) showed black/corrupt.
+
+### Fix
+1. **FrameBuffer_SaveBuffer**: Copies RDRAM→RSX texture buffer with nearest-neighbor upscale (N64 native→display res). Handles RGBA5551/RGBA8888→A8R8G8B8 conversion + byte-swap. Sets up gcmTexture descriptor.
+2. **FrameBuffer_RenderBuffer**: Draws fullscreen textured quad via RSX (ortho projection, PASSTEX shader).
+3. **FrameBuffer_RestoreBuffer**: Same quad drawing for color image restore.
+4. **VI_UpdateScreen**: Added save→render→restore cycle mirroring GX path, gated by `OGL.frameBufferTextures`.
+5. Added `#include "VI.h"` to FrameBuffer.cpp, fragment program loading to Render/Restore quads.
+
+### Key details
+- `OGL.frameBufferTextures` defaults to 0, must be enabled in PS3 settings menu
+- Nearest-neighbor upscale needed because texture dimensions are at display resolution (`width * scaleX`) but RDRAM data is at N64 native resolution
+- `Combiner_SetCombine(EncodeCombineMode(0,0,0,TEXEL0,...))` sets PASSTEX mode (1.0) via `Set_texture_env()`, but doesn't load the FP — must call `rsxSetFragmentProgramParameter` + `rsxLoadFragmentProgramLocation` explicitly

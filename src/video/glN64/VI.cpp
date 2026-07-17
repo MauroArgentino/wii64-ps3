@@ -89,19 +89,70 @@ void VI_UpdateSize()
 void VI_UpdateScreen()
 {
 #ifdef PS3
-	VI_RSX_showFPS();
-	VI_RSX_showDEBUG();
-	rsxSetBlendEnable(context, GCM_FALSE);
-	rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
-	rsxSetDepthTestEnable(context, GCM_TRUE);
-	rsxSetCullFaceEnable(context, GCM_TRUE);
-	// Restore OGL vertex/fragment programs and identity projection
-	// (IplFont::drawInit() changed projection to orthographic for OSD)
-	rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
-	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
-	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
-	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
-	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+	// FrameBuffer management: save, render, restore (mirrors GX path)
+	if (OGL.frameBufferTextures)
+	{
+		FrameBuffer *current = FrameBuffer_FindBuffer( *REG.VI_ORIGIN );
+
+		if ((*REG.VI_ORIGIN != VI.lastOrigin) || ((current) && current->changed))
+		{
+			FrameBuffer_IncrementVIcount();
+			if (gDP.colorImage.changed)
+			{
+				FrameBuffer_SaveBuffer( gDP.colorImage.address, gDP.colorImage.size, gDP.colorImage.width, gDP.colorImage.height );
+				gDP.colorImage.changed = FALSE;
+			}
+
+			FrameBuffer_RenderBuffer( *REG.VI_ORIGIN );
+
+			VI_RSX_showFPS();
+			VI_RSX_showDEBUG();
+
+			rsxSetBlendEnable(context, GCM_FALSE);
+			rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
+			rsxSetDepthTestEnable(context, GCM_TRUE);
+			rsxSetCullFaceEnable(context, GCM_TRUE);
+			// Restore OGL vertex/fragment programs and identity projection
+			rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+			rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+			rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+			rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+			rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+
+			FrameBuffer_RestoreBuffer( gDP.colorImage.address, gDP.colorImage.size, gDP.colorImage.width );
+
+			gDP.colorImage.changed = FALSE;
+			VI.lastOrigin = *REG.VI_ORIGIN;
+		}
+		else
+		{
+			VI_RSX_showFPS();
+			VI_RSX_showDEBUG();
+			rsxSetBlendEnable(context, GCM_FALSE);
+			rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
+			rsxSetDepthTestEnable(context, GCM_TRUE);
+			rsxSetCullFaceEnable(context, GCM_TRUE);
+			rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+			rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+			rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+			rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+			rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+		}
+	}
+	else
+	{
+		VI_RSX_showFPS();
+		VI_RSX_showDEBUG();
+		rsxSetBlendEnable(context, GCM_FALSE);
+		rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
+		rsxSetDepthTestEnable(context, GCM_TRUE);
+		rsxSetCullFaceEnable(context, GCM_TRUE);
+		rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+		rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+		rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+		rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+		rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+	}
 	flip();
 	gSP.changed &= ~CHANGED_COLORBUFFER;
 #elif defined(__GX__)

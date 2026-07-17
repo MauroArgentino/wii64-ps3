@@ -569,3 +569,114 @@ Se agregó variable `drain_level` para capturar el tamaño del buffer antes de q
 
 El test de sine fue útil para confirmar que el artefacto venía del puerto de audio
 RPCS3, no de nuestra pipeline. Ahora se desactiva para probar con audio real del N64.
+
+---
+
+## Fix 27 — Tiny3D migration (infrastructure bridge)
+
+**Archivos:** `src/main/rsxutil.h`, `src/main/rsxutil.cpp`, `src/main/main.cpp`, `Makefile`
+**Cambio:** Reemplazo del RSX init manual por Tiny3D library como capa de RSX management.
+
+### Problema
+El RSX init manual (`rsxInit` + `init_screen` + `setRenderTarget`) requería gestión
+completa de buffers, command buffer, y render targets. Tiny3D ya maneja todo esto
+internamente y proporciona una API más estable.
+
+### Solución
+1. **rsxutil.h** — Bridge header:
+   - `#include <tiny3d.h>` + `#include <libfont.h>`
+   - `#define context gcm_context` (evita linker conflict con Tiny3D's `tiny_gcmContextData *context`)
+   - `#define display_width Video_Resolution.width` / `display_height Video_Resolution.height`
+   - `rsxMemalign` → `tiny3d_AllocTexture` wrapper (sin align param, siempre 128-byte aligned)
+   - `rsxFree` → no-op wrapper (Tiny3D bump allocator no soporta free)
+   - Declaraciones de `gcm_context`, alpha test functions, `flip()`
+
+2. **rsxutil.cpp** — Thin wrapper:
+   - Define `gcmContextData *gcm_context = NULL`
+   - `flip()` llama `tiny3d_Flip()` (buffer swap, wait, render target reset)
+
+3. **main.cpp** — Init:
+   - `tiny3d_Init(1<<20)` reemplaza `host_addr`/`init_screen()`/`setRenderTarget(curr_fb)`
+   - `gcm_context = (gcmContextData *) tiny3d_Get_GCM_Context()`
+
+4. **Makefile** — LIBS: `-ltiny3d -lfont` agregados
+
+### Por qué funciona sin reescribir GraphicsRSX/IPLFont
+El `#define rsxMemalign compat_rsunalign` redirige transparentemente las **30 llamadas**
+a `rsxMemalign` a través del allocator de Tiny3D, previniendo la corrupción de memoria
+que ocurriría si ambos allocators bump-allocate del mismo pool de RSX local memory.
+
+### Riesgo
+Si falla, `git checkout a68ecdf` revierte todo (commit anterior).
+
+---
+
+## Fix 28 — RSX local memory heap save/restore (OGL_Start/OGL_Stop)
+
+**Archivos:** `src/main/rsxutil.h`, `src/main/rsxutil.cpp`, `src/video/glN64/OpenGL.cpp`
+**Cambio:** Guarda/restaura la posición del bump allocator de Tiny3D entre ciclos de emulación.
+
+### Problema
+El bump allocator de Tiny3D (`heap_pointer`) solo avanza; `rsxFree` es no-op.
+Cada ciclo OGL_Start/OGL_Stop (ROM load → emulation → ROM exit) consumía
+memoria RSX local permanentemente. Tras ~4 ciclos, el pool se agotaba:
+FBtex, fp_buffer, y todas las rsxMemalign volvían NULL. Crash en memcpy
+con destino 0x0 (CIA=0x52e08, LR=0x531cc).
+
+TTY.log confirmó: `FBtex=00000000`, `fp_buffer=00000000` — pool exhausto.
+
+### Solución
+1. **rsxutil.h** — `extern void *heap_pointer` + `rsxutil_save_heap()` / `rsxutil_restore_heap()`
+2. **rsxutil.cpp** — Implementación: `heap_save = heap_pointer` / `heap_pointer = heap_save`
+3. **OGL_Start (line ~555)** — `rsxutil_save_heap()` antes de FBtex allocation
+4. **OGL_Stop (line ~617)** — NULL pointers + `rsxutil_restore_heap()` después de Destroy
+
+### Por qué funciona
+- `heap_pointer` es global (no static) en mm.c → accessible via extern
+- Menú y Tiny3D alocan ANTES de OGL_Start → heap_save los preserva
+- OGL alocan DESPUÉS de heap_save → heap_restore los libera completamente
+- Al restaurar, el heap vuelve al punto donde estaba antes de OGL_Start,
+  pero los datos en memoria siguen ahí (no se borran), así que el menú
+  puede seguir usando sus recursos (fp_buffer, texturas) intactos
+
+### Ciclo de vida
+```
+tiny3d_Init → menu allocs → [SAVE HEAP] → OGL_Start → emulation → OGL_Stop → [RESTORE HEAP] → menu continua
+```
+
+---
+
+## Fix 29 — FrameBuffer textures para PS3/RSX
+
+**Archivos:** `FrameBuffer.cpp`, `FrameBuffer.h`, `VI.cpp`
+**Cambio:** Implementación completa del sistema FrameBuffer→textura para RSX
+
+### Problema
+Las funciones `FrameBuffer_SaveBuffer`, `FrameBuffer_RenderBuffer` y `FrameBuffer_RestoreBuffer`
+tenían stubs vacíos en PS3. `VI_UpdateScreen` no llamaba a ninguna función de gestión de
+framebuffers. Resultado: texturas de framebuffer (usadas por juegos como SMW64 para
+screens de selección, fondos, etc.) se muestreaban como datos vacíos → negro o corrupto.
+
+### Solución
+1. **FrameBuffer_SaveBuffer** — Copia RDRAM→RSX con nearest-neighbor upscale:
+   - Para FB existente: re-copia datos de RDRAM al buffer RSX ya alocado
+   - Para FB nuevo: `rsxMemalign(128, textureBytes)`, copia con conversión
+   - Formato: RGBA5551/RGBA8888→A8R8G8B8 con byte-swap `(pixel>>8)|(pixel<<24)`
+   - Set up completo del descriptor `gcmTexture`
+
+2. **FrameBuffer_RenderBuffer** — Dibuja quad fullscreen con la textura FB:
+   - Proyección ortográfica `0..VI.width × VI.height..0`
+   - Viewport completo `display_width × display_height`
+   - Carga VP/FP/viewport + dibuja `GCM_TYPE_QUADS` con PASSTEX shader
+
+3. **FrameBuffer_RestoreBuffer** — Mismo quad para restaurar color image
+
+4. **VI_UpdateScreen** — Añadido ciclo save→render→restore (patrón del path GX):
+   - `if (OGL.frameBufferTextures)` check con `FrameBuffer_FindBuffer`
+   - Save → Render → ShowFPS → Restore → `VI.lastOrigin` update
+
+### Notas
+- `OGL.frameBufferTextures` default=0, habilitable desde menú PS3
+- `#include "VI.h"` añadido a FrameBuffer.cpp para acceso a `VI.width/height`
+- `rsxSetFragmentProgramParameter` + `rsxLoadFragmentProgramLocation` añadidos
+  a RenderBuffer/RestoreBuffer (necesarios para cargar el shader en RSX)
