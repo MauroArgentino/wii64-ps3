@@ -41,6 +41,7 @@ TexEnv *Compile_texture_env( Combiner *color, Combiner *alpha )
 
 	texEnv->usesT0 = FALSE;
 	texEnv->usesT1 = FALSE;
+	texEnv->mode = GL_MODULATE;  // safe default — was uninitialized garbage
 
 	texEnv->fragment.color = texEnv->fragment.alpha = COMBINED;
 
@@ -157,10 +158,10 @@ TexEnv *Compile_texture_env( Combiner *color, Combiner *alpha )
 						texEnv->usesT0 = TRUE;
 						texEnv->usesT1 = FALSE;
 					}
-					else if ((color->stage[i].op[j].param1 == TEXEL0) &&
-					    ((color->stage[i].op[j].param2 != TEXEL0) && (color->stage[i].op[j].param2 != TEXEL0_ALPHA) &&
-						 (color->stage[i].op[j].param2 != TEXEL1) && (color->stage[i].op[j].param2 != TEXEL1_ALPHA)) &&
-						 (color->stage[i].op[j].param3 == TEXEL0_ALPHA))
+				else if ((color->stage[i].op[j].param1 == TEXEL1) &&
+				    ((color->stage[i].op[j].param2 != TEXEL0) && (color->stage[i].op[j].param2 != TEXEL0_ALPHA) &&
+					 (color->stage[i].op[j].param2 != TEXEL1) && (color->stage[i].op[j].param2 != TEXEL1_ALPHA)) &&
+					 (color->stage[i].op[j].param3 == TEXEL1_ALPHA))
 					{
 						texEnv->mode = GL_DECAL;
 						texEnv->fragment.color = color->stage[i].op[j].param2;

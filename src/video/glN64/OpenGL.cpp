@@ -870,10 +870,12 @@ void OGL_UpdateStates()
 		}
 		else if (gDP.otherMode.alphaCompare == G_AC_DITHER)
 		{
-			// No polygon stipple on PS3: accept any fragment with alpha > 0
+			// N64 uses polygon stipple to dither alpha (reject ~50% of
+			// transparent fragments). No stipple on PS3 — at least reject
+			// fully transparent pixels (alpha == 0).
 			rsxSetAlphaTestEnable(context, GCM_TRUE);
 			rsxSetAlphaTestFunc(context, 0x0206 /*GEQUAL*/);
-			rsxSetAlphaTestRef(context, 0);
+			rsxSetAlphaTestRef(context, 1);
 		}
 		else
 		{
@@ -1085,12 +1087,17 @@ void OGL_UpdateStates()
 		     gDP.otherMode.cycleType == G_CYC_2CYCLE ||
 		     gDP.otherMode.forceBlender) &&
 		    (gDP.otherMode.cycleType != G_CYC_COPY) &&
-		    (gDP.otherMode.cycleType != G_CYC_FILL) &&
-		    !(gDP.otherMode.alphaCvgSel))
+		    (gDP.otherMode.cycleType != G_CYC_FILL))
 		{
-			// alphaCvgSel: blend factor should be polygon coverage, not texel alpha.
-			// Without polygon stipple on PS3, we can't emulate this — disable blend.
 			blendEnable = true;
+			if (gDP.otherMode.alphaCvgSel)
+			{
+				// alphaCvgSel: N64 uses polygon coverage as blend factor.
+				// Approximate with standard src-alpha blend.
+				srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA;
+			}
+			else
+			{
 			switch (gDP.otherMode.l >> 16)
 			{
 				case 0x0448: case 0x055A:
@@ -1102,11 +1109,12 @@ void OGL_UpdateStates()
 					srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA; break;
 				case 0x0FA5: case 0x5055:
 					srcFunc = GCM_ZERO; dstFunc = GCM_ONE; break;
-				default:
-					// Most N64 modes are opaque — passthrough, not alpha blend.
-					srcFunc = GCM_ONE; dstFunc = GCM_ZERO; break;
+			default:
+				// Most N64 modes are opaque — passthrough, not alpha blend.
+				srcFunc = GCM_ONE; dstFunc = GCM_ZERO; break;
 			}
-		}
+			} // else (normal blender modes)
+		} // if (1CYCLE/2CYCLE/forceBlender)
 		if (gDP.otherMode.cycleType == G_CYC_FILL)
 		{
 			blendEnable = true;
