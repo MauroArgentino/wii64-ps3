@@ -56,7 +56,7 @@ static u32 fp_offset;
 static rsxVertexProgram *vpo = NULL;
 static rsxFragmentProgram *fpo = NULL;
 static void *vp_ucode = NULL; // Add this
-static s32 projMatrix_id, modelViewMatrix_id, vertexPosition_id, vertexColor0_id, vertexTexcoord_id, textureUnit_id, mode_id;
+static s32 projMatrix_id, modelViewMatrix_id, vertexPosition_id, vertexColor0_id, vertexTexcoord_id, textureUnit_id, mode_id, alpha_mode_id;
 #endif
 
 VI::VI(GFX_INFO info) : gfxInfo(info), bpp(0)
@@ -80,6 +80,7 @@ VI::VI(GFX_INFO info) : gfxInfo(info), bpp(0)
     rsxAddressToOffset(fp_buffer, &fp_offset);
 
     mode_id = rsxFragmentProgramGetConst(fpo, "mode");
+    alpha_mode_id = rsxFragmentProgramGetConst(fpo, "alpha_mode");
     textureUnit_id = rsxFragmentProgramGetAttrib(fpo, "texture");
 #else //PS3
 	FBtex = (u16*) memalign(32,640*480*2);
@@ -330,7 +331,9 @@ void VI::updateScreen()
 	rsxSetVertexProgramParameter(context,vpo,modelViewMatrix_id,(float*)&local_modelViewMatrix);
 
 	float shader_mode = 1; //SHADER_PASSTEX
+	float shader_alpha = 0; // alpha_mode = 0 (1.0 opaque)
 	rsxSetFragmentProgramParameter(context,fpo,mode_id,&shader_mode,fp_offset);
+	rsxSetFragmentProgramParameter(context,fpo,alpha_mode_id,&shader_alpha,fp_offset);
 	rsxLoadFragmentProgramLocation(context,fpo,fp_offset,GCM_LOCATION_RSX);
 
 	rsxSetUserClipPlaneControl(context,GCM_USER_CLIP_PLANE_DISABLE,

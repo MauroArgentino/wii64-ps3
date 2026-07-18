@@ -56,6 +56,7 @@ Graphics::Graphics(GXRModeObj *rmode)
 
 	fp_buffer = NULL;
 	shader_mode = SHADER_PASSCOLOR;
+	shader_alpha_mode = 0.0f;
 
 	setColor((GXColor) {0,0,0,0});
 	init();
@@ -111,6 +112,8 @@ void Graphics::init()
 	rsxAddressToOffset(fp_buffer,&fp_offset);
 
 	mode_id = rsxFragmentProgramGetConst(fpo,"mode");
+	alpha_mode_id = rsxFragmentProgramGetConst(fpo,"alpha_mode");
+	shader_alpha_mode = 0.0f;
 	textureUnit_id = rsxFragmentProgramGetAttrib(fpo,"texture");
 	globalTextureUnit_id = textureUnit_id;
 }
@@ -528,6 +531,7 @@ void Graphics::setTEV(int tev_op)
 		break;
 	}
 	rsxSetFragmentProgramParameter(context,fpo,mode_id,&shader_mode,fp_offset);
+	rsxSetFragmentProgramParameter(context,fpo,alpha_mode_id,&shader_alpha_mode,fp_offset);
 	rsxLoadFragmentProgramLocation(context,fpo,fp_offset,GCM_LOCATION_RSX);
 }
 

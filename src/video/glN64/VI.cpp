@@ -103,6 +103,7 @@ void VI_UpdateScreen()
 	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
 	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
 	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
 	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
 	flip();
 	OGL.frameReady = 0;

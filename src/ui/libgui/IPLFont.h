@@ -89,7 +89,9 @@ private:
 	s32 vertexTexcoord_id;
 	s32 textureUnit_id;
 	s32 mode_id;
+	s32 alpha_mode_id;
 	f32 shader_mode;
+	f32 shader_alpha_mode;
 
 	void *vp_ucode;
 	rsxVertexProgram *vpo;

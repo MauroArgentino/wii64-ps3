@@ -44,7 +44,7 @@
 // Uncomment to bypass N64 audio entirely and generate a pure 440Hz sine wave.
 // If this sounds clean → our audio pipeline is the problem.
 // If this also clicks → RPCS3 audio port has inherent crackling.
-// #define AUDIO_SINE_TEST
+// // #define AUDIO_SINE_TEST
 
 // Use a dedicated audio thread so R4300 isn't blocked during block writes.
 // The thread drains ring buffer into PS3 blocks at the hardware rate,
@@ -259,8 +259,7 @@ static void play_buffer(void){
 	}
 #else // THREADED_AUDIO
 	// Audio thread: waits for add_to_buffer() to fill a buffer, drains it
-	// into PS3 audio blocks. Writes silence when no data available to keep
-	// the RPCS3 audio port alive (prevents silence gap insertion).
+	// into PS3 audio blocks.
 	while(thread_running){
 		// Block until add_to_buffer() signals data is ready
 		sem_wait(buffer_full);
@@ -282,19 +281,6 @@ static void play_buffer(void){
 		NEXT(thread_buffer);
 		read_pos = 0;
 		sem_post(buffer_empty);
-
-		// Fill remaining port blocks with silence to keep RPCS3 port alive
-		{
-			int i;
-			for(i = 0; i < 2; i++){
-				f32 *sbuf;
-				if(!portDataStart)
-					portDataStart = (f32*)((u64)config.audioDataStart);
-				sbuf = portDataStart + config.channelCount * AUDIO_BLOCK_SAMPLES * next_write_block;
-				memset(sbuf, 0, config.channelCount * AUDIO_BLOCK_SAMPLES * sizeof(f32));
-				next_write_block = (next_write_block + 1) % config.numBlocks;
-			}
-		}
 	}
 	printf("[AUDIO] Thread leaving loop\n");
 #endif

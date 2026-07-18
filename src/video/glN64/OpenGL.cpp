@@ -280,6 +280,8 @@ void OGL_InitStates()
 	rsxAddressToOffset(OGL.fp_buffer,&OGL.fp_offset);
 
 	OGL.mode_id = rsxFragmentProgramGetConst(OGL.fpo,"mode");
+	OGL.alpha_mode_id = rsxFragmentProgramGetConst(OGL.fpo,"alpha_mode");
+	OGL.shader_alpha_mode = 0.0f;
 	OGL.textureUnit_id = rsxFragmentProgramGetAttrib(OGL.fpo,"texture");
 #elif defined(__GX__)
 	// TODO: Init GX variables here...
@@ -2474,6 +2476,7 @@ void OGL_RSXinitDlist()
 	rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
 
 	OGL.shader_mode = SHADER_PASSCOLOR;
+	OGL.shader_alpha_mode = 0.0f;
 
 	//Load Vertex and Fragment Programs
 	rsxLoadVertexProgram(context,OGL.vpo,OGL.vp_ucode);
@@ -2481,6 +2484,7 @@ void OGL_RSXinitDlist()
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.modelViewMatrix_id,(float*)&OGL.modelViewMatrix);
 
 	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.mode_id,&OGL.shader_mode,OGL.fp_offset);
+	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.alpha_mode_id,&OGL.shader_alpha_mode,OGL.fp_offset);
 	rsxLoadFragmentProgramLocation(context,OGL.fpo,OGL.fp_offset,GCM_LOCATION_RSX);
 
 	//Temporary Dummy Texture

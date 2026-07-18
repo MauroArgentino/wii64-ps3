@@ -90,6 +90,7 @@ IplFont::IplFont()
 //	shader_mode = 1.0f; //SHADER_PASSTEX
 //	shader_mode = 2.0f; //SHADER_PASSCOLOR
 	shader_mode = 3.0f; //SHADER_MODULATE
+	shader_alpha_mode = 0.0f;
 	vp_ucode = NULL;
 	fp_ucode = NULL;
 	fp_buffer = NULL;
@@ -483,6 +484,8 @@ void IplFont::drawInit(GXColor fontColor)
 	rsxAddressToOffset(fp_buffer,&fp_offset);
 
 	mode_id = rsxFragmentProgramGetConst(fpo,"mode");
+	alpha_mode_id = rsxFragmentProgramGetConst(fpo,"alpha_mode");
+	shader_alpha_mode = 0.0f;
 	textureUnit_id = rsxFragmentProgramGetAttrib(fpo,"texture");
 
 	//Init font texture
@@ -549,6 +552,7 @@ void IplFont::drawInit(GXColor fontColor)
 
 	rsxLoadFragmentProgramLocation(context,fpo,fp_offset,GCM_LOCATION_RSX);
 	rsxSetFragmentProgramParameter(context,fpo,mode_id,&shader_mode,fp_offset);
+	rsxSetFragmentProgramParameter(context,fpo,alpha_mode_id,&shader_alpha_mode,fp_offset);
 
 	//Set blend mode
 	rsxSetBlendEnable(context, GCM_TRUE);

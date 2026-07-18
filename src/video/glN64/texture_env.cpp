@@ -189,7 +189,7 @@ void Set_texture_env( TexEnv *texEnv )
 
 #ifdef PS3
 	switch (texEnv->mode)	// texEnv->mode options are: GL_REPLACE, GL_MODULATE, GL_DECAL
-	{						// combined_shader modes are: SHADER_PASSTEX=1,SHADER_PASSCOLOR=2,SHADER_MODULATE=3
+	{						// combined_shader modes are: SHADER_PASSTEX=1,SHADER_PASSCOLOR=2,SHADER_MODULATE=3,SHADER_DECAL=4
 	case GL_REPLACE:
 		OGL.shader_mode = SHADER_PASSTEX;
 		break;
@@ -202,10 +202,25 @@ void Set_texture_env( TexEnv *texEnv )
 	default:
 		OGL.shader_mode = SHADER_PASSCOLOR;
 	}
-//	dbg_printf("Set_texture_env shader_mode = %f\r\n",OGL.shader_mode);
-//	OGL.shader_mode = SHADER_PASSCOLOR;
-//	rsxFinish(context, OGL.finish_ref++);
+
+	// Map alpha combiner output to shader alpha_mode
+	// 0 = 1.0 (opaque), 1 = color.a (texel), 2 = color0.a (shade)
+	switch (texEnv->fragment.alpha)
+	{
+	case SHADE:
+	case SHADE_ALPHA:
+		OGL.shader_alpha_mode = 2.0f;
+		break;
+	case TEXEL0_ALPHA:
+	case TEXEL1_ALPHA:
+		OGL.shader_alpha_mode = 1.0f;
+		break;
+	default:
+		OGL.shader_alpha_mode = 0.0f;
+	}
+
 	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.mode_id,&OGL.shader_mode,OGL.fp_offset);
+	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.alpha_mode_id,&OGL.shader_alpha_mode,OGL.fp_offset);
 	rsxLoadFragmentProgramLocation(context,OGL.fpo,OGL.fp_offset,GCM_LOCATION_RSX);
 
 #elif defined(__GX__)

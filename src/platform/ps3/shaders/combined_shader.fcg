@@ -5,6 +5,7 @@ void main
 	float2 texcoord : TEXCOORD1,
 	
 	uniform float mode,
+	uniform float alpha_mode,
 	uniform sampler2D texture,
 	
 	out float4 oColor
@@ -13,21 +14,24 @@ void main
 	float4 color = tex2D(texture,texcoord);
 	float4 modtex = color * color0;
 
-	// Compute all 4 possible outputs
-	// DECAL: blend RGB by texel alpha, preserve texel alpha for
-	// transparency (was hardcoded to 1.0, breaking particles/dust)
-	float4 decal   = float4(color.rgb * color.a + color0.rgb * (1.0 - color.a), color.a);
+	// DECAL: blend RGB by texel alpha, alpha from alpha combiner.
+	// alpha_mode selects output alpha source:
+	//   0 = 1.0 (opaque)
+	//   1 = color.a (texel alpha)
+	//   2 = color0.a (shade/vertex alpha — Nintendo logo, etc.)
+	float da1 = 1.0 - clamp(abs(alpha_mode - 1.0), 0.0, 1.0);
+	float da2 = 1.0 - clamp(abs(alpha_mode - 2.0), 0.0, 1.0);
+	float decal_alpha = (1.0 - da1 - da2) * 1.0 + da1 * color.a + da2 * color0.a;
+	float4 decal   = float4(color.rgb * color.a + color0.rgb * (1.0 - color.a), decal_alpha);
 	float4 pastex  = color;
 	float4 passcol = color0;
 
 	// Branchless mode selector using clamp() + abs() — both are
 	// native RSX CG intrinsics (unlike step() which broke).
-	// For integer modes: clamp(abs(mode - N), 0, 1) == 0 when mode==N, 1 otherwise
 	float m1 = 1.0 - clamp(abs(mode - 1.0), 0.0, 1.0);
 	float m2 = 1.0 - clamp(abs(mode - 2.0), 0.0, 1.0);
 	float m3 = 1.0 - clamp(abs(mode - 3.0), 0.0, 1.0);
 
-	// Blend: DECAL default + mode overrides — no if/else anywhere
 	oColor = (1.0 - m1 - m2 - m3) * decal
 	       + m1 * pastex
 	       + m2 * passcol
