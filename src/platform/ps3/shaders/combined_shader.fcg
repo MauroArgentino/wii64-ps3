@@ -18,4 +18,12 @@ void main
 		oColor = color0;
 	if(mode==3) //SHADER_MODULATE
 		oColor = tex2D(texture,texcoord) * color0;
+	if(mode==4) //SHADER_DECAL
+	{
+		float a = color.a;
+		oColor.r = color.r * a + color0.r * (1.0 - a);
+		oColor.g = color.g * a + color0.g * (1.0 - a);
+		oColor.b = color.b * a + color0.b * (1.0 - a);
+		oColor.a = a;
+	}
 }

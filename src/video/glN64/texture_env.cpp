@@ -196,7 +196,7 @@ void Set_texture_env( TexEnv *texEnv )
 		OGL.shader_mode = SHADER_MODULATE;
 		break;
 	case GL_DECAL:
-		OGL.shader_mode = SHADER_MODULATE;
+		OGL.shader_mode = SHADER_DECAL;
 		break;
 	default:
 		OGL.shader_mode = SHADER_PASSCOLOR;

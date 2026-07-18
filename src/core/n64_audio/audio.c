@@ -47,8 +47,9 @@
 // #define AUDIO_SINE_TEST
 
 // Use a dedicated audio thread so R4300 isn't blocked during block writes.
-// The thread polls readIndex at 187.5Hz and fills blocks independently.
-// #define THREADED_AUDIO
+// The thread drains ring buffer into PS3 blocks at the hardware rate,
+// writing silence when no N64 data is available to keep the port alive.
+#define THREADED_AUDIO
 #ifdef AUDIO_PCM_DUMP
 static FILE *pcm_dump = NULL;
 static int pcm_dump_frames = 0;
@@ -90,7 +91,6 @@ static enum { BUFFER_SIZE_32_60 = 2112, BUFFER_SIZE_48_60 = 4096,
 static sys_ppu_thread_t audio_thread;
 static sys_sem_t buffer_full;
 static sys_sem_t buffer_empty;
-static sys_sem_t first_audio;
 static int   thread_running = 0;
 #define AUDIO_STACK_SIZE 4096
 static char  audio_stack[AUDIO_STACK_SIZE];
@@ -103,7 +103,7 @@ static inline void sem_init(sys_sem_t *sem, s32 init, s32 max){
 	attr.attr_protocol = SYS_SEM_ATTR_PROTOCOL;
 	sysSemCreate(sem, &attr, init, max);
 }
-#define sem_wait(s)    sysSemWait((s), 0)
+#define sem_wait(s)    sysSemWait((s), 0x7FFFFFFFFFFFFFFFULL)
 #define sem_post(s)    sysSemPost((s), 1)
 #define sem_destroy(s) sysSemDestroy(s)
 #else // !THREADED_AUDIO
@@ -238,51 +238,65 @@ s32 playOneBlock()
 #ifdef THREADED_AUDIO
 static void play_buffer(void);
 static void audio_thread_entry(void *arg){
+	printf("[AUDIO] Thread started\n");
 	play_buffer();
+	printf("[AUDIO] Thread exiting\n");
 	sysThreadExit(NULL);
 }
 #endif
+static int port_started = 0;
+
 static void play_buffer(void){
-	static int port_started = 0;
 #ifndef THREADED_AUDIO
 	if(!port_started){
 		audioPortStart(portNum);
 		port_started = 1;
 	}
 	// Non-threaded: drain ring buffer into PS3 blocks on R4300 thread.
-	// playOneBlock always succeeds (time-based, no readIndex polling).
+	// No pacing — writes as fast as CPU produces audio.
 	while(read_pos + AUDIO_BLOCK_SAMPLES * 4 <= buffer_offset){
 		playOneBlock();
 	}
 #else // THREADED_AUDIO
-	// Audio thread: waits for buffers from add_to_buffer(), drains them
-	// into PS3 audio blocks via polling. Runs independently of R4300.
-	if(!port_started){
-		audioPortStart(portNum);
-		port_started = 1;
-	}
-
-	// Wait for first buffer before entering drain loop
-	sem_wait(first_audio);
-
+	// Audio thread: waits for add_to_buffer() to fill a buffer, drains it
+	// into PS3 audio blocks. Writes silence when no data available to keep
+	// the RPCS3 audio port alive (prevents silence gap insertion).
 	while(thread_running){
-		// Wait for add_to_buffer() to fill a buffer
+		// Block until add_to_buffer() signals data is ready
 		sem_wait(buffer_full);
 		if(!thread_running) break;
+
+		// Start port on first buffer (thread owns port lifecycle)
+		if(!port_started){
+			audioPortStart(portNum);
+			port_started = 1;
+		}
 
 		// Drain this buffer into PS3 audio blocks
 		unsigned int level = drain_level;
 		while(read_pos + AUDIO_BLOCK_SAMPLES * 4 <= level){
-			if(playOneBlock() != 0){
-				usleep(500);
-			}
+			playOneBlock();
 		}
 
 		// Signal add_to_buffer() that this buffer slot is free
 		NEXT(thread_buffer);
 		read_pos = 0;
 		sem_post(buffer_empty);
+
+		// Fill remaining port blocks with silence to keep RPCS3 port alive
+		{
+			int i;
+			for(i = 0; i < 2; i++){
+				f32 *sbuf;
+				if(!portDataStart)
+					portDataStart = (f32*)((u64)config.audioDataStart);
+				sbuf = portDataStart + config.channelCount * AUDIO_BLOCK_SAMPLES * next_write_block;
+				memset(sbuf, 0, config.channelCount * AUDIO_BLOCK_SAMPLES * sizeof(f32));
+				next_write_block = (next_write_block + 1) % config.numBlocks;
+			}
+		}
 	}
+	printf("[AUDIO] Thread leaving loop\n");
 #endif
 }
 
@@ -371,10 +385,8 @@ static void inline add_to_buffer(void* stream, unsigned int length){
 		}
 
 #ifdef THREADED_AUDIO
-		if(!thread_running){
-			thread_running = 1;
-			sem_post(first_audio);
-		}
+		// Ensure buffer data is visible to audio thread before signaling
+		__asm__ __volatile__("lwsync" ::: "memory");
 		drain_level = buffer_offset;
 		sem_post(buffer_full);
 #else
@@ -383,7 +395,9 @@ static void inline add_to_buffer(void* stream, unsigned int length){
 
 		NEXT(which_buffer);
 		buffer_offset = 0;
+#ifndef THREADED_AUDIO
 		read_pos = 0;
+#endif
 	}
 }
 
@@ -487,10 +501,13 @@ EXPORT void CALL RomOpen()
 #ifdef THREADED_AUDIO
 	sem_init(&buffer_full, 0, NUM_BUFFERS);
 	sem_init(&buffer_empty, NUM_BUFFERS, NUM_BUFFERS);
-	sem_init(&first_audio, 0, 1);
-	thread_running = 0;
-	sysThreadCreate(&audio_thread, audio_thread_entry, NULL, AUDIO_PRIORITY, AUDIO_STACK_SIZE, THREAD_JOINABLE, "audio");
+	thread_running = 1;
+	printf("[AUDIO] RomOpen: creating audio thread\n");
+	int ret = sysThreadCreate(&audio_thread, audio_thread_entry, NULL, AUDIO_PRIORITY, AUDIO_STACK_SIZE, THREAD_JOINABLE, "audio");
+	printf("[AUDIO] sysThreadCreate returned %d\n", ret);
 	thread_buffer = which_buffer = 0;
+	read_pos = 0;
+	drain_level = 0;
 	audio_paused = 1;
 #endif
 }
@@ -499,16 +516,17 @@ EXPORT void CALL
 RomClosed( void )
 {
 #ifdef THREADED_AUDIO
-	// Destroy semaphores and suspend the thread so audio can't play
-	if(!thread_running) sem_post(first_audio);
+	// Signal thread to exit and wake it if blocked on semaphore
 	thread_running = 0;
+	sem_post(buffer_full);
+	sysThreadJoin(audio_thread, NULL);
 	sem_destroy(buffer_full);
 	sem_destroy(buffer_empty);
-	sem_destroy(first_audio);
-	sysThreadJoin(audio_thread, NULL);
 	audio_paused = 0;
 #endif
 	// So we don't have a buzzing sound when we exit the game
+	next_write_block = 0;
+	port_started = 0;
 	int ret = audioPortStop(portNum);
 	dbg_printf("audioPortStop: %08x\n",ret);
 }

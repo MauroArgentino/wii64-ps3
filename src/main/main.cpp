@@ -236,7 +236,7 @@ int main(int argc, char* argv[]){
 	setRenderTarget(curr_fb);
 	atexit(program_exit_callback);
 	sysUtilRegisterCallback(0,sysutil_exit_callback,NULL);
-	ps3_audio_init();
+	// ps3_audio_init(); // DISABLED: second audio port interferes with ROM audio on RPCS3
 
 	//Initialize controls once before menu runs <- needed?
 	control_info_init();
