@@ -82,6 +82,12 @@ TexEnv *Compile_texture_env( Combiner *color, Combiner *alpha )
 						texEnv->fragment.alpha = alpha->stage[i].op[j].param1;
 						texEnv->mode = GL_MODULATE;
 					}
+					else if (texEnv->fragment.alpha != COMBINED)
+					{
+						// Both operands are non-texel constants (e.g., PRIM * ENV)
+						// Propagate the MUL operand as the alpha source
+						texEnv->fragment.alpha = alpha->stage[i].op[j].param1;
+					}
 					break;
 				case ADD:
 					break;
@@ -206,11 +212,14 @@ void Set_texture_env( TexEnv *texEnv )
 	}
 
 	// Map alpha combiner output to shader alpha_mode
-	// 0 = 1.0 (opaque), 1 = color.a (texel), 2 = color0.a (shade)
+	// 0 = 1.0 (opaque), 1 = color.a (texel), 2 = color0.a (shade/vertex)
 	switch (texEnv->fragment.alpha)
 	{
 	case SHADE:
 	case SHADE_ALPHA:
+	case PRIMITIVE_ALPHA:
+	case ENV_ALPHA:
+	case PRIM_LOD_FRAC:
 		OGL.shader_alpha_mode = 2.0f;
 		break;
 	case TEXEL0_ALPHA:
