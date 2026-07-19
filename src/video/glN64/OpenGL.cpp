@@ -1112,8 +1112,10 @@ void OGL_UpdateStates()
 				case 0x0FA5: case 0x5055:
 					srcFunc = GCM_ZERO; dstFunc = GCM_ONE; break;
 			default:
-				// Most N64 modes are opaque — passthrough, not alpha blend.
-				srcFunc = GCM_ONE; dstFunc = GCM_ZERO; break;
+				// Safe fallback: SRC_ALPHA/ONE_MINUS_SRC_ALPHA
+				// For opaque fragments (alpha=1.0) this degenerates to ONE/ZERO.
+				// For semi-transparent fragments (shadows, effects) this blends correctly.
+				srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA; break;
 			}
 			} // else (normal blender modes)
 		} // if (1CYCLE/2CYCLE/forceBlender)
