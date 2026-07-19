@@ -33,8 +33,11 @@ typedef struct _game_hacks {
 	/* Alpha / blending */
 	u8 force_alpha_opaque;    /* Force all DECAL alpha = 1.0 */
 
+	/* Zelda Majora's Mask specific */
+	u8 mm_fix_logo_alpha;     /* MM: fix N64 logo alpha LOAD(TEXEL*_ALPHA) bug */
+
 	/* Reserved for future per-game flags */
-	u8 reserved[8];
+	u8 reserved[7];
 } GameHacks;
 
 extern GameHacks gameHacks;

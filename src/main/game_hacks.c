@@ -54,5 +54,6 @@ void GameHacks_Detect(void)
 	    crc1 == sl(0x5085C0D1))     /* JP */
 	{
 		gameHacks.zelda_warp = 1;
+		gameHacks.mm_fix_logo_alpha = 1;
 	}
 }
