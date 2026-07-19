@@ -34,6 +34,7 @@
 #include <string.h>
 #include <math.h>
 #include <audio/audio.h>
+#include <sys/event_queue.h>
 
 // Uncomment to dump raw PCM to /dev_hdd0/tmp/audio_dump.pcm
 // Format: s16le stereo, 48kHz
@@ -448,15 +449,19 @@ InitiateAudio( AUDIO_INFO Audio_Info )
 {
 	AudioInfo = Audio_Info;
 	
-	s32 ret = audioInit();
-
-	dbg_printf("audioInit: %08x\n",ret);
+	// audioInit() is a one-time global init — don't reinitialize on ROM switch
+	static int audio_initialized = 0;
+	if (!audio_initialized) {
+		s32 ret = audioInit();
+		dbg_printf("audioInit: %08x\n",ret);
+		audio_initialized = 1;
+	}
 
 	params.numChannels = AUDIO_PORT_2CH;
 	params.numBlocks = AUDIO_BLOCK_8;
 	params.attrib = 0x1000;
 	params.level = 1.0f;
-	ret = audioPortOpen(&params,&portNum);
+	s32 ret = audioPortOpen(&params,&portNum);
 	dbg_printf("audioPortOpen: %08x\n",ret);
 	dbg_printf("      portNum: %d\n",portNum);
 
@@ -501,8 +506,8 @@ EXPORT void CALL RomOpen()
 EXPORT void CALL
 RomClosed( void )
 {
-#ifdef THREADED_AUDIO
 	// Signal thread to exit and wake it if blocked on semaphore
+#ifdef THREADED_AUDIO
 	thread_running = 0;
 	sem_post(buffer_full);
 	sysThreadJoin(audio_thread, NULL);
@@ -510,11 +515,25 @@ RomClosed( void )
 	sem_destroy(buffer_empty);
 	audio_paused = 0;
 #endif
-	// So we don't have a buzzing sound when we exit the game
+
+	// Stop and close audio port
 	next_write_block = 0;
 	port_started = 0;
+	portDataStart = NULL;
+	buffer_offset = 0;
+	read_pos = 0;
+	drain_level = 0;
+
 	int ret = audioPortStop(portNum);
 	dbg_printf("audioPortStop: %08x\n",ret);
+
+	// Remove event queue before closing port
+	audioRemoveNotifyEventQueue(snd_key);
+	sysEventQueueDestroy(snd_queue, 0);
+
+	// Close the audio port to free the handle
+	ret = audioPortClose(portNum);
+	dbg_printf("audioPortClose: %08x\n",ret);
 }
 
 EXPORT void CALL
