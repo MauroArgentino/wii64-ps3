@@ -31,6 +31,7 @@
 #include "../r4300/r4300.h"
 #include "../r4300/exception.h"
 #include "../r4300/macros.h"
+#include "../../main/game_hacks.h"
 
 #ifdef USE_EXPANSION
 	#define MEMMASK 0x7FFFFF
@@ -47,14 +48,17 @@ u32 *tlb_LUT_w = NULL;
 
 u32 virtual_to_physical_address(u32 addresse, int w)
 {
-   if (addresse >= 0x7f000000 && addresse < 0x80000000) // golden eye hack
+   if (addresse >= 0x7f000000 && addresse < 0x80000000)
      {
-	if (ROM_HEADER->CRC1 == sl(0xDCBC50D1)) // US
-	  return 0xb0034b30 + (addresse & MEMMASK);
-	if (ROM_HEADER->CRC1 == sl(0x0414CA61)) // E
-	  return 0xb00329f0 + (addresse & MEMMASK);
-	if (ROM_HEADER->CRC1 == sl(0xA24F4CF1)) // J
-	  return 0xb0034b70 + (addresse & MEMMASK);
+	if (gameHacks.goldeneye_tlb)
+	  {
+	    if (ROM_HEADER->CRC1 == sl(0xDCBC50D1)) // US
+	      return 0xb0034b30 + (addresse & MEMMASK);
+	    if (ROM_HEADER->CRC1 == sl(0x0414CA61)) // E
+	      return 0xb00329f0 + (addresse & MEMMASK);
+	    if (ROM_HEADER->CRC1 == sl(0xA24F4CF1)) // J
+	      return 0xb0034b70 + (addresse & MEMMASK);
+	  }
      }
    if (w == 1)
      {

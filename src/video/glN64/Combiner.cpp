@@ -35,6 +35,7 @@
 #endif // !__GX__
 #include "Debug.h"
 #include "gDP.h"
+#include "../../main/game_hacks.h"
 
 CombinerInfo combiner;
 
@@ -478,7 +479,8 @@ void Combiner_SelectCombine( u64 mux )
 {
 	//TODO: mux may have an endian issue
 	// Hack for the Banjo-Tooie shadow (framebuffer textures must be enabled too)
-	if ((gDP.otherMode.cycleType == G_CYC_1CYCLE) && (mux == 0x00ffe7ffffcf9fcfLL) && (cache.current[0]->frameBufferTexture))
+	if (gameHacks.banjo_tooie_shadow &&
+	    (gDP.otherMode.cycleType == G_CYC_1CYCLE) && (mux == 0x00ffe7ffffcf9fcfLL) && (cache.current[0]->frameBufferTexture))
 	{
 		mux = EncodeCombineMode( 0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0,
 								 0, 0, 0, 0, TEXEL0, 0, PRIMITIVE, 0 );

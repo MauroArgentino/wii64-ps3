@@ -50,6 +50,7 @@ extern "C" {
 #include "../main/savestates.h"
 #include "ROM-Cache.h"
 #include "wii64config.h"
+#include "game_hacks.h"
 #include "../ui/fileBrowser/fileBrowser.h"
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
 }
@@ -377,6 +378,7 @@ int loadROM(fileBrowser_file* rom){
 
 	// Init everything for this ROM
 	init_memory();
+	GameHacks_Detect();
 
 //	gfx_set_fb(xfb[0], xfb[1]);
 	// Adjust window settings based on the actual display resolution

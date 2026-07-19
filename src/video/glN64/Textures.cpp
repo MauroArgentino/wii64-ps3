@@ -44,6 +44,7 @@
 #include "convert.h"
 #include "2xSAI.h"
 #include "FrameBuffer.h"
+#include "../../main/game_hacks.h"
 
 TextureCache	cache;
 #ifdef __GX__
@@ -1293,7 +1294,8 @@ void TextureCache_Load( CachedTexture *texInfo )
 	}
 
 	// Hack for Zelda warp texture
-	if (((texInfo->tMem << 3) + (texInfo->width * texInfo->height << texInfo->size >> 1)) > 4096)
+	if (gameHacks.zelda_warp &&
+	    ((texInfo->tMem << 3) + (texInfo->width * texInfo->height << texInfo->size >> 1)) > 4096)
 		texInfo->tMem = 0;
 
 #ifdef __GX__
