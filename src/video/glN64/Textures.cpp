@@ -1598,9 +1598,13 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 		rsxTextureFilter(context,OGL.textureUnit_id,GCM_TEXTURE_LINEAR,GCM_TEXTURE_LINEAR,GCM_TEXTURE_CONVOLUTION_QUINCUNX);
 	else
 		rsxTextureFilter(context,OGL.textureUnit_id,GCM_TEXTURE_NEAREST,GCM_TEXTURE_NEAREST,GCM_TEXTURE_CONVOLUTION_QUINCUNX);
-	// Set clamping modes
-	rsxTextureWrapMode(context,OGL.textureUnit_id,texture->clampS ? GCM_TEXTURE_CLAMP_TO_EDGE : GCM_TEXTURE_REPEAT,
-		texture->clampT ? GCM_TEXTURE_CLAMP_TO_EDGE : GCM_TEXTURE_REPEAT,GCM_TEXTURE_CLAMP_TO_EDGE,0,GCM_TEXTURE_ZFUNC_LESS,0);
+	// Set clamping modes (N64 has 4 wrap modes: clamp, repeat, mirror, mirror+clamp)
+	u32 wrapS, wrapT;
+	if (texture->mirrorS) wrapS = texture->clampS ? GCM_TEXTURE_MIRROR_CLAMP_TO_EDGE : GCM_TEXTURE_MIRRORED_REPEAT;
+	else                  wrapS = texture->clampS ? GCM_TEXTURE_CLAMP_TO_EDGE : GCM_TEXTURE_REPEAT;
+	if (texture->mirrorT) wrapT = texture->clampT ? GCM_TEXTURE_MIRROR_CLAMP_TO_EDGE : GCM_TEXTURE_MIRRORED_REPEAT;
+	else                  wrapT = texture->clampT ? GCM_TEXTURE_CLAMP_TO_EDGE : GCM_TEXTURE_REPEAT;
+	rsxTextureWrapMode(context,OGL.textureUnit_id,wrapS,wrapT,GCM_TEXTURE_CLAMP_TO_EDGE,0,GCM_TEXTURE_ZFUNC_LESS,0);
 //	dbg_printf("TextureCache_ActivateTexture %d\r\n", t);
 #elif defined(__GX__)
 	if (!((gDP.otherMode.textureFilter == G_TF_BILERP) || (gDP.otherMode.textureFilter == G_TF_AVERAGE) || (OGL.forceBilinear)))

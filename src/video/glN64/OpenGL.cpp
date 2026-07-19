@@ -2061,22 +2061,26 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 //	dbg_printf("OGL_TexRect V1=[%f,%f], V2=[%f,%f], z=%f, col=%f, %f, %f, %f\r\n", rect[0].x, rect[0].y, rect[1].x, rect[1].y, rect[0].z,
 //		rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
 	rsxDrawVertexBegin(context,GCM_TYPE_QUADS);
+		// TL: (uls, ult)
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
 		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[0].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[0].x, rect[0].y, rect[0].z, 1.0f);
 
+		// TR: (lrs, ult) or flipped: (lrs, ult)
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
 		if (flip)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[0].t0);
-		else		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[1].t0);
+		else		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[0].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[1].x, rect[0].y, rect[0].z, 1.0f);
 
+		// BR: (lrs, lrt)
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
 		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[1].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[1].x, rect[1].y, rect[0].z, 1.0f);
 
+		// BL: (uls, lrt) or flipped: (uls, lrt)
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
 		if (flip)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[1].t0);
-		else		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[1].t0);
+		else		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[1].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[0].x, rect[1].y, rect[0].z, 1.0f);
 	rsxDrawVertexEnd(context);
 #elif defined(__GX__)
