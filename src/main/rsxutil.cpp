@@ -31,21 +31,31 @@ u32 color_offset[2];
 u32 *color_buffer[2];
 
 static u32 sLabelVal = 1;
+int rsx_hung = 0;
 
 static void waitFinish()
 {
+	u32 timeout = 0;
 	rsxSetWriteBackendLabel(context,GCM_LABEL_INDEX,sLabelVal);
 
 	rsxFlushBuffer(context);
 
 	while(*(vu32*)gcmGetLabelAddress(GCM_LABEL_INDEX)!=sLabelVal)
+	{
 		usleep(30);
+		if(++timeout > 100000) {
+			rsx_hung = 1;
+			return;
+		}
+	}
 
 	++sLabelVal;
 }
 
 static void waitRSXIdle()
 {
+	if (rsx_hung) return;
+
 	rsxSetWriteBackendLabel(context,GCM_LABEL_INDEX,sLabelVal);
 	rsxSetWaitLabel(context,GCM_LABEL_INDEX,sLabelVal);
 
@@ -93,9 +103,26 @@ void setRenderTarget(u32 index)
 void init_screen(void *host_addr,u32 size)
 {
 	context = rsxInit(CB_SIZE,size,host_addr);
+	if (context == NULL) {
+		if (host_addr) free(host_addr);
+		return;
+	}
 
 	videoState state;
-	videoGetState(0,0,&state);
+	if (videoGetState(0,0,&state) != 0) {
+		rsxFinish(context,0);
+		if (host_addr) free(host_addr);
+		context = NULL;
+		return;
+	}
+
+	/* Make sure display is enabled */
+	if (state.state != 0) {
+		rsxFinish(context,0);
+		if (host_addr) free(host_addr);
+		context = NULL;
+		return;
+	}
 
 	videoConfiguration vconfig;
 	memset(&vconfig,0,sizeof(videoConfiguration));
@@ -118,10 +145,16 @@ void init_screen(void *host_addr,u32 size)
 
 	vconfig.format = VIDEO_BUFFER_FORMAT_XRGB;
 	vconfig.pitch = display_width*sizeof(u32);
+	vconfig.aspect = state.displayMode.aspect;
 
 	waitRSXIdle();
 
-	videoConfigure(0,&vconfig,NULL,0);
+	if (videoConfigure(0,&vconfig,NULL,0) != 0) {
+		rsxFinish(context,0);
+		if (host_addr) free(host_addr);
+		context = NULL;
+		return;
+	}
 	videoGetState(0,0,&state);
 
 	gcmSetFlipMode(GCM_FLIP_VSYNC);
@@ -129,6 +162,13 @@ void init_screen(void *host_addr,u32 size)
 	color_pitch = display_width*sizeof(u32);
 	color_buffer[0] = (u32*)rsxMemalign(64,(display_height*color_pitch));
 	color_buffer[1] = (u32*)rsxMemalign(64,(display_height*color_pitch));
+
+	if (!color_buffer[0] || !color_buffer[1]) {
+		rsxFinish(context,0);
+		if (host_addr) free(host_addr);
+		context = NULL;
+		return;
+	}
 
 	rsxAddressToOffset(color_buffer[0],&color_offset[0]);
 	rsxAddressToOffset(color_buffer[1],&color_offset[1]);
@@ -139,6 +179,8 @@ void init_screen(void *host_addr,u32 size)
 	depth_pitch = display_width*sizeof(u32);
 	depth_buffer = (u32*)rsxMemalign(64,(display_height*depth_pitch)*2);
 	rsxAddressToOffset(depth_buffer,&depth_offset);
+
+	gcmResetFlipStatus();
 }
 
 void waitflip()

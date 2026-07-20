@@ -39,10 +39,11 @@ static int availableRegsDefault[32] = {
 	0, /* r0 is mostly used for saving/restoring lr: used as a temp */
 	0, /* sp: leave alone! */
 	0, /* gp: leave alone! */
-	1,1,1,1,1,1,1,1, /* Volatile argument registers */
-	1,1, /* Volatile registers */
-	/* Non-volatile registers: using might be too costly */
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	1,1,1,1,1,1,1,1, /* r3-r10: Volatile argument registers */
+	1,1, /* r11-r12: Volatile registers */
+	0, /* r13: TLS/unused */
+	0,0,0,0,0,0,0,0,0,0, /* r14-r23: DYNAREG base pointers */
+	1,1,1,1,1,1,1,1  /* r24-r31: Non-volatile, safe on PS3 (saved by dyna_run trampoline) */
 	};
 static int availableRegs[32];
 
@@ -277,11 +278,9 @@ static struct {
 
 static unsigned int nextLRUValFPR;
 static int availableFPRsDefault[32] = {
-	0, /* Volatile: used as a temp */
-	1,1,1,1,1,1,1,1, /* Volatile argument registers */
-	1,1,1,1,1, /* Volatile registers */
-	/* Non-volatile registers: using might be too costly */
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	0, /* f0: temp, used by recompiler for fctiw/stfiwx etc */
+	1,1,1,1,1,1,1,1,1,1,1,1,1, /* f1-f13: Volatile registers */
+	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 /* f14-f31: Non-volatile, callee-saved by C ABI */
 	};
 static int availableFPRs[32];
 

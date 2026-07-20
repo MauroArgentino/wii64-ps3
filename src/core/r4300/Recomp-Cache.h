@@ -23,8 +23,8 @@
 #ifndef RECOMP_CACHE_H
 #define RECOMP_CACHE_H
 
-// Hold 16MB worth of recompiled data max on PS3
-#define RECOMP_CACHE_SIZE (16*1024*1024)
+// Hold 64MB worth of recompiled data max on PS3 (was 16MB, PS3 has 256MB XDR)
+#define RECOMP_CACHE_SIZE (64*1024*1024)
 
 // Allocate and free memory to be used for recompiled code
 //   Any memory allocated this way can be freed at any time

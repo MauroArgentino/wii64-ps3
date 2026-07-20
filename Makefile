@@ -137,11 +137,11 @@ run:
 #---------------------------------------------------------------------------------
 pkg:	$(BUILD) $(OUTPUT).pkg
 
-$(OUTPUT).pkg: $(OUTPUT).self
-	@echo "Generando PKG usando la carpeta 'pkg' de la raiz..."
+$(OUTPUT).pkg: $(OUTPUT).elf
+	@echo "Generando PKG con EBOOT.BIN NPDRM..."
 	@mkdir -p $(CURDIR)/pkg/USRDIR
-	@cp $< $(CURDIR)/pkg/USRDIR/EBOOT.BIN
-	@$(PKG) --contentid $(CONTENTID) $(CURDIR)/pkg/ $@
+	@$(SELF_NPDRM) $(SCETOOL_FLAGS) --np-content-id=$(CONTENTID) --encrypt $< $(CURDIR)/pkg/USRDIR/EBOOT.BIN
+	@C:/PSDK3v2/mingw/Python27/python.exe C:/PSDK3v2/ps3dev/bin/pkg.py --contentid $(CONTENTID) "$(CURDIR)/pkg/" $@
 
 #---------------------------------------------------------------------------------
 

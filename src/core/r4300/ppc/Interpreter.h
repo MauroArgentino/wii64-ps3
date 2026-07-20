@@ -135,60 +135,55 @@
 //#define INTERPRET_CTC1
 //#endif
 
-#if 1
-#define INTERPRET_FP_S
-#define INTERPRET_FP_D
-#define INTERPRET_FP_W
+// FP recompilation enabled — all FP ops now recompiled to native PPC instructions
+// FP format gates (S/D/W/L dispatch to individual ops)
+// L kept interpreted: CVT_FP_L needs __floatdidf/__floatdisf (soft-float, not in PS3 libgcc)
+//#define INTERPRET_FP_S
+//#define INTERPRET_FP_D
+//#define INTERPRET_FP_W
 #define INTERPRET_FP_L
-#endif
 
-#if 1
-#define INTERPRET_FP_ADD
-#define INTERPRET_FP_SUB
-#define INTERPRET_FP_MUL
-#define INTERPRET_FP_DIV
-#define INTERPRET_FP_ABS
-#define INTERPRET_FP_MOV
-#define INTERPRET_FP_NEG
-#endif
-#define INTERPRET_FP_SQRT
+// FP arithmetic → native PPC fadd/fsub/fmul/fdiv/fabs/fmr/fneg/fsqrt
+//#define INTERPRET_FP_ADD
+//#define INTERPRET_FP_SUB
+//#define INTERPRET_FP_MUL
+//#define INTERPRET_FP_DIV
+//#define INTERPRET_FP_ABS
+//#define INTERPRET_FP_MOV
+//#define INTERPRET_FP_NEG
+//#define INTERPRET_FP_SQRT
 
-#if 1
+// FP rounding/conversions → native PPC fctiw/fctiwz/mtfsfi
+// _L variants kept interpreted: need __fixdfdi/__floatdidf (soft-float, not in PS3 libgcc)
 #define INTERPRET_FP_ROUND_L
 #define INTERPRET_FP_TRUNC_L
 #define INTERPRET_FP_FLOOR_L
 #define INTERPRET_FP_CEIL_L
-#endif
-#if 1
-#define INTERPRET_FP_ROUND_W
-#define INTERPRET_FP_TRUNC_W
-#define INTERPRET_FP_FLOOR_W
-#define INTERPRET_FP_CEIL_W
-#endif
-#if 1
-#define INTERPRET_FP_CVT_S
-#define INTERPRET_FP_CVT_D
-#define INTERPRET_FP_CVT_W
 #define INTERPRET_FP_CVT_L
-#endif
+//#define INTERPRET_FP_ROUND_W
+//#define INTERPRET_FP_TRUNC_W
+//#define INTERPRET_FP_FLOOR_W
+//#define INTERPRET_FP_CEIL_W
+//#define INTERPRET_FP_CVT_S
+//#define INTERPRET_FP_CVT_D
+//#define INTERPRET_FP_CVT_W
 
-#if 1
-#define INTERPRET_FP_C_F
-#define INTERPRET_FP_C_UN
-#define INTERPRET_FP_C_EQ
-#define INTERPRET_FP_C_UEQ
-#define INTERPRET_FP_C_OLT
-#define INTERPRET_FP_C_ULT
-#define INTERPRET_FP_C_OLE
-#define INTERPRET_FP_C_ULE
-#define INTERPRET_FP_C_SF
-#define INTERPRET_FP_C_NGLE
-#define INTERPRET_FP_C_SEQ
-#define INTERPRET_FP_C_NGL
-#define INTERPRET_FP_C_LT
-#define INTERPRET_FP_C_NGE
-#define INTERPRET_FP_C_LE
-#define INTERPRET_FP_C_NGT
-#endif
+// FP comparisons → native PPC fcmpu/crand/cror + branch
+//#define INTERPRET_FP_C_F
+//#define INTERPRET_FP_C_UN
+//#define INTERPRET_FP_C_EQ
+//#define INTERPRET_FP_C_UEQ
+//#define INTERPRET_FP_C_OLT
+//#define INTERPRET_FP_C_ULT
+//#define INTERPRET_FP_C_OLE
+//#define INTERPRET_FP_C_ULE
+//#define INTERPRET_FP_C_SF
+//#define INTERPRET_FP_C_NGLE
+//#define INTERPRET_FP_C_SEQ
+//#define INTERPRET_FP_C_NGL
+//#define INTERPRET_FP_C_LT
+//#define INTERPRET_FP_C_NGE
+//#define INTERPRET_FP_C_LE
+//#define INTERPRET_FP_C_NGT
 
 #endif

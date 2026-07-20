@@ -66,6 +66,7 @@ extern "C" {
 #include <netinet/in.h>
 #include <net/socket.h>
 #include <sysutil/sysutil.h>
+#include <sysmodule/sysmodule.h>
 
 #include <assert.h>
 #include <io/pad.h>
@@ -229,10 +230,20 @@ int main(int argc, char* argv[]){
 	/* INITIALIZE */
 	Initialise();
 
+	/* Load required sysmodules */
+	sysModuleLoad(SYSMODULE_GCM_SYS);
+	sysModuleLoad(SYSMODULE_IO);
+	sysModuleLoad(SYSMODULE_SYSUTIL);
+	sysModuleLoad(SYSMODULE_FS);
+
 	udp_setup();
 	void *host_addr = memalign(1024*1024,HOST_SIZE);
 
 	init_screen(host_addr,HOST_SIZE);
+	if (context == NULL || rsx_hung) {
+		/* RSX init failed or hung — black screen otherwise */
+		while(1) usleep(500000);
+	}
 	ioPadInit(7);
 	setRenderTarget(curr_fb);
 	atexit(program_exit_callback);

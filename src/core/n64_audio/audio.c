@@ -35,6 +35,19 @@
 #include <math.h>
 #include <audio/audio.h>
 #include <sys/event_queue.h>
+#include <lv2/systime.h>
+
+// Uncomment for audio timing debug logging (prints to stdout)
+#define AUDIO_DEBUG_LOG
+#ifdef AUDIO_DEBUG_LOG
+static s64 audio_log_t0 = 0; // first timestamp for relative time
+#define ATLOG(fmt, ...) do { \
+	if(!audio_log_t0) audio_log_t0 = sysGetSystemTime(); \
+	printf("[ADEBUG %8.3f] " fmt "\n", (float)(sysGetSystemTime() - audio_log_t0) / 1000000.0f, ##__VA_ARGS__); \
+} while(0)
+#else
+#define ATLOG(fmt, ...) do {} while(0)
+#endif
 
 // Uncomment to dump raw PCM to /dev_hdd0/tmp/audio_dump.pcm
 // Format: s16le stereo, 48kHz
@@ -231,6 +244,7 @@ s32 playOneBlock()
 		portDataStart = (f32*)((u64)config.audioDataStart);
 
 	buf = portDataStart + config.channelCount * AUDIO_BLOCK_SAMPLES * next_write_block;
+	ATLOG("playOneBlock: writing to port block %d/%ld (portAddr=%08x)", next_write_block, config.numBlocks, (u32)portDataStart);
 	fillBuffer(buf);
 	next_write_block = (next_write_block + 1) % config.numBlocks;
 	return 0;
@@ -252,12 +266,17 @@ static void play_buffer(void){
 	if(!port_started){
 		audioPortStart(portNum);
 		port_started = 1;
+		ATLOG("audio port STARTED (non-threaded)");
 	}
 	// Non-threaded: drain ring buffer into PS3 blocks on R4300 thread.
 	// No pacing — writes as fast as CPU produces audio.
+	unsigned int blocks_written = 0;
 	while(read_pos + AUDIO_BLOCK_SAMPLES * 4 <= buffer_offset){
 		playOneBlock();
+		blocks_written++;
 	}
+	if(blocks_written > 0)
+		ATLOG("non-threaded drain: wrote %u blocks buf_off=%u read_pos=%u", blocks_written, buffer_offset, read_pos);
 #else // THREADED_AUDIO
 	// Audio thread: waits for add_to_buffer() to fill a buffer, drains it
 	// into PS3 audio blocks.
@@ -270,13 +289,17 @@ static void play_buffer(void){
 		if(!port_started){
 			audioPortStart(portNum);
 			port_started = 1;
+			ATLOG("audio port STARTED");
 		}
 
 		// Drain this buffer into PS3 audio blocks
 		unsigned int level = drain_level;
+		unsigned int blocks_written = 0;
 		while(read_pos + AUDIO_BLOCK_SAMPLES * 4 <= level){
 			playOneBlock();
+			blocks_written++;
 		}
+		ATLOG("thread drain: level=%u blocks=%u next_write=%d", level, blocks_written, next_write_block);
 
 		// Signal add_to_buffer() that this buffer slot is free
 		NEXT(thread_buffer);
@@ -338,6 +361,7 @@ static void inline add_to_buffer(void* stream, unsigned int length){
 	unsigned int rlengthLeft = (unsigned int)ceilf((float)lengthLeft / freq_ratio);
 
 	input_frames_left = lengthLeft;
+	ATLOG("add_to_buffer: length=%u in_frames=%u out_frames=%u buf_off=%u/%u", length, lengthLeft, rlengthLeft, buffer_offset, buffer_size);
 
 	while(input_frames_left > 0){
 		unsigned int avail_out = (buffer_size - buffer_offset) >> 2;
@@ -364,6 +388,7 @@ static void inline add_to_buffer(void* stream, unsigned int length){
 		if(buffer_offset < buffer_size){
 			if(input_frames_left == 0){
 #ifdef THREADED_AUDIO
+				ATLOG("add_to_buffer: partial fill buf_off=%u/%u (waiting for more)", buffer_offset, buffer_size);
 				sem_post(buffer_empty);
 #endif
 				return;
@@ -371,6 +396,8 @@ static void inline add_to_buffer(void* stream, unsigned int length){
 			continue;
 		}
 
+		// Buffer is full — signal audio thread
+		ATLOG("add_to_buffer: BUFFER FULL buf=%d drain_level=%u -> signaling thread", which_buffer, buffer_offset);
 #ifdef THREADED_AUDIO
 		// Ensure buffer data is visible to audio thread before signaling
 		__asm__ __volatile__("lwsync" ::: "memory");
@@ -397,6 +424,7 @@ AiLenChanged( void )
 		         (*AudioInfo.AI_DRAM_ADDR_REG & 0xFFFFFF));
 	unsigned int length = *AudioInfo.AI_LEN_REG;
 
+	ATLOG("AiLenChanged: addr=%08x len=%u freq=%u ratio=%.3f", *AudioInfo.AI_DRAM_ADDR_REG & 0xFFFFFF, length, freq, freq_ratio);
 	add_to_buffer(stream, length);
 }
 
@@ -474,6 +502,12 @@ InitiateAudio( AUDIO_INFO Audio_Info )
 	dbg_printf("config.portSize: %d\n",config.portSize);
 	dbg_printf("config.audioDataStart: %08x\n",config.audioDataStart);
 
+	// Debug log: port geometry
+	printf("[ADEBUG] PORT: numBlocks=%ld blockSamples=%d blockSize=%ld totalBytes=%d ch=%ld dataStart=%08x\n",
+		config.numBlocks, AUDIO_BLOCK_SAMPLES,
+		(long)(config.channelCount * AUDIO_BLOCK_SAMPLES * sizeof(f32)),
+		config.portSize, config.channelCount, config.audioDataStart);
+
 	ret = audioCreateNotifyEventQueue(&snd_queue,&snd_key);
 	dbg_printf("audioCreateNotifyEventQueue: %08x\n",ret);
 	dbg_printf("snd_queue: %16lx\n",(long unsigned int)snd_queue);
@@ -484,6 +518,8 @@ InitiateAudio( AUDIO_INFO Audio_Info )
 
 	ret = sysEventQueueDrain(snd_queue);
 	dbg_printf("sysEventQueueDrain: %08x\n",ret);
+
+	ATLOG("InitiateAudio: freq=%u real_freq=%u ratio=%.3f", freq, real_freq, freq_ratio);
 	return TRUE;
 }
 
