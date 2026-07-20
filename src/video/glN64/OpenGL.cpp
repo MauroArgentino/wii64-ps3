@@ -57,6 +57,7 @@
 #include "Textures.h"
 #include "Combiner.h"
 #include "VI.h"
+#include "../../main/game_hacks.h"
 
 #ifndef GL_BGR
 #define GL_BGR GL_BGR_EXT
@@ -2475,6 +2476,7 @@ void OGL_RSXinitDlist()
 
 	// Sync render settings from menu
 	OGL.frameBufferTextures = glN64_useFrameBufferTextures;
+	if (gameHacks.mm_fbtex) OGL.frameBufferTextures = 1;
 	OGL.enable2xSaI = glN64_use2xSaiTextures;
 
 	//Turn off Blending

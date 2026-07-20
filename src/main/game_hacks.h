@@ -35,9 +35,10 @@ typedef struct _game_hacks {
 
 	/* Zelda Majora's Mask specific */
 	u8 mm_fix_logo_alpha;     /* MM: fix N64 logo alpha LOAD(TEXEL*_ALPHA) bug */
+	u8 mm_fbtex;              /* MM: auto-enable framebuffer textures for blur */
 
 	/* Reserved for future per-game flags */
-	u8 reserved[7];
+	u8 reserved[6];
 } GameHacks;
 
 extern GameHacks gameHacks;

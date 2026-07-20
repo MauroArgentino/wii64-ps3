@@ -10,6 +10,8 @@ extern gcmContextData *context;
 extern u32 display_width;
 extern u32 display_height;
 extern u32 curr_fb;
+extern u32 color_pitch;
+extern u32 color_offset[2];
 
 void setRenderTarget(u32 index);
 void init_screen(void *host_addr,u32 size);

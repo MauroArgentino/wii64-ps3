@@ -27,6 +27,7 @@
 #include "Textures.h"
 #include "Combiner.h"
 #include "Types.h"
+#include "../../main/game_hacks.h"
 
 FrameBufferInfo frameBuffer;
 
@@ -208,8 +209,22 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 				break;
 			}
 #ifdef PS3
-			// RSX: No direct equivalent of GX_CopyTex / glCopyTexSubImage2D.
-			// Framebuffer-to-texture copy not yet implemented for RSX.
+			if (current->texture->rsxTextureBuffer != NULL)
+			{
+				// RSX: Copy current color buffer to framebuffer texture
+				rsxSetTransferImage(context, GCM_TRANSFER_LOCAL_TO_LOCAL,
+					current->texture->rsxTextureOffset,
+					current->texture->realWidth * 4,
+					0, 0,
+					color_offset[curr_fb],
+					color_pitch,
+					0, 0,
+					current->texture->width,
+					current->texture->height,
+					4);
+				rsxFlushBuffer(context);
+				rsxInvalidateTextureCache(context, GCM_INVALIDATE_TEXTURE);
+			}
 #elif defined(__GX__)
 			//Note: texture realWidth and realHeight should be multiple of 2!
 			GX_SetTexCopySrc(OGL.GXorigX, OGL.GXorigY,(u16) current->texture->realWidth,(u16) current->texture->realHeight);
@@ -322,8 +337,45 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 	cache.cachedBytes += current->texture->textureBytes;
 
 #ifdef PS3
-	// RSX: No direct equivalent of GX_CopyTex / glCopyTexImage2D.
-	// Framebuffer-to-texture copy not yet implemented for RSX.
+	// RSX: Allocate texture buffer and copy current color buffer
+	current->texture->rsxTextureBuffer = (u32*)rsxMemalign(128, current->texture->textureBytes);
+	if (current->texture->rsxTextureBuffer)
+	{
+		rsxAddressToOffset(current->texture->rsxTextureBuffer, &current->texture->rsxTextureOffset);
+
+		current->texture->rsxTex.format    = (GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN);
+		current->texture->rsxTex.mipmap    = 1;
+		current->texture->rsxTex.dimension = GCM_TEXTURE_DIMS_2D;
+		current->texture->rsxTex.cubemap   = GCM_FALSE;
+		current->texture->rsxTex.remap     = ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+		                                       (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+		                                       (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+		                                       (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
+		                                       (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT) |
+		                                       (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+		                                       (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+		                                       (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT));
+		current->texture->rsxTex.width    = current->texture->realWidth;
+		current->texture->rsxTex.height   = current->texture->realHeight;
+		current->texture->rsxTex.depth    = 1;
+		current->texture->rsxTex.location = GCM_LOCATION_RSX;
+		current->texture->rsxTex.pitch    = current->texture->realWidth * 4;
+		current->texture->rsxTex.offset   = current->texture->rsxTextureOffset;
+
+		// Copy from color buffer to framebuffer texture
+		rsxSetTransferImage(context, GCM_TRANSFER_LOCAL_TO_LOCAL,
+			current->texture->rsxTextureOffset,
+			current->texture->realWidth * 4,
+			0, 0,
+			color_offset[curr_fb],
+			color_pitch,
+			0, 0,
+			current->texture->width,
+			current->texture->height,
+			4);
+		rsxFlushBuffer(context);
+		rsxInvalidateTextureCache(context, GCM_INVALIDATE_TEXTURE);
+	}
 #elif defined(__GX__)
 	//Note: texture realWidth and realHeight should be multiple of 2!
 	GX_SetTexCopySrc((u16) OGL.GXorigX, (u16) OGL.GXorigY,(u16) current->texture->realWidth,(u16) current->texture->realHeight);

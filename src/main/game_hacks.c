@@ -55,5 +55,6 @@ void GameHacks_Detect(void)
 	{
 		gameHacks.zelda_warp = 1;
 		gameHacks.mm_fix_logo_alpha = 1;
+		gameHacks.mm_fbtex = 1;
 	}
 }
