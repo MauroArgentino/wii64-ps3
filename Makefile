@@ -57,6 +57,24 @@ LIBS	:=	-laudio -lsimdmath -lrsx -lgcm_sys -lio -lsysmodule -lsysutil -lrt -llv2
 LIBDIRS	:=
 
 #---------------------------------------------------------------------------------
+# SPU program: compiled separately, embedded into PPU ELF via bin2s
+#---------------------------------------------------------------------------------
+SPU_DIR		:=	src/platform/ps3/spu_core
+SPU_CC		:=	spu-gcc
+SPU_LD		:=	spu-gcc
+SPU_OBJCOPY	:=	spu-objcopy
+SPU_AS		:=	ppu-as
+SPU_BIN2S	:=	bin2s
+
+SPU_CFLAGS	:=	-O2 -Wall -ffreestanding -nostdlib -I$(PSL1GHT)/spu/include
+SPU_LDFLAGS	:=	-nostdlib -Ttext 0x0
+
+SPU_TARGET	:=	spu_core
+SPU_ELF		:=	$(SPU_DIR)/$(SPU_TARGET).elf
+SPU_BIN		:=	$(SPU_DIR)/$(SPU_TARGET).bin
+SPU_EMBED_OBJ	:=	$(SPU_DIR)/$(SPU_TARGET)_elf.o
+
+#---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
 # rules for different file extensions
 #---------------------------------------------------------------------------------
@@ -98,7 +116,8 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 					$(addsuffix .o,$(VPOFILES)) \
 					$(addsuffix .o,$(FPOFILES)) \
 					$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) \
-					$(sFILES:.s=.o) $(SFILES:.S=.o)
+					$(sFILES:.s=.o) $(SFILES:.S=.o) \
+					$(notdir $(SPU_EMBED_OBJ))
 
 #---------------------------------------------------------------------------------
 # build a list of include paths
@@ -120,15 +139,27 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 .PHONY: $(BUILD) clean
 
 #---------------------------------------------------------------------------------
-$(BUILD):
+$(BUILD): spu_build
 	@[ -d $@ ] || mkdir -p $@
+	@cp -f $(SPU_EMBED_OBJ) $@/$(notdir $(SPU_EMBED_OBJ))
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+
+#---------------------------------------------------------------------------------
+spu_build:
+	@echo "Compiling SPU program..."
+	@$(SPU_CC) $(SPU_CFLAGS) -c $(SPU_DIR)/spu_main.c -o $(SPU_DIR)/spu_main.o
+	@$(SPU_LD) $(SPU_LDFLAGS) -L$(PSL1GHT)/spu/lib $(SPU_DIR)/spu_main.o -lsputhread -o $(SPU_ELF)
+	@echo "Embedding SPU ELF into PPU object via bin2s..."
+	@$(SPU_BIN2S) -a 64 $(SPU_ELF) | $(SPU_AS) -o $(SPU_EMBED_OBJ)
+	@echo "SPU build complete"
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
 	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).self $(OUTPUT).pkg *.map
 	@rm -f $(foreach dir,$(SOURCES),$(dir)/*.o) $(foreach dir,$(SOURCES),$(dir)/*.d)
+	@echo "Cleaning SPU artifacts..."
+	@rm -f $(SPU_DIR)/*.o $(SPU_DIR)/*.elf $(SPU_DIR)/*.bin $(SPU_EMBED_OBJ)
 
 #---------------------------------------------------------------------------------
 run:

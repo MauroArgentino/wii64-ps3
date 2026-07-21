@@ -53,6 +53,7 @@ extern "C" {
 #include "game_hacks.h"
 #include "../ui/fileBrowser/fileBrowser.h"
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
+#include "../platform/ps3/spu_manager.h"
 }
 
 #include <stdio.h>
@@ -90,6 +91,7 @@ struct sockaddr_in server;
 
 void program_exit_callback()
 {
+	spu_manager_shutdown();
 	ps3_audio_exit();
 	gcmSetWaitFlip(context);
 	rsxFinish(context,1);
@@ -249,6 +251,15 @@ int main(int argc, char* argv[]){
 	atexit(program_exit_callback);
 	sysUtilRegisterCallback(0,sysutil_exit_callback,NULL);
 	// ps3_audio_init(); // DISABLED: second audio port interferes with ROM audio on RPCS3
+
+	/* Initialize SPU manager (Phase 0 skeleton) */
+	if (spu_manager_init() == 0) {
+		printf("[MAIN] SPU manager init OK\n");
+		if (spu_manager_start() == 0) {
+			printf("[MAIN] SPU manager started OK\n");
+			spu_send_command(SPU_CMD_PING, 0);
+		}
+	}
 
 	//Initialize controls once before menu runs <- needed?
 	control_info_init();
