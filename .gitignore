@@ -4,6 +4,13 @@ rom.z64
 *.pkg
 *.self
 *.log
+*.o
+*.d
+*.vpo
+*.fpo
+*.bin
+*.stackdump
 python2.7
 .vscode/
 gitk3y.txt
+pkg/USRDIR/
