@@ -63,7 +63,9 @@ static s64 audio_log_t0 = 0; // first timestamp for relative time
 // Use a dedicated audio thread so R4300 isn't blocked during block writes.
 // The thread drains ring buffer into PS3 blocks at the hardware rate,
 // writing silence when no N64 data is available to keep the port alive.
-#define THREADED_AUDIO
+// DISABLED: threaded path causes audio reverberation/distortion.
+// The non-threaded synchronous path (a68ecdf) sounds clean.
+// #define THREADED_AUDIO
 #ifdef AUDIO_PCM_DUMP
 static FILE *pcm_dump = NULL;
 static int pcm_dump_frames = 0;
