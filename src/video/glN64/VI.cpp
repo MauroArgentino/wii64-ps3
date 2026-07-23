@@ -93,6 +93,18 @@ void VI_UpdateScreen()
 		return;
 	VI_RSX_showFPS();
 	VI_RSX_showDEBUG();
+
+	// FBE: Save current framebuffer so gDPLoadTile can detect it
+	// (GL path does this at lines 192-196; PS3 was missing it entirely)
+	if (OGL.frameBufferTextures)
+	{
+		if (gDP.colorImage.changed)
+		{
+			FrameBuffer_SaveBuffer( gDP.colorImage.address, gDP.colorImage.size, gDP.colorImage.width, gDP.colorImage.height );
+			gDP.colorImage.changed = FALSE;
+		}
+	}
+
 	rsxSetBlendEnable(context, GCM_FALSE);
 	rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
 	rsxSetDepthTestEnable(context, GCM_TRUE);

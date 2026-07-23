@@ -426,11 +426,45 @@ void FrameBuffer_RenderBuffer( u32 address )
 			glEnable( GL_TEXTURE_2D );*/
 
 #ifdef PS3
-			// RSX render state for framebuffer copy quad
+			// RSX: Draw saved framebuffer texture to current render target
 			rsxSetBlendEnable(context, GCM_FALSE);
 			rsxSetDepthTestEnable(context, GCM_FALSE);
 			rsxSetDepthWriteEnable(context, GCM_FALSE);
 			rsxSetCullFaceEnable(context, GCM_FALSE);
+			rsxSetScissor(context, 0, 0, display_width, display_height);
+
+			{
+				float u1 = (float)current->texture->width / (float)current->texture->realWidth;
+				float v1 = (float)current->texture->height / (float)current->texture->realHeight;
+
+				OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, (float)display_width, (float)display_height, 0.0f, 1.0f, -1.0f));
+				rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
+				rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
+				rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+
+				f32 vp_scale[4] = { display_width * 0.5f, display_height * -0.5f, 0.5f, 0.0f };
+				f32 vp_offset[4] = { display_width * 0.5f, display_height * 0.5f, 0.5f, 0.0f };
+				rsxSetViewport(context, 0, 0, display_width, display_height, 0.0f, 1.0f, vp_scale, vp_offset);
+
+				rsxDrawVertexBegin(context, GCM_TYPE_QUADS);
+					// TL
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, 0.0f, 0.0f, 0.0f, 1.0f);
+					// TR
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, u1, 0.0f);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, (float)current->texture->width, 0.0f, 0.0f, 1.0f);
+					// BR
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, u1, v1);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, (float)current->texture->width, (float)current->texture->height, 0.0f, 1.0f);
+					// BL
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 1.0f, 1.0f, 1.0f);
+					rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, v1);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, 0.0f, (float)current->texture->height, 0.0f, 1.0f);
+				rsxDrawVertexEnd(context);
+			}
 #elif defined(__GX__)
 			GX_SetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_CLEAR); 
 			GX_SetAlphaCompare(GX_ALWAYS,0,GX_AOP_AND,GX_ALWAYS,0);

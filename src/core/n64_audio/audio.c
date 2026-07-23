@@ -37,8 +37,8 @@
 #include <sys/event_queue.h>
 #include <lv2/systime.h>
 
-// Uncomment for audio timing debug logging (prints to stdout)
-#define AUDIO_DEBUG_LOG
+// Audio timing debug logging (prints to stdout) — DISABLED: causes RPCS3 crash
+// #define AUDIO_DEBUG_LOG
 #ifdef AUDIO_DEBUG_LOG
 static s64 audio_log_t0 = 0; // first timestamp for relative time
 #define ATLOG(fmt, ...) do { \

@@ -146,12 +146,16 @@ $(BUILD): spu_build
 
 #---------------------------------------------------------------------------------
 spu_build:
-	@echo "Compiling SPU program..."
-	@$(SPU_CC) $(SPU_CFLAGS) -c $(SPU_DIR)/spu_main.c -o $(SPU_DIR)/spu_main.o
-	@$(SPU_LD) $(SPU_LDFLAGS) -L$(PSL1GHT)/spu/lib $(SPU_DIR)/spu_main.o -lsputhread -o $(SPU_ELF)
-	@echo "Embedding SPU ELF into PPU object via bin2s..."
-	@$(SPU_BIN2S) -a 64 $(SPU_ELF) | $(SPU_AS) -o $(SPU_EMBED_OBJ)
-	@echo "SPU build complete"
+	@if [ ! -f "$(SPU_EMBED_OBJ)" ]; then \
+		echo "Compiling SPU program..."; \
+		$(SPU_CC) $(SPU_CFLAGS) -c $(SPU_DIR)/spu_main.c -o $(SPU_DIR)/spu_main.o; \
+		$(SPU_LD) $(SPU_LDFLAGS) -L$(PSL1GHT)/spu/lib $(SPU_DIR)/spu_main.o -lsputhread -o $(SPU_ELF); \
+		echo "Embedding SPU ELF into PPU object via bin2s..."; \
+		$(SPU_BIN2S) -a 64 $(SPU_ELF) | $(SPU_AS) -o $(SPU_EMBED_OBJ); \
+		echo "SPU build complete"; \
+	else \
+		echo "SPU pre-built artifacts found, skipping build"; \
+	fi
 
 #---------------------------------------------------------------------------------
 clean:

@@ -84,7 +84,7 @@ void setRenderTarget(u32 index)
 	sf.colorPitch[2]	= 64;
 	sf.colorPitch[3]	= 64;
 
-	sf.depthFormat		= GCM_TF_ZETA_Z16;
+	sf.depthFormat		= GCM_TF_ZETA_Z24S8;
 	sf.depthLocation	= GCM_LOCATION_RSX;
 	sf.depthOffset		= depth_offset;
 	sf.depthPitch		= depth_pitch;
@@ -176,7 +176,7 @@ void init_screen(void *host_addr,u32 size)
 	gcmSetDisplayBuffer(0,color_offset[0],color_pitch,display_width,display_height);
 	gcmSetDisplayBuffer(1,color_offset[1],color_pitch,display_width,display_height);
 
-	depth_pitch = display_width*sizeof(u32);
+	depth_pitch = display_width*sizeof(u32); // Z24S8 = 4 bytes per pixel
 	depth_buffer = (u32*)rsxMemalign(64,(display_height*depth_pitch)*2);
 	rsxAddressToOffset(depth_buffer,&depth_offset);
 

@@ -1374,6 +1374,77 @@ void OGL_AddTriangle( SPVertex *vertices, int v0, int v1, int v2 )
 	int CntTriProj, CntTriProjW, CntTriOther, CntTriNear, CntTriPolyOffset;
 #endif
 
+#ifdef PS3
+// Near-plane constant: vertices with w <= this are behind the camera
+#define NEAR_CLIP_EPS 0.001f
+
+// Clip polygon against w = NEAR_CLIP_EPS using Sutherland-Hodgman.
+// Input: polygon (3+ verts). Output: clipped polygon (max 6 verts).
+static int clipNearPlaneW(const GLVertex *in, int n, GLVertex *out)
+{
+	int m = 0;
+	for (int i = 0; i < n; i++) {
+		int j = (i + 1) % n;
+		float wi = in[i].w, wj = in[j].w;
+		int iFront = (wi > NEAR_CLIP_EPS);
+		int jFront = (wj > NEAR_CLIP_EPS);
+
+		if (iFront && jFront) {
+			out[m++] = in[j];
+		} else if (iFront && !jFront) {
+			float t = (NEAR_CLIP_EPS - wi) / (wj - wi);
+			GLVertex v;
+			v.x = in[i].x + t * (in[j].x - in[i].x);
+			v.y = in[i].y + t * (in[j].y - in[i].y);
+			v.z = in[i].z + t * (in[j].z - in[i].z);
+			v.w = NEAR_CLIP_EPS;
+			v.color.r = in[i].color.r + t * (in[j].color.r - in[i].color.r);
+			v.color.g = in[i].color.g + t * (in[j].color.g - in[i].color.g);
+			v.color.b = in[i].color.b + t * (in[j].color.b - in[i].color.b);
+			v.color.a = in[i].color.a + t * (in[j].color.a - in[i].color.a);
+			v.secondaryColor.r = in[i].secondaryColor.r + t * (in[j].secondaryColor.r - in[i].secondaryColor.r);
+			v.secondaryColor.g = in[i].secondaryColor.g + t * (in[j].secondaryColor.g - in[i].secondaryColor.g);
+			v.secondaryColor.b = in[i].secondaryColor.b + t * (in[j].secondaryColor.b - in[i].secondaryColor.b);
+			v.secondaryColor.a = in[i].secondaryColor.a + t * (in[j].secondaryColor.a - in[i].secondaryColor.a);
+			v.s0 = in[i].s0 + t * (in[j].s0 - in[i].s0);
+			v.t0 = in[i].t0 + t * (in[j].t0 - in[i].t0);
+			v.s1 = in[i].s1 + t * (in[j].s1 - in[i].s1);
+			v.t1 = in[i].t1 + t * (in[j].t1 - in[i].t1);
+			v.fog = in[i].fog + t * (in[j].fog - in[i].fog);
+			out[m++] = v;
+		} else if (!iFront && jFront) {
+			float t = (NEAR_CLIP_EPS - wi) / (wj - wi);
+			GLVertex v;
+			v.x = in[i].x + t * (in[j].x - in[i].x);
+			v.y = in[i].y + t * (in[j].y - in[i].y);
+			v.z = in[i].z + t * (in[j].z - in[i].z);
+			v.w = NEAR_CLIP_EPS;
+			v.color.r = in[i].color.r + t * (in[j].color.r - in[i].color.r);
+			v.color.g = in[i].color.g + t * (in[j].color.g - in[i].color.g);
+			v.color.b = in[i].color.b + t * (in[j].color.b - in[i].color.b);
+			v.color.a = in[i].color.a + t * (in[j].color.a - in[i].color.a);
+			v.secondaryColor.r = in[i].secondaryColor.r + t * (in[j].secondaryColor.r - in[i].secondaryColor.r);
+			v.secondaryColor.g = in[i].secondaryColor.g + t * (in[j].secondaryColor.g - in[i].secondaryColor.g);
+			v.secondaryColor.b = in[i].secondaryColor.b + t * (in[j].secondaryColor.b - in[i].secondaryColor.b);
+			v.secondaryColor.a = in[i].secondaryColor.a + t * (in[j].secondaryColor.a - in[i].secondaryColor.a);
+			v.s0 = in[i].s0 + t * (in[j].s0 - in[i].s0);
+			v.t0 = in[i].t0 + t * (in[j].t0 - in[i].t0);
+			v.s1 = in[i].s1 + t * (in[j].s1 - in[i].s1);
+			v.t1 = in[i].t1 + t * (in[j].t1 - in[i].t1);
+			v.fog = in[i].fog + t * (in[j].fog - in[i].fog);
+			out[m++] = v;
+			out[m++] = in[j];
+		}
+	}
+	return m;
+}
+
+static inline void submitRSXVertex(int id, const GLVertex *v)
+{
+	rsxDrawVertex4f(context, id, v->x, v->y, v->z, v->w);
+}
+#endif
+
 void OGL_DrawTriangles()
 {
 	if (OGL.usePolygonStipple && (gDP.otherMode.alphaCompare == G_AC_DITHER) && !(gDP.otherMode.alphaCvgSel))
@@ -1390,19 +1461,47 @@ void OGL_DrawTriangles()
 
 #ifdef PS3
 //	dbg_printf("OGL_DrawTris: numTri %d, numVert %d, useT0 %d, useT1 %d\n", OGL.numTriangles, OGL.numVertices, combiner.usesT0, combiner.usesT1);
-	//Update MV & P Matrices - needed?
-	//set vertex description - already done by shader
 
 	rsxDrawVertexBegin(context,GCM_TYPE_TRIANGLES);
-	for (int i = 0; i < OGL.numVertices; i++) {
-		rsxDrawVertex4f(context, OGL.vertexColor0_id, OGL.vertices[i].color.r, OGL.vertices[i].color.g, 
-			OGL.vertices[i].color.b, OGL.vertices[i].color.a);
-		//TODO: Add 2nd Tex Coord
-		//rsxDrawVertex2f(context, OGL.vertexTexcoord_id, OGL.vertices[i].s1,OGL.vertices[i].t1);
-		if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, OGL.vertices[i].s0,OGL.vertices[i].t0);
-		else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, OGL.vertices[i].s1,OGL.vertices[i].t1);
-		else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
-		rsxDrawVertex4f(context, OGL.vertexPosition_id, OGL.vertices[i].x, OGL.vertices[i].y, OGL.vertices[i].z, OGL.vertices[i].w);
+	for (int i = 0; i < OGL.numVertices; i += 3) {
+		const GLVertex *v = &OGL.vertices[i];
+
+		// Count vertices in front of near plane
+		int numFront = 0;
+		for (int j = 0; j < 3; j++) {
+			if (v[j].w > NEAR_CLIP_EPS) numFront++;
+		}
+
+		if (numFront == 3) {
+			// All 3 in front: render as-is (fast path)
+			for (int j = 0; j < 3; j++) {
+				rsxDrawVertex4f(context, OGL.vertexColor0_id, v[j].color.r, v[j].color.g,
+					v[j].color.b, v[j].color.a);
+				if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, v[j].s0, v[j].t0);
+				else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, v[j].s1, v[j].t1);
+				else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
+				rsxDrawVertex4f(context, OGL.vertexPosition_id, v[j].x, v[j].y, v[j].z, v[j].w);
+			}
+		} else if (numFront == 0) {
+			// All 3 behind camera: skip entirely
+			continue;
+		} else {
+			// Triangle crosses near plane: clip and emit 1-2 sub-triangles
+			GLVertex clipped[6];
+			int n = clipNearPlaneW(v, 3, clipped);
+			// Fan triangulate: emit (c0, ck, ck+1) for k=1..n-2
+			for (int k = 1; k < n - 1; k++) {
+				const GLVertex *tri[3] = { &clipped[0], &clipped[k], &clipped[k+1] };
+				for (int j = 0; j < 3; j++) {
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, tri[j]->color.r, tri[j]->color.g,
+						tri[j]->color.b, tri[j]->color.a);
+					if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, tri[j]->s0, tri[j]->t0);
+					else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, tri[j]->s1, tri[j]->t1);
+					else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
+					rsxDrawVertex4f(context, OGL.vertexPosition_id, tri[j]->x, tri[j]->y, tri[j]->z, tri[j]->w);
+				}
+			}
+		}
 	}
 	rsxDrawVertexEnd(context);
 #elif defined(__GX__)
@@ -2232,7 +2331,7 @@ void OGL_ClearDepthBuffer()
 
 	OGL_UpdateStates();
 	rsxSetDepthWriteEnable(context,GCM_TRUE);
-	rsxSetClearDepthValue(context,0xffff);
+	rsxSetClearDepthValue(context,0xFFFFFF00); // Z24S8: depth in upper24, stencil=0
 	rsxClearSurface(context, GCM_CLEAR_Z);
 
 	OGL_UpdateDepthUpdate();
@@ -2453,7 +2552,7 @@ void OGL_RSXinitDlist()
 	//Clear color buffer
 	u32 color = 0;
 	rsxSetClearColor(context,color);
-	rsxSetClearDepthValue(context,0xffff);
+	rsxSetClearDepthValue(context,0xFFFFFF00); // Z24S8: depth in upper24, stencil=0
 	rsxClearSurface(context,GCM_CLEAR_R |
 							GCM_CLEAR_G |
 							GCM_CLEAR_B |

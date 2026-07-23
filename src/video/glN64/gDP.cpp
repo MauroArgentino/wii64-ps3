@@ -442,6 +442,19 @@ void gDPSetTextureImage( u32 format, u32 size, u32 width, u32 address )
 	gDP.textureImage.address = RSP_SegmentToPhysical( address );
 	gDP.textureImage.bpl = gDP.textureImage.width << gDP.textureImage.size >> 1;
 
+#ifdef PS3
+	// FBE: If texture image points to current color buffer, save it NOW
+	// so gDPLoadTile can detect it. Without this, the buffer isn't saved
+	// until VI_UpdateScreen (after the entire display list), which is too late.
+	if (OGL.frameBufferTextures && gDP.colorImage.changed &&
+		gDP.textureImage.address >= gDP.colorImage.address &&
+		gDP.textureImage.address < gDP.colorImage.address + ((gDP.colorImage.width * gDP.colorImage.height) << gDP.colorImage.size >> 1))
+	{
+		FrameBuffer_SaveBuffer( gDP.colorImage.address, gDP.colorImage.size, gDP.colorImage.width, gDP.colorImage.height );
+		gDP.colorImage.changed = FALSE;
+	}
+#endif // PS3
+
 #ifdef DEBUG
 	DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TEXTURE, "gDPSetTextureImage( %s, %s, %i, 0x%08X );\n",
 		ImageFormatText[gDP.textureImage.format],

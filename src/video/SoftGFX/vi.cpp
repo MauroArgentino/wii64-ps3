@@ -310,7 +310,7 @@ void VI::updateScreen()
 
 	u32 color = 0;
 	rsxSetClearColor(context,color);
-	rsxSetClearDepthValue(context,0xffff);
+	rsxSetClearDepthValue(context,0xFFFFFF00); // Z24S8: depth in upper24, stencil=0
 	rsxClearSurface(context,GCM_CLEAR_R |
 							GCM_CLEAR_G |
 							GCM_CLEAR_B |

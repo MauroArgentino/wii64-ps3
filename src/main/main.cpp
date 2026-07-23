@@ -339,9 +339,9 @@ int main(int argc, char* argv[]){
 
 			// Limpiamos ambos buffers (front y back) para quitar el menú de la vista
 			// Esto evita que veas la imagen "congelada" del homebrew.
-			menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xffff);
+			menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xFFFFFF00);
 			flip();
-			menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xffff);
+			menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xFFFFFF00);
 			flip();
 
 			go(); // Este bucle bloquea hasta que el usuario sale del juego (Menu Combo)

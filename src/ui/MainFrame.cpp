@@ -267,7 +267,7 @@ void Func_PlayGame()
 */
 
 	// Limpiamos el buffer gráfico para quitar el menú de la pantalla
-	menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xffff);
+	menu::Gui::getInstance().gfx->clearEFB((GXColor){0, 0, 0, 0xFF}, 0xFFFFFF00);
 	menu::Gui::getInstance().gfx->swapBuffers();
 
 	// Cambiamos el estado para que el bucle de main.cpp tome el control
