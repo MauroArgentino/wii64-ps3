@@ -29,6 +29,10 @@
 #include "../../ui/libgui/IPLFont.h"
 #include "../../main/timers.h"
 #include "../../main/debug/DEBUG.h"
+extern "C" {
+#include "../../main/rom.h"
+#include "../../main/compatibility.h"
+}
 #endif // PS3
 
 #include "glN64.h"
@@ -254,6 +258,9 @@ extern char text[DEBUG_TEXT_HEIGHT][DEBUG_TEXT_WIDTH];
 #endif // __GX__ PS3
 
 #ifdef PS3
+static int gameInfoTimer = 0;
+static int gameInfoShown = 0;
+
 void VI_RSX_showFPS(){
 	static char caption[25];
 
@@ -265,6 +272,67 @@ void VI_RSX_showFPS(){
 	menu::IplFont::getInstance().drawInit(fontColor);
 	if(showFPSonScreen)
 		menu::IplFont::getInstance().drawString(10,35,caption, 1.0, false);
+
+	// Show game info for 5 seconds after ROM load
+	if (ROM_HEADER && gameInfoTimer > 0)
+	{
+		static char gameInfo[256];
+		static char gameInfo2[128];
+		char country[16];
+
+		if (!gameInfoShown)
+		{
+			countrycodestring(ROM_HEADER->Country_code & 0xFF, country);
+			sprintf(gameInfo, "%s", ROM_SETTINGS.goodname);
+			sprintf(gameInfo2, "CRC: %08X / %08X  ID: %c%c%c  %s",
+				(unsigned int)ROM_HEADER->CRC1,
+				(unsigned int)ROM_HEADER->CRC2,
+				(unsigned int)(ROM_HEADER->Manufacturer_ID),
+				(unsigned int)((ROM_HEADER->Cartridge_ID >> 8) & 0xFF),
+				(unsigned int)(ROM_HEADER->Cartridge_ID & 0xFF),
+				country);
+			gameInfoShown = 1;
+		}
+
+		GXColor infoColor = {200,200,255,255};
+		menu::IplFont::getInstance().drawInit(infoColor);
+		menu::IplFont::getInstance().drawString(10, 55, gameInfo, 0.8, false);
+
+		// Show compatibility rating if known
+		const GameCompatEntry *compat = Compat_Lookup(ROM_HEADER->CRC1);
+		if (compat)
+		{
+			static char compatInfo[128];
+			sprintf(compatInfo, "[%c] %s - %s", Compat_RatingChar(compat->rating),
+				Compat_RatingString(compat->rating), compat->notes);
+			GXColor compatColor;
+			switch (compat->rating) {
+				case COMPAT_PERFECT:  compatColor = (GXColor){100,255,100,255}; break;
+				case COMPAT_GOOD:     compatColor = (GXColor){200,255,100,255}; break;
+				case COMPAT_PLAYABLE: compatColor = (GXColor){255,255,100,255}; break;
+				case COMPAT_BOOTABLE: compatColor = (GXColor){255,180,100,255}; break;
+				default:              compatColor = (GXColor){255,100,100,255}; break;
+			}
+			menu::IplFont::getInstance().drawInit(compatColor);
+			menu::IplFont::getInstance().drawString(10, 90, compatInfo, 0.5, false);
+		}
+		else
+		{
+			GXColor unknownColor = {255,150,150,255};
+			menu::IplFont::getInstance().drawInit(unknownColor);
+			menu::IplFont::getInstance().drawString(10, 90, "[?] Sin entrada en base de datos", 0.5, false);
+		}
+
+		menu::IplFont::getInstance().drawInit(infoColor);
+		menu::IplFont::getInstance().drawString(10, 75, gameInfo2, 0.6, false);
+		gameInfoTimer--;
+	}
+}
+
+void VI_RSX_resetGameInfo(void)
+{
+	gameInfoTimer = 300;  // show for ~5 seconds at 60fps
+	gameInfoShown = 0;
 }
 
 void VI_RSX_showDEBUG()

@@ -35,6 +35,7 @@ void VI_UpdateScreen();
 #ifdef PS3
 void VI_RSX_showFPS();
 void VI_RSX_showDEBUG();
+void VI_RSX_resetGameInfo(void);
 void VI_GX_updateDEBUG();
 #endif // PS3
 

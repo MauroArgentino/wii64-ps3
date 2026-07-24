@@ -78,6 +78,8 @@ extern "C" {
 extern "C" void ps3_audio_init();
 extern "C" void ps3_audio_exit();
 
+extern void VI_RSX_resetGameInfo(void);
+
 extern "C" void pauseAudio(void);
 extern "C" void pauseInput(void);
 extern "C" void resumeAudio(void);
@@ -399,6 +401,7 @@ int loadROM(fileBrowser_file* rom){
 	// Init everything for this ROM
 	init_memory();
 	GameHacks_Detect();
+	VI_RSX_resetGameInfo();
 
 //	gfx_set_fb(xfb[0], xfb[1]);
 	// Adjust window settings based on the actual display resolution

@@ -22,7 +22,6 @@
 #include "OpenGL.h"
 #include "Combiner.h"
 #include "texture_env.h"
-#include "../../main/game_hacks.h"
 
 void Init_texture_env()
 {
@@ -62,8 +61,7 @@ TexEnv *Compile_texture_env( Combiner *color, Combiner *alpha )
 					else
 					{
 						texEnv->mode = GL_REPLACE;
-						if (gameHacks.mm_fix_logo_alpha)
-							texEnv->fragment.alpha = alpha->stage[i].op[j].param1;
+						texEnv->fragment.alpha = alpha->stage[i].op[j].param1;
 						texEnv->usesT0 = alpha->stage[i].op[j].param1 == TEXEL0_ALPHA;
 						texEnv->usesT1 = alpha->stage[i].op[j].param1 == TEXEL1_ALPHA;
 					}

@@ -33,6 +33,7 @@ extern "C" {
 #include "../main/rom.h"
 #include "../main/plugin.h"
 #include "../main/savestates.h"
+#include "../main/compatibility.h"
 #include "../ui/fileBrowser/fileBrowser.h"
 #ifdef PS3
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
@@ -145,6 +146,27 @@ void Func_ShowRomInfo()
     countrycodestring(ROM_HEADER->Country_code&0xFF, buffer2);
 	sprintf(buffer,"Country: %s\n",buffer2);
 	strcat(RomInfo,buffer);
+	sprintf(buffer,"CRC: %08X / %08X\n",
+		(unsigned int)ROM_HEADER->CRC1,
+		(unsigned int)ROM_HEADER->CRC2);
+	strcat(RomInfo,buffer);
+
+	const GameCompatEntry *compat = Compat_Lookup(ROM_HEADER->CRC1);
+	if (compat)
+	{
+		sprintf(buffer,"Compatibility: [%c] %s\n", Compat_RatingChar(compat->rating),
+			Compat_RatingString(compat->rating));
+		strcat(RomInfo,buffer);
+		if (compat->notes[0])
+		{
+			sprintf(buffer,"Notes: %s\n", compat->notes);
+			strcat(RomInfo,buffer);
+		}
+	}
+	else
+	{
+		strcat(RomInfo,"Compatibility: [?] Sin entrada\n");
+	}
 
 	menu::MessageBox::getInstance().setMessage(RomInfo);
 }
