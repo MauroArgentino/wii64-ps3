@@ -1676,7 +1676,8 @@ void OGL_DrawLine( SPVertex *vertices, int v0, int v1, float width )
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, vertices[v[i]].x, vertices[v[i]].y, vertices[v[i]].z, vertices[v[i]].w);
 	}
 	rsxDrawVertexEnd(context);
-#elif defined(__GX__)	
+	OGL_UpdateDepthUpdate();
+#elif defined(__GX__)
 	//TODO: Implement secondary color.
 //	GX_SetLineWidth( width * OGL.scaleX, GX_TO_ZERO );
 	GX_SetLineWidth( width * OGL.GXscaleX * 6, GX_TO_ZERO );
@@ -1793,8 +1794,7 @@ void OGL_DrawRect( int ulx, int uly, int lrx, int lry, float *color )
 #ifdef PS3
 	rsxSetScissor(context, 0, 0, display_width, display_height);
 	rsxSetCullFaceEnable(context,GCM_FALSE);
-	OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, 0.0f, VI.height, 1.0f, -1.0f ));
-//	OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, VI.height, 0.0f, 1.0f, -1.0f ));
+	OGL.projMatrix = transpose(Matrix4::orthographic(0.0f, VI.width, VI.height, 0.0f, 1.0f, -1.0f ));
 	//Load Vertex Program with new matrix
 	rsxLoadVertexProgram(context,OGL.vpo,OGL.vp_ucode);
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.projMatrix_id,(float*)&OGL.projMatrix);
@@ -2160,6 +2160,8 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 		SetConstant( rect[0].secondaryColor, combiner.vertex.secondaryColor, combiner.vertex.alpha );
 
 #ifdef PS3
+	// N64 TextureRectangle never writes to depth buffer
+	rsxSetDepthWriteEnable(context, GCM_FALSE);
 //	dbg_printf("OGL_TexRect V1=[%f,%f], V2=[%f,%f], z=%f, col=%f, %f, %f, %f\r\n", rect[0].x, rect[0].y, rect[1].x, rect[1].y, rect[0].z,
 //		rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
 	rsxDrawVertexBegin(context,GCM_TYPE_QUADS);
@@ -2168,9 +2170,9 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[0].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[0].x, rect[0].y, rect[0].z, 1.0f);
 
-		// TR: (lrs, ult) or flipped: (lrs, ult)
+		// TR: (lrs, ult) or flipped: (uls, lrt)
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
-		if (flip)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[0].t0);
+		if (flip)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[1].t0);
 		else		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[0].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[1].x, rect[0].y, rect[0].z, 1.0f);
 
@@ -2179,9 +2181,9 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[1].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[1].x, rect[1].y, rect[0].z, 1.0f);
 
-		// BL: (uls, lrt) or flipped: (uls, lrt)
+		// BL: (uls, lrt) or flipped: (lrs, ult)
 		rsxDrawVertex4f(context, OGL.vertexColor0_id, rect[0].color.r, rect[0].color.g, rect[0].color.b, rect[0].color.a);
-		if (flip)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[1].t0);
+		if (flip)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[1].s0, rect[0].t0);
 		else		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, rect[0].s0, rect[1].t0);
 		rsxDrawVertex4f(context, OGL.vertexPosition_id, rect[0].x, rect[1].y, rect[0].z, 1.0f);
 	rsxDrawVertexEnd(context);

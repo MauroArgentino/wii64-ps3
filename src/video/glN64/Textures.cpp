@@ -1054,13 +1054,24 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 	//TODO: Implement 2xSaI
 	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
 	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
-	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128,texInfo->textureBytes);
+	// RSX linear textures require pitch aligned to 128 bytes.
+	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
+	u32 rsxBytes = rsxPitch * texInfo->realHeight;
+	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
+	memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
 	{
 		u32 *src32 = dest;
 		u32 *dst32 = texInfo->rsxTextureBuffer;
-		u32 numTexels = texInfo->textureBytes / 4;
-		for (u32 k = 0; k < numTexels; k++)
-			dst32[k] = (src32[k] >> 8) | (src32[k] << 24);
+		for (u32 row = 0; row < texInfo->realHeight; row++)
+		{
+			u32 *srcRow = src32 + row * texInfo->realWidth;
+			u8 *dstRow = (u8*)dst32 + row * rsxPitch;
+			for (u32 col = 0; col < texInfo->realWidth; col++)
+			{
+				u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+				((u32*)dstRow)[col] = swapped;
+			}
+		}
 	}
 	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
 	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
@@ -1069,18 +1080,18 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 	texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
 	texInfo->rsxTex.cubemap		= GCM_FALSE;
 	texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
-								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
-								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
-								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
+							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
 	texInfo->rsxTex.width		= texInfo->realWidth;
 	texInfo->rsxTex.height		= texInfo->realHeight;
 	texInfo->rsxTex.depth		= 1;
 	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= texInfo->realWidth*4;
+	texInfo->rsxTex.pitch		= rsxPitch;
 	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	free( swapped );
 	free( dest );
@@ -1481,13 +1492,24 @@ void TextureCache_Load( CachedTexture *texInfo )
 	//TODO: Implement 2xSaI
 	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
 	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
-	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128,texInfo->textureBytes);
+	// RSX linear textures require pitch aligned to 128 bytes.
+	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
+	u32 rsxBytes = rsxPitch * texInfo->realHeight;
+	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
+	memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
 	{
 		u32 *src32 = dest;
 		u32 *dst32 = texInfo->rsxTextureBuffer;
-		u32 numTexels = texInfo->textureBytes / 4;
-		for (u32 k = 0; k < numTexels; k++)
-			dst32[k] = (src32[k] >> 8) | (src32[k] << 24);
+		for (u32 row = 0; row < texInfo->realHeight; row++)
+		{
+			u32 *srcRow = src32 + row * texInfo->realWidth;
+			u8 *dstRow = (u8*)dst32 + row * rsxPitch;
+			for (u32 col = 0; col < texInfo->realWidth; col++)
+			{
+				u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+				((u32*)dstRow)[col] = swapped;
+			}
+		}
 	}
 	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
 	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
@@ -1496,18 +1518,18 @@ void TextureCache_Load( CachedTexture *texInfo )
 	texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
 	texInfo->rsxTex.cubemap		= GCM_FALSE;
 	texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
-								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
-								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
-								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
-								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
+							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+							   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
 	texInfo->rsxTex.width		= texInfo->realWidth;
 	texInfo->rsxTex.height		= texInfo->realHeight;
 	texInfo->rsxTex.depth		= 1;
 	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= texInfo->realWidth*4;
+	texInfo->rsxTex.pitch		= rsxPitch;
 	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	free( dest );
 #elif defined(__GX__)
