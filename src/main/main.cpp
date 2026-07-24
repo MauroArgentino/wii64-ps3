@@ -223,8 +223,6 @@ static void dummy_func(){ }
 void (*fBRead)(DWORD addr) = NULL;
 void (*fBWrite)(DWORD addr, DWORD size) = NULL;
 void (*fBGetFrameBufferInfo)(void *p) = NULL;
-void new_frame(){ }
-void new_vi(){ }
 int loadROM();
 
 int main(int argc, char* argv[]){
