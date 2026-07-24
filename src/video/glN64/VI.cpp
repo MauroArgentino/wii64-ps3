@@ -260,6 +260,7 @@ extern char text[DEBUG_TEXT_HEIGHT][DEBUG_TEXT_WIDTH];
 #ifdef PS3
 static int gameInfoTimer = 0;
 static int gameInfoShown = 0;
+static char debugRenderState[4][128];
 
 void VI_RSX_showFPS(){
 	static char caption[25];
@@ -272,6 +273,40 @@ void VI_RSX_showFPS(){
 	menu::IplFont::getInstance().drawInit(fontColor);
 	if(showFPSonScreen)
 		menu::IplFont::getInstance().drawString(10,35,caption, 1.0, false);
+
+	// Render state debug (shown whenever a ROM is loaded)
+	if (ROM_HEADER)
+	{
+		sprintf(debugRenderState[0], "shader_mode=%.0f alpha_mode=%.0f", OGL.shader_mode, OGL.shader_alpha_mode);
+		sprintf(debugRenderState[1], "alpha_cmp=%d test_en=%d ref=%d func=%.4X",
+			gDP.otherMode.alphaCompare,
+			(gDP.otherMode.alphaCompare == G_AC_THRESHOLD && !(gDP.otherMode.alphaCvgSel)) ? 1 :
+			(gDP.otherMode.cvgXAlpha) ? 1 :
+			(gDP.otherMode.alphaCompare == G_AC_DITHER) ? 1 : 0,
+			(gDP.otherMode.alphaCompare == G_AC_THRESHOLD && !(gDP.otherMode.alphaCvgSel)) ? (u32)(gDP.blendColor.a * 255) :
+			(gDP.otherMode.cvgXAlpha) ? 128 :
+			(gDP.otherMode.alphaCompare == G_AC_DITHER) ? 1 : 0,
+			(gDP.otherMode.alphaCompare == G_AC_THRESHOLD && !(gDP.otherMode.alphaCvgSel)) ? ((gDP.blendColor.a > 0.0f) ? 0x0206 : 0x0204) :
+			(gDP.otherMode.cvgXAlpha) ? 0x0206 :
+			(gDP.otherMode.alphaCompare == G_AC_DITHER) ? 0x0206 : 0x0200);
+		sprintf(debugRenderState[2], "blend_en=%d  cycle=%d  alphaCvg=%d cvgXAlpha=%d otherMode.h=%.4X",
+			(gDP.otherMode.cycleType == G_CYC_1CYCLE || gDP.otherMode.cycleType == G_CYC_2CYCLE || gDP.otherMode.forceBlender) &&
+			gDP.otherMode.cycleType != G_CYC_COPY && gDP.otherMode.cycleType != G_CYC_FILL,
+			gDP.otherMode.cycleType,
+			gDP.otherMode.alphaCvgSel,
+			gDP.otherMode.cvgXAlpha,
+			gDP.otherMode.l >> 16);
+		sprintf(debugRenderState[3], "prim=(%.0f,%.0f,%.0f,%.0f) blend=(%.0f,%.0f,%.0f,%.0f)",
+			gDP.primColor.r*255, gDP.primColor.g*255, gDP.primColor.b*255, gDP.primColor.a*255,
+			gDP.blendColor.r*255, gDP.blendColor.g*255, gDP.blendColor.b*255, gDP.blendColor.a*255);
+
+		GXColor debugColor = {255,120,120,255};
+		menu::IplFont::getInstance().drawInit(debugColor);
+		menu::IplFont::getInstance().drawString(10, 110, debugRenderState[0], 0.45, false);
+		menu::IplFont::getInstance().drawString(10, 126, debugRenderState[1], 0.45, false);
+		menu::IplFont::getInstance().drawString(10, 142, debugRenderState[2], 0.45, false);
+		menu::IplFont::getInstance().drawString(10, 158, debugRenderState[3], 0.40, false);
+	}
 
 	// Show game info for 5 seconds after ROM load
 	if (ROM_HEADER && gameInfoTimer > 0)
