@@ -882,12 +882,7 @@ void OGL_UpdateStates()
 		}
 		else
 		{
-			// G_AC_NONE on N64 still uses coverage-based alpha. On PS3 RSX,
-			// disabling alpha test leaves alpha==0 fragments drawn opaque → solid
-			// rectangles. Enable a minimal alpha test (GREATER 0) as a fallback.
-			rsxSetAlphaTestEnable(context, GCM_TRUE);
-			rsxSetAlphaTestFunc(context, 0x0204 /*NV40TCL_ALPHA_TEST_FUNC_GREATER*/);
-			rsxSetAlphaTestRef(context, 0);
+			rsxSetAlphaTestEnable(context, GCM_FALSE);
 		}
 	}
 #elif defined(__GX__)
