@@ -50,10 +50,12 @@ static int inline mips_is_jump(MIPS_instr);
 void jump_to(unsigned int);
 void check_interrupt();
 
-double __floatdidf(long long);
-float __floatdisf(long long);
 long long __fixdfdi(double);
 long long __fixsfdi(float);
+
+/* Soft-float helpers (libgcc not linked for PS3) */
+double __floatdidf(long long v) { return (double)v; }
+float __floatdisf(long long v) { return (float)v; }
 
 #define CANT_COMPILE_DELAY() \
 	((get_src_pc()&0xFFF) == 0xFFC && \

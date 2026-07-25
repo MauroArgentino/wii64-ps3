@@ -58,6 +58,8 @@
 #include "Combiner.h"
 #include "VI.h"
 #include "../../main/game_hacks.h"
+#include "RSX_VideoBackend.h"
+#include "debug_pause.h"
 
 #ifndef GL_BGR
 #define GL_BGR GL_BGR_EXT
@@ -242,6 +244,9 @@ void OGL_InitExtensions()
 	OGL.NV_texture_env_combine4 = isExtensionSupported( "GL_NV_texture_env_combine4" );;
 }
 
+// Debug cycle override: -1=off, 0-11=force debug cycle mode
+extern int g_debugCycleOverride;
+
 void OGL_InitStates()
 {
 #ifdef PS3
@@ -284,7 +289,8 @@ void OGL_InitStates()
 	OGL.alpha_mode_id = rsxFragmentProgramGetConst(OGL.fpo,"alpha_mode");
 	OGL.shader_alpha_mode = 0.0f;
 	OGL.textureUnit_id = rsxFragmentProgramGetAttrib(OGL.fpo,"texture");
-#elif defined(__GX__)
+
+	#elif defined(__GX__)
 	// TODO: Init GX variables here...
 #else // __GX__
 	glMatrixMode( GL_PROJECTION );
@@ -355,7 +361,7 @@ void OGL_InitStates()
 	}
 
 #if defined(PS3)
-	flip(); // Usar la función de intercambio de buffers de PS3
+	flip();
 #elif !defined(__LINUX__)
 	SwapBuffers( wglGetCurrentDC() );
 #else
@@ -408,8 +414,12 @@ void OGL_ResizeWindow()
 		SetWindowPos( hWnd, NULL, 0, 0,	windowRect.right - windowRect.left + 1,
 						windowRect.bottom - windowRect.top + 1 + toolRect.bottom - toolRect.top + 1, SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOMOVE );
 	}
-#else // !__LINUX__
-#endif // __LINUX__
+#elif defined(PS3)
+	// PS3: display dimensions are configured by init_screen() in rsxutil.cpp
+	// OGL.width/height are set after this block below
+#else
+	// Linux/other: defaults
+#endif
 	// This is mainly initializing OGL.heightOffset because I don't think it's inited otherwise.
 	OGL.fullscreen = true;
 	OGL.fullscreenWidth = 640;
@@ -740,6 +750,14 @@ void OGL_UpdateDepthUpdate()
 
 void OGL_UpdateStates()
 {
+	// Debug cycle override: -1=off, 0-11=force debug cycle mode
+	extern int g_debugCycleOverride;
+	if (g_debugCycleOverride >= 0 && g_debugCycleOverride <= 11) {
+		extern void VI_RSX_applyDebugCycle();
+		VI_RSX_applyDebugCycle();
+		return; // skip normal state update
+	}
+
 #ifdef __GX__
 	if (OGL.GXclearColorBuffer || OGL.GXclearDepthBuffer)
 		OGL_GXclearEFB();
@@ -874,10 +892,10 @@ void OGL_UpdateStates()
 		else if (gDP.otherMode.alphaCompare == G_AC_DITHER)
 		{
 			// N64 uses polygon stipple to dither alpha (reject ~50% of
-			// transparent fragments). No stipple on PS3 — at least reject
+			// transparent pixels). No stipple on PS3 — at least reject
 			// fully transparent pixels (alpha == 0).
 			rsxSetAlphaTestEnable(context, GCM_TRUE);
-			rsxSetAlphaTestFunc(context, 0x0206 /*GEQUAL*/);
+			rsxSetAlphaTestFunc(context, 0x0206 /*NV40TCL_ALPHA_TEST_FUNC_GEQUAL*/);
 			rsxSetAlphaTestRef(context, 1);
 		}
 		else
@@ -1093,16 +1111,16 @@ void OGL_UpdateStates()
 		    (gDP.otherMode.cycleType != G_CYC_FILL))
 		{
 			blendEnable = true;
-			if (gDP.otherMode.alphaCvgSel)
-			{
-				// alphaCvgSel: N64 uses polygon coverage as blend factor.
-				// Approximate with standard src-alpha blend.
-				srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA;
-			}
-			else
-			{
-			switch (gDP.otherMode.l >> 16)
-			{
+		if (gDP.otherMode.alphaCvgSel)
+		{
+			// alphaCvgSel: N64 uses polygon coverage as blend factor.
+			// Approximate with standard src-alpha blend.
+			srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA;
+		}
+		else
+		{
+		switch (gDP.otherMode.l >> 16)
+				{
 				case 0x0448: case 0x055A:
 					srcFunc = GCM_ONE; dstFunc = GCM_ONE; break;
 				case 0x0C08: case 0x0F0A:
@@ -1112,12 +1130,12 @@ void OGL_UpdateStates()
 					srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA; break;
 				case 0x0FA5: case 0x5055:
 					srcFunc = GCM_ZERO; dstFunc = GCM_ONE; break;
-			default:
-				// Safe fallback: SRC_ALPHA/ONE_MINUS_SRC_ALPHA
-				// For opaque fragments (alpha=1.0) this degenerates to ONE/ZERO.
-				// For semi-transparent fragments (shadows, effects) this blends correctly.
-				srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA; break;
-			}
+				default:
+					// Safe fallback: SRC_ALPHA/ONE_MINUS_SRC_ALPHA
+					// For opaque fragments (alpha=1.0) this degenerates to ONE/ZERO.
+					// For semi-transparent fragments (shadows, effects) this blends correctly.
+					srcFunc = GCM_SRC_ALPHA; dstFunc = GCM_ONE_MINUS_SRC_ALPHA; break;
+				}
 			} // else (normal blender modes)
 		} // if (1CYCLE/2CYCLE/forceBlender)
 		if (gDP.otherMode.cycleType == G_CYC_FILL)
@@ -1460,11 +1478,44 @@ void OGL_DrawTriangles()
 	}
 
 #ifdef PS3
-//	dbg_printf("OGL_DrawTris: numTri %d, numVert %d, useT0 %d, useT1 %d\n", OGL.numTriangles, OGL.numVertices, combiner.usesT0, combiner.usesT1);
-
+#ifdef DEBUG_POLYGONS
+	{
+		static uint32_t poly_counter = 0;
+		for (int i_tri = 0; i_tri < OGL.numVertices; i_tri += 3) {
+			const GLVertex *v0 = &OGL.vertices[i_tri];
+			debug_poly_info_t info;
+			memset(&info, 0, sizeof(info));
+			info.index = poly_counter++;
+			info.num_vertices = 3;
+			info.z_values[0] = v0[0].z; info.z_values[1] = v0[1].z; info.z_values[2] = v0[2].z;
+			float minS = v0[0].s0, maxS = v0[0].s0;
+			float minT = v0[0].t0, maxT = v0[0].t0;
+			for (int j = 1; j < 3; j++) {
+				if (v0[j].s0 < minS) minS = v0[j].s0;
+				if (v0[j].s0 > maxS) maxS = v0[j].s0;
+				if (v0[j].t0 < minT) minT = v0[j].t0;
+				if (v0[j].t0 > maxT) maxT = v0[j].t0;
+			}
+			info.uv_min_s = minS; info.uv_max_s = maxS;
+			info.uv_min_t = minT; info.uv_max_t = maxT;
+			info.shader_mode = (uint32_t)OGL.shader_mode;
+			info.alpha_mode = OGL.shader_alpha_mode;
+			info.uses_t0 = combiner.usesT0;
+			info.uses_t1 = combiner.usesT1;
+			debug_pause_record_poly(&info);
+		}
+	}
+#endif
 	rsxDrawVertexBegin(context,GCM_TYPE_TRIANGLES);
 	for (int i = 0; i < OGL.numVertices; i += 3) {
 		const GLVertex *v = &OGL.vertices[i];
+
+#ifdef DEBUG_POLYGONS
+		uint32_t tri_idx = g_debug_pause.frame_tri_index;
+		g_debug_pause.frame_tri_index++;
+		int highlight = g_debug_pause.paused && (tri_idx == g_debug_pause.poly_index);
+		if (g_debug_pause.paused && !highlight) continue;
+#endif
 
 		// Count vertices in front of near plane
 		int numFront = 0;
@@ -1475,8 +1526,17 @@ void OGL_DrawTriangles()
 		if (numFront == 3) {
 			// All 3 in front: render as-is (fast path)
 			for (int j = 0; j < 3; j++) {
+#ifdef DEBUG_POLYGONS
+				if (highlight) {
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 0.0f, 1.0f, 1.0f);
+				} else {
+					rsxDrawVertex4f(context, OGL.vertexColor0_id, v[j].color.r, v[j].color.g,
+						v[j].color.b, v[j].color.a);
+				}
+#else
 				rsxDrawVertex4f(context, OGL.vertexColor0_id, v[j].color.r, v[j].color.g,
 					v[j].color.b, v[j].color.a);
+#endif
 				if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, v[j].s0, v[j].t0);
 				else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, v[j].s1, v[j].t1);
 				else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
@@ -1493,8 +1553,17 @@ void OGL_DrawTriangles()
 			for (int k = 1; k < n - 1; k++) {
 				const GLVertex *tri[3] = { &clipped[0], &clipped[k], &clipped[k+1] };
 				for (int j = 0; j < 3; j++) {
+#ifdef DEBUG_POLYGONS
+					if (highlight) {
+						rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 0.0f, 1.0f, 1.0f);
+					} else {
+						rsxDrawVertex4f(context, OGL.vertexColor0_id, tri[j]->color.r, tri[j]->color.g,
+							tri[j]->color.b, tri[j]->color.a);
+					}
+#else
 					rsxDrawVertex4f(context, OGL.vertexColor0_id, tri[j]->color.r, tri[j]->color.g,
 						tri[j]->color.b, tri[j]->color.a);
+#endif
 					if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, tri[j]->s0, tri[j]->t0);
 					else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, tri[j]->s1, tri[j]->t1);
 					else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);

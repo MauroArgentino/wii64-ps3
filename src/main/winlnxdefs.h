@@ -58,6 +58,7 @@ typedef int HWND;
 typedef int WPARAM;
 typedef int LPARAM;
 typedef void* LPVOID;
+typedef const char* LPCSTR;
 
 #define __declspec(dllexport)
 #define _cdecl

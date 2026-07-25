@@ -39,6 +39,10 @@
 #include "DepthBuffer.h"
 #include "GBI.h"
 
+#ifdef DEBUG_POLYGONS
+#include "debug_pause.h"
+#endif
+
 RSPInfo		RSP;
 
 void RSP_LoadMatrix( f32 mtx[4][4], u32 address )
@@ -241,6 +245,9 @@ DWORD WINAPI RSP_ThreadProc( LPVOID lpParameter )
 
 void RSP_ProcessDList()
 {
+#ifdef DEBUG_POLYGONS
+	debug_pause_begin_frame();
+#endif
 	VI_UpdateSize();
 	OGL_UpdateScale();
 

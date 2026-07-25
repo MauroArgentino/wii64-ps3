@@ -17,6 +17,11 @@
 #include "../gui/DEBUG.h"
 #endif // __GX__
 
+#include "Debug.h"
+#include <stdio.h>
+#include "../../main/GameHackManager.h"
+extern GameHackManager *g_game_hack_mgr;
+
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 # include <windows.h>
 #else
@@ -769,7 +774,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 
 #ifndef __GX__
 #ifdef PS3
-	// PS3 RSX only supports A8R8G8B8 textures. Force 32-bit (RGBA8) path
+// PS3 RSX only supports A8R8G8B8 textures. Force 32-bit (RGBA8) path
 	// for ALL formats so the RSX upload block always gets correctly-sized u32 data.
 	texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
 	if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
@@ -779,9 +784,25 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 		else
 			GetTexel = GetCI8IA_RGBA8888;
 	}
+	else if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_RGBA16))
+	{
+		// RGBA16 palette (1-bit alpha) - use RGBA conversion
+		if (texInfo->size == G_IM_SIZ_4b)
+			GetTexel = GetCI4RGBA_RGBA8888;
+		else
+			GetTexel = GetCI8RGBA_RGBA8888;
+	}
 	else
 	{
 		GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
+	}
+	// DEBUG: Log texture format for invisible faces investigation
+	static int texDebugCount = 0;
+	if (texDebugCount < 50) {
+		printf("TEX: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d\n",
+			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
+			texInfo->realWidth, texInfo->realHeight);
+		texDebugCount++;
 	}
 	glInternalFormat = GL_RGBA8;
 	glType = GL_UNSIGNED_BYTE;
@@ -1130,7 +1151,16 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 	}
 	else
 	{
+		/* Force UNPACK_ALIGNMENT=1 for I4/IA4/CI4 formats to fix stride issues */
+		extern GameHackManager *g_game_hack_mgr;
+		const GameHacks *hacks = g_game_hack_mgr ? GameHackManager_GetHacks(g_game_hack_mgr) : NULL;
+		if (hacks && hacks->unpackAlignment == 1) {
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		}
 		glTexImage2D( GL_TEXTURE_2D, 0, glInternalFormat, texInfo->realWidth, texInfo->realHeight, 0, GL_RGBA, glType, dest );
+		if (hacks && hacks->unpackAlignment == 1) {
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 4); // Restore default
+		}
 
 		free (swapped );
 		free( dest );
@@ -1171,7 +1201,15 @@ void TextureCache_Load( CachedTexture *texInfo )
 	}
 	else
 	{
-		GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
+GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
+	}
+	// DEBUG: Log texture format for invisible faces investigation
+	static int texDebugCount = 0;
+	if (texDebugCount < 50) {
+		printf("TEX: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d\n",
+			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
+			texInfo->realWidth, texInfo->realHeight);
+		texDebugCount++;
 	}
 	glInternalFormat = GL_RGBA8;
 	glType = GL_UNSIGNED_BYTE;

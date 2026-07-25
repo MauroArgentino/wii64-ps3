@@ -1,49 +1,34 @@
 /**
- * wii64-ps3 - game_hacks.h
- * Per-game rendering/memory hack flags.
+ * wii64-ps3 - game_hacks.h (Compatibility Wrapper)
+ * Legacy per-game hack flags - now backed by GameHackManager.
  *
- * After loading a ROM, call GameHacks_Detect() to populate the
- * global 'gameHacks' struct based on the ROM's CRC1.  Rendering
- * and memory code checks these flags instead of hardcoding CRC
- * comparisons scattered across the codebase.
- *
- * To add a new game:
- *   1. Add a new u8 flag field to the GameHacks struct below.
- *   2. Add an else-if branch in GameHacks_Detect() using the CRC.
- *   3. Check the flag in the relevant rendering/memory code.
+ * This header provides backward compatibility for code using the old
+ * global 'gameHacks' struct. New code should use GameHackManager directly.
  **/
 
 #ifndef GAME_HACKS_H
 #define GAME_HACKS_H
 
 #include "winlnxdefs.h"
-#include "rom.h"
+#include "GameHackManager.h"
 
-typedef struct _game_hacks {
-	/* Memory */
-	u8 goldeneye_tlb;         /* GoldenEye 007: TLB address fix */
+/* Legacy struct - maps to GameHacks in GameHackManager.h */
+typedef GameHacks _game_hacks;
 
-	/* Combiner / color */
-	u8 banjo_tooie_shadow;    /* Banjo-Tooie: shadow combiner fix */
-	u8 banjo_tooie_fbtex;     /* Banjo-Tooie: force framebuffer textures */
+/* Legacy field name mappings to new GameHacks struct */
+#define goldeneye_tlb          useFBE
+#define banjo_tooie_shadow     forceAlphaTest
+#define banjo_tooie_fbtex      forceOpaqueAlphaCvg
+#define zelda_warp             forceAlphaTest
+#define force_alpha_opaque     forceOpaqueAlphaCvg
+#define mm_fix_logo_alpha      fixVertexNaN
+#define mm_fbtex               forceOpaqueAlphaCvg
+#define reserved               internalWidth
 
-	/* Textures */
-	u8 zelda_warp;            /* Zelda OoT/MM: warp texture TMEM fix */
-
-	/* Alpha / blending */
-	u8 force_alpha_opaque;    /* Force all DECAL alpha = 1.0 */
-
-	/* Zelda Majora's Mask specific */
-	u8 mm_fix_logo_alpha;     /* MM: fix N64 logo alpha LOAD(TEXEL*_ALPHA) bug */
-	u8 mm_fbtex;              /* MM: auto-enable framebuffer textures for blur */
-
-	/* Reserved for future per-game flags */
-	u8 reserved[6];
-} GameHacks;
-
+/* Global instance (backward compatibility) */
 extern GameHacks gameHacks;
 
-/* Call once after ROM_HEADER is populated (inside loadROM). */
+/* Initialize from GameHackManager (call once after ROM load) */
 void GameHacks_Detect(void);
 
-#endif
+#endif /* GAME_HACKS_H */

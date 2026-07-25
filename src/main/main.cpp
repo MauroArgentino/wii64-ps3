@@ -51,6 +51,7 @@ extern "C" {
 #include "ROM-Cache.h"
 #include "wii64config.h"
 #include "game_hacks.h"
+#include "../main/GameHackManager.h"
 #include "../ui/fileBrowser/fileBrowser.h"
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
 #include "../platform/ps3/spu_manager.h"
@@ -80,6 +81,8 @@ extern "C" void ps3_audio_exit();
 
 extern void VI_RSX_resetGameInfo(void);
 
+extern GameHackManager *g_game_hack_mgr;
+
 extern "C" void pauseAudio(void);
 extern "C" void pauseInput(void);
 extern "C" void resumeAudio(void);
@@ -97,6 +100,13 @@ void program_exit_callback()
 	ps3_audio_exit();
 	gcmSetWaitFlip(context);
 	rsxFinish(context,1);
+
+	/* Destroy GameHackManager */
+	extern GameHackManager *g_game_hack_mgr;
+	if (g_game_hack_mgr) {
+		GameHackManager_Destroy(g_game_hack_mgr);
+		g_game_hack_mgr = NULL;
+	}
 }
 
 extern char shutdownMenu;
@@ -379,6 +389,13 @@ int loadROM(fileBrowser_file* rom){
 		romClosed_input();
 		romClosed_audio();
 		romClosed_gfx();
+
+		// Unload GameHackManager
+		extern GameHackManager *g_game_hack_mgr;
+		if (g_game_hack_mgr) {
+			GameHackManager_Unload(g_game_hack_mgr);
+		}
+
 		closeDLL_RSP();
 		closeDLL_input();
 		closeDLL_audio();
@@ -402,6 +419,13 @@ int loadROM(fileBrowser_file* rom){
 	init_memory();
 	GameHacks_Detect();
 	VI_RSX_resetGameInfo();
+
+	// Initialize and load GameHackManager for this ROM
+	extern GameHackManager *g_game_hack_mgr;
+	if (!g_game_hack_mgr) {
+		GameHackManager_Init(&g_game_hack_mgr);
+	}
+	GameHackManager_LoadForCRC(g_game_hack_mgr, ROM_HEADER->CRC1);
 
 //	gfx_set_fb(xfb[0], xfb[1]);
 	// Adjust window settings based on the actual display resolution

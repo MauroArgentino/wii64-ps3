@@ -312,4 +312,7 @@ void OGL_GXinitDlist();
 void OGL_GXclearEFB();
 #endif // __GX__
 
+// Debug cycle override: -1=off, 0-11=force debug cycle mode
+extern int g_debugCycleOverride;
+
 #endif

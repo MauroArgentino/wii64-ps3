@@ -74,17 +74,17 @@ int spu_manager_init(void)
     sysSpuImage image;
     ret = sysSpuImageImport(&image, (void*)spu_core_elf, 0);
     if (ret != 0) {
-        printf("[SPU] sysSpuImageImport failed: %08x (elf=%08x, size=%08x)\n",
-               ret, (u32)spu_core_elf, (u32)spu_core_elf_size);
+        printf("[SPU] sysSpuImageImport failed: %08x (elf=%08lx, size=%08x)\n",
+               ret, (unsigned long)spu_core_elf, spu_core_elf_size);
         return ret;
     }
-    printf("[SPU] SPU image imported OK (size=%08x)\n", (u32)spu_core_elf_size);
+    printf("[SPU] SPU image imported OK (size=%08x)\n", spu_core_elf_size);
 
     /* Step 4: Create thread group */
     sysSpuThreadGroupAttribute grpattr;
     memset(&grpattr, 0, sizeof(grpattr));
     grpattr.nameSize = sizeof(grp_name);
-    grpattr.nameAddress = (u32)ptr2ea(grp_name);
+    grpattr.nameAddress = (u32)(unsigned long)grp_name;
     grpattr.groupType = 0;
     grpattr.memContainer = 0;
 
@@ -98,7 +98,7 @@ int spu_manager_init(void)
     /* Step 5: Initialize the SPU thread */
     sysSpuThreadAttribute thrattr;
     memset(&thrattr, 0, sizeof(thrattr));
-    thrattr.nameAddress = (u32)ptr2ea(thr_name);
+    thrattr.nameAddress = (u32)(unsigned long)thr_name;
     thrattr.nameSize = sizeof(thr_name);
     thrattr.attribute = SPU_THREAD_ATTR_NONE;
 

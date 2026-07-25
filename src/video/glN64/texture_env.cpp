@@ -79,8 +79,16 @@ TexEnv *Compile_texture_env( Combiner *color, Combiner *alpha )
 					else if (((alpha->stage[i].op[j].param1 != TEXEL0_ALPHA) || (alpha->stage[i].op[j].param1 != TEXEL1_ALPHA)) &&
 						((alpha->stage[i].op[j - 1].param1 == TEXEL0_ALPHA) || (alpha->stage[i].op[j - 1].param1 == TEXEL1_ALPHA)))
 					{
-						texEnv->fragment.alpha = alpha->stage[i].op[j].param1;
 						texEnv->mode = GL_MODULATE;
+						if (texEnv->fragment.alpha == TEXEL0_ALPHA || texEnv->fragment.alpha == TEXEL1_ALPHA)
+						{
+							// Keep texel alpha as source when multiplying by primitive/env/shade
+							// texEnv->fragment.alpha already correctly set to TEXEL0/1 from LOAD
+						}
+						else
+						{
+							texEnv->fragment.alpha = alpha->stage[i].op[j].param1;
+						}
 					}
 					else if (texEnv->fragment.alpha != COMBINED)
 					{

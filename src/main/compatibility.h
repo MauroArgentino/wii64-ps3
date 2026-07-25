@@ -36,6 +36,7 @@ extern "C" {
 typedef struct _game_compat_entry {
 	u32 crc1;
 	const char *name;
+	const char *rom_id;   // 4-char ROM ID (e.g., "NSME", "CREE", "CLJE")
 	u8 rating;
 	const char *notes;
 } GameCompatEntry;

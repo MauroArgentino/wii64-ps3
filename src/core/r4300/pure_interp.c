@@ -3280,6 +3280,13 @@ if ((r4300.pc >= 0x80000000) && (r4300.pc < 0xc0000000))
      }
 }
 extern void dbg_printf(const char *fmt,...);
+
+#ifdef PS3
+extern volatile int debug_pause_cpu_halt;
+extern void debug_pause_poll_halt(void);
+#include <sys/thread.h>
+#endif
+
 void pure_interpreter()
 {
    //r4300.pc = 0xa4000040;
@@ -3287,6 +3294,13 @@ void pure_interpreter()
    r4300.last_pc = r4300.pc;
    while (!r4300.stop)
      {
+#ifdef PS3
+	if (debug_pause_cpu_halt) {
+		debug_pause_poll_halt();
+		sysThreadYield();
+		continue;
+	}
+#endif
 	prefetch();
 #ifdef COMPARE_CORE
 	compare_core();

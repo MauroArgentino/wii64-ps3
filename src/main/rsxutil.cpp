@@ -33,15 +33,15 @@ u32 *color_buffer[2];
 static u32 sLabelVal = 1;
 int rsx_hung = 0;
 
-static void waitFinish()
-{
+VideoConfig g_video_config;
+
+static void waitFinish() {
 	u32 timeout = 0;
 	rsxSetWriteBackendLabel(context,GCM_LABEL_INDEX,sLabelVal);
 
 	rsxFlushBuffer(context);
 
-	while(*(vu32*)gcmGetLabelAddress(GCM_LABEL_INDEX)!=sLabelVal)
-	{
+	while(*(vu32*)gcmGetLabelAddress(GCM_LABEL_INDEX)!=sLabelVal) {
 		usleep(30);
 		if(++timeout > 100000) {
 			rsx_hung = 1;
@@ -52,8 +52,7 @@ static void waitFinish()
 	++sLabelVal;
 }
 
-static void waitRSXIdle()
-{
+static void waitRSXIdle() {
 	if (rsx_hung) return;
 
 	rsxSetWriteBackendLabel(context,GCM_LABEL_INDEX,sLabelVal);
@@ -64,8 +63,7 @@ static void waitRSXIdle()
 	waitFinish();
 }
 
-void setRenderTarget(u32 index)
-{
+void setRenderTarget(u32 index) {
 	gcmSurface sf;
 
 	sf.colorFormat		= GCM_TF_COLOR_X8R8G8B8;
@@ -100,8 +98,7 @@ void setRenderTarget(u32 index)
 	rsxSetSurface(context,&sf);
 }
 
-void init_screen(void *host_addr,u32 size)
-{
+void init_screen(void *host_addr,u32 size) {
 	context = rsxInit(CB_SIZE,size,host_addr);
 	if (context == NULL) {
 		if (host_addr) free(host_addr);
@@ -180,18 +177,21 @@ void init_screen(void *host_addr,u32 size)
 	depth_buffer = (u32*)rsxMemalign(64,(display_height*depth_pitch)*2);
 	rsxAddressToOffset(depth_buffer,&depth_offset);
 
+	gcmSetDisplayBuffer(0,color_offset[0],color_pitch,display_width,display_height);
+	gcmSetDisplayBuffer(1,color_offset[1],color_pitch,display_width,display_height);
+
+	gcmSetFlipMode(GCM_FLIP_VSYNC);
+
 	gcmResetFlipStatus();
 }
 
-void waitflip()
-{
+void waitflip() {
 	while(gcmGetFlipStatus()!=0)
 		usleep(200);
 	gcmResetFlipStatus();
 }
 
-void flip()
-{
+void flip() {
 	if(!first_fb) waitflip();
 	else gcmResetFlipStatus();
 
@@ -202,8 +202,7 @@ void flip()
 	setRenderTarget(curr_fb);
 
 	rsxSetClearColor(context, 0);
-	rsxClearSurface(context, GCM_CLEAR_R | GCM_CLEAR_G | GCM_CLEAR_B |
-	                         GCM_CLEAR_A | GCM_CLEAR_S | GCM_CLEAR_Z);
+	rsxClearSurface(context, GCM_CLEAR_R | GCM_CLEAR_G | GCM_CLEAR_B | GCM_CLEAR_A | GCM_CLEAR_S | GCM_CLEAR_Z);
 
 	rsxFlushBuffer(context);
 
@@ -219,26 +218,44 @@ void flip()
 
 extern "C" s32 rsxContextCallback(gcmContextData *context, u32 count);
 
-void rsxSetAlphaTestEnable(gcmContextData *ctx, u32 enable)
-{
+void rsxSetAlphaTestEnable(gcmContextData *ctx, u32 enable) {
 	RSX_CTX_BEGIN(ctx, 2);
 	RSX_CTX_PTR(ctx)[0] = RSX_METHOD_ALPHA(NV40TCL_ALPHA_TEST_ENABLE);
 	RSX_CTX_PTR(ctx)[1] = enable;
 	RSX_CTX_END(ctx, 2);
 }
 
-void rsxSetAlphaTestFunc(gcmContextData *ctx, u32 func)
-{
+void rsxSetAlphaTestFunc(gcmContextData *ctx, u32 func) {
 	RSX_CTX_BEGIN(ctx, 2);
 	RSX_CTX_PTR(ctx)[0] = RSX_METHOD_ALPHA(NV40TCL_ALPHA_TEST_FUNC);
 	RSX_CTX_PTR(ctx)[1] = func;
 	RSX_CTX_END(ctx, 2);
 }
 
-void rsxSetAlphaTestRef(gcmContextData *ctx, u32 ref)
-{
+void rsxSetAlphaTestRef(gcmContextData *ctx, u32 ref) {
 	RSX_CTX_BEGIN(ctx, 2);
 	RSX_CTX_PTR(ctx)[0] = RSX_METHOD_ALPHA(NV40TCL_ALPHA_TEST_REF);
 	RSX_CTX_PTR(ctx)[1] = ref;
 	RSX_CTX_END(ctx, 2);
+}
+
+/* Configura el viewport para internal 3D rendering vs display resolution */
+void RSX_ConfigureViewport(uint32_t internal_w, uint32_t internal_h,
+                           uint32_t display_w, uint32_t display_h) {
+    g_video_config.internal_w = internal_w;
+    g_video_config.internal_h = internal_h;
+    g_video_config.display_w = display_w;
+    g_video_config.display_h = display_h;
+    display_width = display_w;
+    display_height = display_h;
+}
+
+void RSX_SetInternalResolution(uint32_t w, uint32_t h) {
+    g_video_config.internal_w = w ? w : 640;
+    g_video_config.internal_h = h ? h : 480;
+}
+
+void RSX_SetDisplayResolution(uint32_t w, uint32_t h) {
+    g_video_config.display_w = w ? w : 1920;
+    g_video_config.display_h = h ? h : 1080;
 }

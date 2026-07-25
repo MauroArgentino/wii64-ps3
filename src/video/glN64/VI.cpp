@@ -29,6 +29,8 @@
 #include "../../ui/libgui/IPLFont.h"
 #include "../../main/timers.h"
 #include "../../main/debug/DEBUG.h"
+#include "../../platform/ps3/spu_worker_pool.h"
+#include "debug_pause.h"
 extern "C" {
 #include "../../main/rom.h"
 #include "../../main/compatibility.h"
@@ -51,6 +53,11 @@ extern "C" {
 
 VIInfo VI;
 
+// Forward declarations for PS3 OSD functions
+#ifdef PS3
+static void VI_RSX_showSPU();
+static void VI_RSX_showDebugPause();
+#endif
 
 #if defined(__GX__)||defined(PS3)
 extern char printToScreen;
@@ -95,8 +102,33 @@ void VI_UpdateScreen()
 #ifdef PS3
 	if (!OGL.frameReady)
 		return;
+
+#ifdef DEBUG_POLYGONS
+	debug_pause_poll();
+	if (g_debug_pause.paused) {
+		VI_RSX_showFPS();
+#ifdef SHOW_DEBUG
+		VI_RSX_showSPU();
+		VI_RSX_showDEBUG();
+#endif
+		VI_RSX_showDebugPause();
+		flip();
+		/* After rendering the step frame, re-halt the CPU */
+		if (!g_debug_pause.frame_frozen) {
+			debug_pause_on_frame_done();
+		}
+		return;
+	}
+#endif
+
 	VI_RSX_showFPS();
+#ifdef SHOW_DEBUG
+	VI_RSX_showSPU();
 	VI_RSX_showDEBUG();
+#endif
+#ifdef DEBUG_POLYGONS
+	VI_RSX_showDebugPause();
+#endif
 
 	// FBE: Save current framebuffer so gDPLoadTile can detect it
 	// (GL path does this at lines 192-196; PS3 was missing it entirely)
@@ -260,12 +292,126 @@ extern char text[DEBUG_TEXT_HEIGHT][DEBUG_TEXT_WIDTH];
 #ifdef PS3
 static int gameInfoTimer = 0;
 static int gameInfoShown = 0;
-static char debugRenderState[4][128];
+static char debugRenderState[6][128];
+
+// Debug cycle mode for testing blend/alpha combinations
+int debugCycleMode = 0;
+int debugCycleTimer = 0;
+int g_debugCycleOverride = -1; // -1=off, 0-11=force mode (MUST match OpenGL.cpp extern)
+static const int debugCycleInterval = 120; // ~2 seconds at 60fps
+static const char* debugCycleNames[] = {
+    "DEFAULT",
+    "SRC_ALPHA/INV_SRC (alpha_mode=1)",
+    "SRC_ALPHA/INV_SRC (alpha_mode=0)",
+    "ONE/ZERO (alpha_mode=1)", 
+    "ONE/ZERO (alpha_mode=0)",
+    "SRC_ALPHA/ONE (additive)",
+    "Force SRC_ALPHA/INV_SRC",
+    "SRC_ALPHA/INV_SRC + AlphaTest(GEQUAL,1)",
+    "SRC_ALPHA/INV_SRC + AlphaTest(GEQUAL,128)",
+    "Force AlphaTest(GEQUAL,1) only",
+    "Force SRC_ALPHA/INV + AlphaTest(GEQUAL,1) + alpha_mode=1",
+    "FORCE OPAQUE (ONE/ZERO, alpha_mode=0)"
+};
+
+void VI_RSX_updateDebugCycle() {
+    // Auto-cycle disabled - set debugCycleMode manually if needed
+    // debugCycleTimer++;
+    // if (debugCycleTimer >= debugCycleInterval) {
+    //     debugCycleTimer = 0;
+    //     debugCycleMode = (debugCycleMode + 1) % 12;
+    //     // Don't set g_debugCycleOverride - only affects OSD, not game rendering
+    // }
+}
+
+void VI_RSX_applyDebugCycle() {
+    switch (debugCycleMode) {
+        case 0: // DEFAULT - use game's settings
+            break;
+        case 1: // SRC_ALPHA/INV_SRC with alpha_mode=1 (texel alpha)
+            rsxSetBlendFunc(context, GCM_SRC_ALPHA, GCM_ONE_MINUS_SRC_ALPHA, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 1.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_FALSE);
+            break;
+        case 2: // SRC_ALPHA/INV_SRC with alpha_mode=0 (opaque output)
+            rsxSetBlendFunc(context, GCM_SRC_ALPHA, GCM_ONE_MINUS_SRC_ALPHA, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 0.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_FALSE);
+            break;
+        case 3: // ONE/ZERO with alpha_mode=1
+            rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 1.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_FALSE);
+            break;
+        case 4: // ONE/ZERO with alpha_mode=0
+            rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 0.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_FALSE);
+            break;
+        case 5: // SRC_ALPHA/ONE (additive)
+            rsxSetBlendFunc(context, GCM_SRC_ALPHA, GCM_ONE, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 1.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_FALSE);
+            break;
+        case 6: // Force SRC_ALPHA/INV_SRC (override)
+            rsxSetBlendEnable(context, GCM_TRUE);
+            rsxSetBlendFunc(context, GCM_SRC_ALPHA, GCM_ONE_MINUS_SRC_ALPHA, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 1.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_FALSE);
+            break;
+        case 7: // SRC_ALPHA/INV_SRC + AlphaTest(GEQUAL, ref=1)
+            rsxSetBlendFunc(context, GCM_SRC_ALPHA, GCM_ONE_MINUS_SRC_ALPHA, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 1.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_TRUE);
+            rsxSetAlphaTestFunc(context, 0x0206); // GEQUAL
+            rsxSetAlphaTestRef(context, 1);
+            break;
+        case 8: // SRC_ALPHA/INV_SRC + AlphaTest(GEQUAL, ref=128)
+            rsxSetBlendFunc(context, GCM_SRC_ALPHA, GCM_ONE_MINUS_SRC_ALPHA, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 1.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_TRUE);
+            rsxSetAlphaTestFunc(context, 0x0206); // GEQUAL
+            rsxSetAlphaTestRef(context, 128);
+            break;
+        case 9: // Force AlphaTest(GEQUAL, ref=1) only (no blend override)
+            rsxSetAlphaTestEnable(context, GCM_TRUE);
+            rsxSetAlphaTestFunc(context, 0x0206); // GEQUAL
+            rsxSetAlphaTestRef(context, 1);
+            break;
+        case 10: // FORCE: AlphaTest+AlphaMode1+VertexAlpha1
+            rsxSetAlphaTestEnable(context, GCM_TRUE);
+            rsxSetAlphaTestFunc(context, 0x0206); // GEQUAL
+            rsxSetAlphaTestRef(context, 1);
+            rsxSetBlendFunc(context, GCM_SRC_ALPHA, GCM_ONE_MINUS_SRC_ALPHA, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 1.0f;
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            // Note: can't force vertex alpha here, game sets it
+            break;
+        case 11: // FORCE OPAQUE: alpha=1, ONE/ZERO
+            rsxSetBlendFunc(context, GCM_ONE, GCM_ZERO, GCM_ONE, GCM_ZERO);
+            OGL.shader_alpha_mode = 0.0f; // opaque output
+            rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+            rsxSetAlphaTestEnable(context, GCM_FALSE);
+            break;
+    }
+}
 
 void VI_RSX_showFPS(){
 	static char caption[25];
 
 	TimerUpdate();
+
+	// Debug cycle mode auto-switch
+	VI_RSX_updateDebugCycle();
+	VI_RSX_applyDebugCycle();
 
 	sprintf(caption, "%.1f VI/s, %.1f FPS",Timers.vis,Timers.fps);
 	
@@ -296,6 +442,8 @@ void VI_RSX_showFPS(){
 			gDP.otherMode.alphaCvgSel,
 			gDP.otherMode.cvgXAlpha,
 			gDP.otherMode.l >> 16);
+		sprintf(debugRenderState[4], "otherMode.l=%.8X", gDP.otherMode.l);
+		sprintf(debugRenderState[5], "debug_cycle=%d: %s", debugCycleMode, debugCycleNames[debugCycleMode]);
 		sprintf(debugRenderState[3], "prim=(%.0f,%.0f,%.0f,%.0f) blend=(%.0f,%.0f,%.0f,%.0f)",
 			gDP.primColor.r*255, gDP.primColor.g*255, gDP.primColor.b*255, gDP.primColor.a*255,
 			gDP.blendColor.r*255, gDP.blendColor.g*255, gDP.blendColor.b*255, gDP.blendColor.a*255);
@@ -306,6 +454,8 @@ void VI_RSX_showFPS(){
 		menu::IplFont::getInstance().drawString(10, 126, debugRenderState[1], 0.45, false);
 		menu::IplFont::getInstance().drawString(10, 142, debugRenderState[2], 0.45, false);
 		menu::IplFont::getInstance().drawString(10, 158, debugRenderState[3], 0.40, false);
+		menu::IplFont::getInstance().drawString(10, 174, debugRenderState[4], 0.40, false);
+		menu::IplFont::getInstance().drawString(10, 190, debugRenderState[5], 0.40, false);
 	}
 
 	// Show game info for 5 seconds after ROM load
@@ -369,6 +519,97 @@ void VI_RSX_resetGameInfo(void)
 	gameInfoTimer = 300;  // show for ~5 seconds at 60fps
 	gameInfoShown = 0;
 }
+
+#ifdef SHOW_DEBUG
+static void VI_RSX_showSPU()
+{
+	spu_worker_pool_t *pool = spu_worker_pool_get_default();
+	if (!pool) return;
+
+	spu_worker_stats_t stats[SPU_NUM_TOTAL];
+	int count = spu_worker_pool_get_worker_stats(pool, stats, SPU_NUM_TOTAL);
+	if (count <= 0) return;
+
+	GXColor spuColor = {180, 180, 255, 255};
+	menu::IplFont::getInstance().drawInit(spuColor);
+
+	char line[128];
+	int y = 210;
+	sprintf(line, "--- SPU Workers (%d active) ---", count);
+	menu::IplFont::getInstance().drawString(10, y, line, 0.40, false);
+	y += 14;
+
+	for (int i = 0; i < count; i++) {
+		uint32_t busy = stats[i].busy_us;
+		uint32_t idle = stats[i].idle_us;
+		uint32_t total = busy + idle;
+		uint32_t pct = (total > 0) ? (busy * 100 / total) : 0;
+		const char *type = stats[i].is_audio ? "AUD" : "GFX";
+		sprintf(line, "SPU%d %s: %u%% busy  jobs:%u",
+			stats[i].worker_id, type, pct, stats[i].jobs_completed);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.40, false);
+		y += 14;
+	}
+}
+#endif
+
+#ifdef DEBUG_POLYGONS
+static void VI_RSX_showDebugPause()
+{
+	if (!g_debug_pause.paused) return;
+
+	GXColor pauseColor = {255, 255, 80, 255};
+	GXColor polyColor = {200, 200, 200, 255};
+	GXColor activeColor = {100, 255, 100, 255};
+	menu::IplFont::getInstance().drawInit(pauseColor);
+
+	char line[128];
+	sprintf(line, "=== PAUSED (R1+L1 resume, R2 step) ===");
+	menu::IplFont::getInstance().drawString(10, 210, line, 0.50, false);
+	sprintf(line, "Frame polys: %u  Viewing: #%u",
+		g_debug_pause.poly_count, g_debug_pause.poly_index);
+	menu::IplFont::getInstance().drawString(10, 228, line, 0.45, false);
+
+	/* Show current polygon info */
+	if (g_debug_pause.poly_count > 0 && g_debug_pause.poly_index < DEBUG_POLY_RING_SIZE) {
+		uint32_t idx = g_debug_pause.poly_index % g_debug_pause.poly_count;
+		const debug_poly_info_t *p = &g_debug_pause.ring[idx];
+
+		int y = 250;
+		menu::IplFont::getInstance().drawInit(polyColor);
+
+		sprintf(line, "Poly #%u  verts:%u", p->index, p->num_vertices);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.40, false);
+		y += 14;
+
+		sprintf(line, "Z: %.3f %.3f %.3f", p->z_values[0], p->z_values[1], p->z_values[2]);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
+		y += 14;
+
+		sprintf(line, "UV S:[%.1f..%.1f] T:[%.1f..%.1f]",
+			p->uv_min_s, p->uv_max_s, p->uv_min_t, p->uv_max_t);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
+		y += 14;
+
+		const char *shader_names[] = {"DECAL", "PASSTEX", "PASSCOL", "MODULATE"};
+		const char *sname = (p->shader_mode <= 3) ? shader_names[p->shader_mode] : "?";
+		sprintf(line, "shader:%s  alpha:%.0f  T0:%d T1:%d",
+			sname, p->alpha_mode, p->uses_t0, p->uses_t1);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
+		y += 14;
+
+		sprintf(line, "tex: %ux%u fmt:%u", p->tex_width, p->tex_height, p->tex_format);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
+		y += 14;
+
+		/* Highlight current polygon with green border */
+		menu::IplFont::getInstance().drawInit(activeColor);
+		sprintf(line, ">>> Polygon %u of %u <<<",
+			g_debug_pause.poly_index + 1, g_debug_pause.poly_count);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.45, false);
+	}
+}
+#endif
 
 void VI_RSX_showDEBUG()
 {

@@ -10,11 +10,10 @@
 #if !defined( DEBUGGFX_H ) && defined( DEBUG )
 #define DEBUGGFX_H
 
-#ifndef __LINUX__
+#if !defined(__LINUX__) && !defined(PS3)
 # include <windows.h>
-#else
-# include "winlnxdefs.h"
 #endif
+/* winlnxdefs.h is force-included via -include in CFLAGS on PS3/Linux */
 #include <stdio.h>
 
 #define		DEBUG_LOW		0x1000

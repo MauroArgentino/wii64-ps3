@@ -21,6 +21,9 @@
 **/
 
 #include <stdlib.h>
+#ifdef PS3
+#include <sys/thread.h>
+#endif
 #include "../Invalid_Code.h"
 #include "../ARAM-blocks.h"
 #include "../exception.h"
@@ -49,6 +52,15 @@ extern unsigned int dyna_run(PowerPC_func* func, void* code);
 
 void dynarec(unsigned int address){
 	while(!r4300.stop){
+#ifdef PS3
+		extern volatile int debug_pause_cpu_halt;
+		extern void debug_pause_poll_halt(void);
+		if (debug_pause_cpu_halt) {
+			debug_pause_poll_halt();
+			sysThreadYield();
+			continue;
+		}
+#endif
 		refresh_stat();
 		
 		start_section(TRAMP_SECTION);
