@@ -4,9 +4,13 @@
 #include <ppu-asm.h>
 #include <stdio.h>
 
-// Reservamos 16MB para el cache de código generado por el DynaREC
-// Debe coincidir con RECOMP_CACHE_SIZE en Recomp-Cache.h
-#define DYNAREC_CACHE_SIZE (16 * 1024 * 1024)
+/*
+ * DYNAREC_CACHE_SIZE must equal RECOMP_CACHE_SIZE (Recomp-Cache.h).
+ * Cannot include Recomp-Cache.h here because it references PowerPC_func
+ * which is not available in this translation unit.
+ * If you change this value, update RECOMP_CACHE_SIZE in Recomp-Cache.h too.
+ */
+#define DYNAREC_CACHE_SIZE (64 * 1024 * 1024)
 
 static void* s_code_cache = NULL;
 
