@@ -13,8 +13,14 @@
 /* Forward declaration */
 struct GameHackManager;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 void RSX_VideoInit(void);
-void RSX_SetInternalResolution(uint32_t w, uint32_t h);
+#ifdef __cplusplus
+}
+#endif
+
 void RSX_Set3DViewport(void);
 void RSX_SetUIViewport(void);
 void RSX_SetRenderTarget3D(void);
