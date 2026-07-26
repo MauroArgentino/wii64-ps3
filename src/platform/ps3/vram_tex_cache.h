@@ -1,7 +1,7 @@
 /**
  * vram_tex_cache.h - VRAM Texture Hash Cache for PS3 RSX
  *
- * Persistent VRAM cache keyed by content hash (xxHash64).
+ * Persistent VRAM cache keyed by content hash (FNV-1a 64-bit).
  * Avoids re-uploading identical textures to RSX VRAM.
  */
 
@@ -18,11 +18,10 @@ extern "C" {
 /* Configuration */
 #define VRAM_TEX_CACHE_MAX_ENTRIES    4096
 #define VRAM_TEX_CACHE_MAX_SIZE_MB    64    /* PS3 has 256MB VRAM total; reserve rest for framebuffers, etc. */
-#define VRAM_TEX_HASH_SEED            0x9E3779B97F4A7C15ULL
 
 /* VRAM cache entry */
 typedef struct {
-    uint64_t hash;              /* xxHash64 of texture data (+palette if CI) */
+    uint64_t hash;              /* FNV-1a hash of texture data (+palette if CI) */
     uint32_t vram_offset;       /* RSX VRAM offset (from rsxAddressToOffset) */
     uint32_t vram_size;         /* Size in bytes (aligned to 128B pitch) */
     uint32_t width, height;     /* Texture dimensions */
