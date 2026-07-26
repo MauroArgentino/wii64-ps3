@@ -234,14 +234,25 @@ void go()
 		dynacore = 2;
 		printf("[GO] Pure interpreter returned, stop=%d\n", r4300.stop);
 	} else {
+		int interpcore_save = 0;
+		int dynacore_save = 0;
+		int dynarec_ok = 0;
+
+		interpcore_save = interpcore;
+		dynacore_save = dynacore;
 		interpcore = 0;
 		dynacore = 1;
+
 		if(cpu_inited) {
-			// Solo inicializamos el DynaREC si realmente se va a usar
 			#ifdef PPC_DYNAREC
 				printf("[GO] Initializing dynarec memory...\n");
 				if (!init_dynarec_memory()) {
-					printf("[GO] Dynarec: Error crítico inicializando memoria ejecutable.\n");
+					printf("[GO] Dynarec memory init failed, falling back to pure interpreter\n");
+					dynacore = 2;
+					interpcore = 1;
+					pure_interpreter();
+					dynacore = dynacore_save;
+					interpcore = interpcore_save;
 					return;
 				}
 				printf("[GO] Dynarec memory initialized OK\n");
@@ -251,10 +262,16 @@ void go()
 			init_blocks();
 			printf("[GO] init_blocks done\n");
 			cpu_inited = 0;
+			dynarec_ok = 1;
+		} else {
+			dynarec_ok = 1;
 		}
-		printf("[GO] Starting dynarec at pc=0x%08x\n", r4300.pc);
-		dynarec(r4300.pc);
-		printf("[GO] Dynarec returned, pc=0x%08x, stop=%d\n", r4300.pc, r4300.stop);
+
+		if (dynarec_ok) {
+			printf("[GO] Starting dynarec at pc=0x%08x\n", r4300.pc);
+			dynarec(r4300.pc);
+			printf("[GO] Dynarec returned, pc=0x%08x, stop=%d\n", r4300.pc, r4300.stop);
+		}
 	}
 	debug_count += Count;
 }

@@ -1,5 +1,4 @@
 #include "PS3DynarecMemoryManager.h"
-#include <malloc.h>
 #include <string.h>
 #include <ppu-asm.h>
 #include <stdio.h>
@@ -12,25 +11,40 @@
  */
 #define DYNAREC_CACHE_SIZE (64 * 1024 * 1024)
 
-static void* s_code_cache = NULL;
+/*
+ * Use a STATIC BSS array for the code cache instead of memalign().
+ *
+ * WHY: On RPCS3, heap memory (from memalign/malloc via PSL1GHT's sbrk) is
+ * mapped by sysMMapperSearchAndMap with SYS_MEMORY_PROT_READ_WRITE only --
+ * no execute permission. When the PPU tries to execute compiled PPC code
+ * from heap memory, RPCS3 crashes with:
+ *   "VM: Access violation executing location 0xXXXXXXXX (unmapped memory)"
+ *
+ * The sys_mmapper_change_address_access_right syscall (336) is a STUB in
+ * RPCS3 -- it returns CELL_OK without changing anything.
+ *
+ * SOLUTION: The PS3 ELF loader maps segments per program headers. The data
+ * segment (hdr_data) has FLAGS(PF_W | PF_X) = Write + Execute. BSS is part
+ * of this segment. A static BSS array therefore gets mapped as EXECUTABLE
+ * by the ELF loader, both on RPCS3 and on real PS3 hardware.
+ *
+ * On real PS3, heap memory is also executable (no NX enforcement), so this
+ * change is safe on both platforms.
+ */
+__attribute__((aligned(1048576)))
+static unsigned char s_code_cache[DYNAREC_CACHE_SIZE];
+
+static int s_cache_initialized = 0;
 
 __attribute__((visibility("default"))) int init_dynarec_memory() {
-    if (s_code_cache) return 1;
+    if (s_cache_initialized) return 1;
 
-    // En PS3 homebrew, el heap suele tener permisos RWX o permite ejecución.
-    // Alineamos a 4KB por seguridad.
-    s_code_cache = memalign(4096, DYNAREC_CACHE_SIZE);
-    if (!s_code_cache) {
-        printf("[DYNAREC] ERROR: memalign failed for %d bytes\n", DYNAREC_CACHE_SIZE);
-        return 0;
-    }
-    
-    printf("[DYNAREC] Code cache allocated at %p, size=%d (0x%x)\n", 
-           s_code_cache, DYNAREC_CACHE_SIZE, DYNAREC_CACHE_SIZE);
+    printf("[DYNAREC] Code cache (BSS) at %p, size=%d (0x%x)\n",
+           (void*)s_code_cache, DYNAREC_CACHE_SIZE, DYNAREC_CACHE_SIZE);
 
     memset(s_code_cache, 0, DYNAREC_CACHE_SIZE);
-    
-    // Verificar que la memoria es escribible
+
+    /* Verify memory is writable */
     volatile unsigned int *test_ptr = (volatile unsigned int *)s_code_cache;
     *test_ptr = 0x12345678;
     if (*test_ptr != 0x12345678) {
@@ -38,27 +52,22 @@ __attribute__((visibility("default"))) int init_dynarec_memory() {
         return 0;
     }
     *test_ptr = 0;
-    
+
     printf("[DYNAREC] Memory write test passed\n");
-    printf("[DYNAREC] To verify execution, test a small PPC snippet after flush\n");
-    
+    s_cache_initialized = 1;
     return 1;
 }
 
 __attribute__((visibility("default"))) void flush_icache(void* start, size_t size) {
-    // Sincronización del caché de instrucciones para PowerPC (arquitectura de la PS3)
-    // Esto es vital para que el procesador vea el nuevo código generado en RAM.
     uintptr_t addr = (uintptr_t)start;
     uintptr_t end = addr + size;
     uintptr_t i;
 
-    // dcbst: Sincroniza el caché de datos con la memoria principal
     for (i = addr & ~127; i < end; i += 128) {
         asm volatile("dcbst 0, %0" : : "r"(i) : "memory");
     }
     asm volatile("sync");
 
-    // icbi: Invalida el caché de instrucciones para forzar la recarga
     for (i = addr & ~127; i < end; i += 128) {
         asm volatile("icbi 0, %0" : : "r"(i) : "memory");
     }
@@ -66,13 +75,10 @@ __attribute__((visibility("default"))) void flush_icache(void* start, size_t siz
 }
 
 __attribute__((visibility("default"))) void* get_code_cache_ptr() {
-    return s_code_cache;
+    return (void*)s_code_cache;
 }
 
 __attribute__((visibility("default"))) void deinit_dynarec_memory() {
-    if (s_code_cache) {
-        printf("[DYNAREC] Freeing code cache at %p\n", s_code_cache);
-        free(s_code_cache);
-        s_code_cache = NULL;
-    }
+    printf("[DYNAREC] Code cache is static BSS, no free needed\n");
+    s_cache_initialized = 0;
 }
