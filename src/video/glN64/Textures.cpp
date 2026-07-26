@@ -51,6 +51,11 @@ extern GameHackManager *g_game_hack_mgr;
 #include "FrameBuffer.h"
 #include "../../main/game_hacks.h"
 
+#ifdef PS3
+#include "../../platform/ps3/vram_tex_cache.h"
+#include "RSX_VideoBackend.h"
+#endif // PS3
+
 TextureCache	cache;
 #ifdef __GX__
 heap_cntrl* GXtexCache;
@@ -414,6 +419,13 @@ void TextureCache_Init()
 	cache.enable2xSaI = OGL.enable2xSaI;
 	cache.bitDepth = OGL.textureBitDepth;
 
+#ifdef PS3
+	// Ensure RSX VRAM pool is initialized before allocating textures
+	RSX_VideoInit();
+	// Initialize VRAM Texture Hash Cache
+	vram_tex_cache_init();
+#endif // PS3
+
 #ifdef __GX__
 	//Init texture cache heap if not yet inited
 	if(!GXtexCache)
@@ -676,7 +688,7 @@ CachedTexture *TextureCache_AddTop()
 	}
 
 	CachedTexture *newtop = (CachedTexture*)malloc( sizeof( CachedTexture ) );
-//	memset( newtop, 0x00, sizeof( CachedTexture ) );
+	memset( newtop, 0x00, sizeof( CachedTexture ) );
 
 #ifdef PS3
 	newtop->rsxTextureBuffer = NULL;
@@ -1072,50 +1084,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 #endif // __GX__
 
 #ifdef PS3
-	//TODO: Implement 2xSaI
-	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
-	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
-	// RSX linear textures require pitch aligned to 128 bytes.
-	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
-	u32 rsxBytes = rsxPitch * texInfo->realHeight;
-	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
-	memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
-	{
-		u32 *src32 = dest;
-		u32 *dst32 = texInfo->rsxTextureBuffer;
-		for (u32 row = 0; row < texInfo->realHeight; row++)
-		{
-			u32 *srcRow = src32 + row * texInfo->realWidth;
-			u8 *dstRow = (u8*)dst32 + row * rsxPitch;
-			for (u32 col = 0; col < texInfo->realWidth; col++)
-			{
-				u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
-				((u32*)dstRow)[col] = swapped;
-			}
-		}
-	}
-	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
-	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
-	texInfo->rsxTex.format		= texInfo->rsxFmt;
-	texInfo->rsxTex.mipmap		= 1;
-	texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
-	texInfo->rsxTex.cubemap		= GCM_FALSE;
-	texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-	texInfo->rsxTex.width		= texInfo->realWidth;
-	texInfo->rsxTex.height		= texInfo->realHeight;
-	texInfo->rsxTex.depth		= 1;
-	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= rsxPitch;
-	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
-	free( swapped );
-	free( dest );
+	/* PS3: rsxTex fields will be set by the second PS3 block below */
 #elif defined(__GX__)
 	//2xSaI textures will not be implemented for now.
 	DCFlushRange(texInfo->GXtexture, texInfo->textureBytes);
@@ -1527,49 +1496,139 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 #endif // !__GX__
 
 #ifdef PS3
-	//TODO: Implement 2xSaI
-	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
-	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
-	// RSX linear textures require pitch aligned to 128 bytes.
-	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
-	u32 rsxBytes = rsxPitch * texInfo->realHeight;
-	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
-	memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
+	/* PS3 RSX texture upload - single unified path */
+	/* First, set ALL rsxTex fields (needed for rsxLoadTexture) */
 	{
-		u32 *src32 = dest;
-		u32 *dst32 = texInfo->rsxTextureBuffer;
-		for (u32 row = 0; row < texInfo->realHeight; row++)
+		u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
+		texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
+		texInfo->rsxTex.format		= texInfo->rsxFmt;
+		texInfo->rsxTex.mipmap		= 1;
+		texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
+		texInfo->rsxTex.cubemap		= GCM_FALSE;
+		texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
+		texInfo->rsxTex.width		= texInfo->realWidth;
+		texInfo->rsxTex.height		= texInfo->realHeight;
+		texInfo->rsxTex.depth		= 1;
+		texInfo->rsxTex.location	= GCM_LOCATION_RSX;
+		texInfo->rsxTex.pitch		= rsxPitch;
+	}
+
+	if (!texInfo->frameBufferTexture)
+	{
+		/* Non-framebuffer texture: try VRAM hash cache */
+		#include "../../platform/ps3/vram_tex_cache.h"
+		uint32_t vram_offset = 0, vram_pitch = 0;
+		uint8_t has_palette = (texInfo->format == G_IM_FMT_CI) ? 1 : 0;
+		uint32_t palette_crc = 0;
+
+		if (has_palette)
 		{
-			u32 *srcRow = src32 + row * texInfo->realWidth;
-			u8 *dstRow = (u8*)dst32 + row * rsxPitch;
-			for (u32 col = 0; col < texInfo->realWidth; col++)
+			u32 palette_size = (texInfo->size == G_IM_SIZ_4b) ? 16 : 256;
+			u32 palette_addr = 256 + texInfo->palette * palette_size;
+			u16 *palette_data = (u16*)&TMEM[palette_addr];
+			palette_crc = 0xFFFFFFFF;
 			{
-				u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
-				((u32*)dstRow)[col] = swapped;
+				u32 ii;
+				for (ii = 0; ii < palette_size; ii++)
+				{
+					palette_crc ^= palette_data[ii];
+					{
+						int bb;
+						for (bb = 0; bb < 16; bb++)
+							palette_crc = (palette_crc >> 1) ^ (0xEDB88320 & -(palette_crc & 1));
+					}
+				}
+			}
+			palette_crc ^= 0xFFFFFFFF;
+		}
+
+		{
+			int cache_result = vram_tex_cache_get_or_upload(
+				dest, texInfo->textureBytes,
+				texInfo->realWidth, texInfo->realHeight,
+				GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN,
+				has_palette, palette_crc,
+				&vram_offset, &vram_pitch
+			);
+			if (cache_result == 1)
+			{
+				/* Cache hit - reuse existing VRAM texture */
+				texInfo->rsxTextureOffset = vram_offset;
+				texInfo->rsxTex.offset = vram_offset;
+				texInfo->rsxTex.pitch = vram_pitch;
+			}
+			else if (cache_result == 0 && vram_offset != 0)
+			{
+				/* Cache did the upload (miss or disabled with fallback) */
+				texInfo->rsxTextureOffset = vram_offset;
+				texInfo->rsxTex.offset = vram_offset;
+				texInfo->rsxTex.pitch = vram_pitch;
+			}
+			else
+			{
+				/* Cache disabled or failed - direct upload fallback */
+				u32 rsxPitch2 = (texInfo->realWidth * 4 + 127) & ~127u;
+				u32 rsxBytes = rsxPitch2 * texInfo->realHeight;
+				texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
+				if (texInfo->rsxTextureBuffer)
+				{
+					u32 *src32 = dest;
+					u32 *dst32 = texInfo->rsxTextureBuffer;
+					u32 row, col;
+					memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
+					for (row = 0; row < texInfo->realHeight; row++)
+					{
+						u32 *srcRow = src32 + row * texInfo->realWidth;
+						u8 *dstRow = (u8*)dst32 + row * rsxPitch2;
+						for (col = 0; col < texInfo->realWidth; col++)
+						{
+							u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+							((u32*)dstRow)[col] = swapped;
+						}
+					}
+					rsxAddressToOffset(texInfo->rsxTextureBuffer, &texInfo->rsxTextureOffset);
+					texInfo->rsxTex.offset = texInfo->rsxTextureOffset;
+					texInfo->rsxTex.pitch = rsxPitch2;
+				}
 			}
 		}
+		free(dest);
 	}
-	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
-	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
-	texInfo->rsxTex.format		= texInfo->rsxFmt;
-	texInfo->rsxTex.mipmap		= 1;
-	texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
-	texInfo->rsxTex.cubemap		= GCM_FALSE;
-	texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-	texInfo->rsxTex.width		= texInfo->realWidth;
-	texInfo->rsxTex.height		= texInfo->realHeight;
-	texInfo->rsxTex.depth		= 1;
-	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= rsxPitch;
-	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
-	free( dest );
+	else
+	{
+		/* Framebuffer texture - always upload fresh (no cache) */
+		u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
+		u32 rsxBytes = rsxPitch * texInfo->realHeight;
+		texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
+		if (texInfo->rsxTextureBuffer)
+		{
+			u32 *src32 = dest;
+			u32 *dst32 = texInfo->rsxTextureBuffer;
+			u32 row, col;
+			memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
+			for (row = 0; row < texInfo->realHeight; row++)
+			{
+				u32 *srcRow = src32 + row * texInfo->realWidth;
+				u8 *dstRow = (u8*)dst32 + row * rsxPitch;
+				for (col = 0; col < texInfo->realWidth; col++)
+				{
+					u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+					((u32*)dstRow)[col] = swapped;
+				}
+			}
+			rsxAddressToOffset(texInfo->rsxTextureBuffer, &texInfo->rsxTextureOffset);
+			texInfo->rsxTex.offset = texInfo->rsxTextureOffset;
+			texInfo->rsxTex.pitch = rsxPitch;
+		}
+		free(dest);
+	}
 #elif defined(__GX__)
 	//2xSaI textures will not be implemented for now.
 	if(texInfo->GXtexture != NULL)

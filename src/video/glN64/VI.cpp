@@ -31,6 +31,7 @@
 #include "../../main/debug/DEBUG.h"
 #include "../../platform/ps3/spu_worker_pool.h"
 #include "debug_pause.h"
+#include "../../platform/ps3/vram_tex_cache.h"
 extern "C" {
 #include "../../main/rom.h"
 #include "../../main/compatibility.h"
@@ -103,6 +104,9 @@ void VI_UpdateScreen()
 	if (!OGL.frameReady)
 		return;
 
+	// Advance VRAM texture cache frame counter for LRU
+	vram_tex_cache_new_frame();
+
 #ifdef DEBUG_POLYGONS
 	debug_pause_poll();
 	if (g_debug_pause.paused) {
@@ -125,6 +129,9 @@ void VI_UpdateScreen()
 #ifdef SHOW_DEBUG
 	VI_RSX_showSPU();
 	VI_RSX_showDEBUG();
+#ifdef PS3
+	VI_RSX_showVRAMCache();
+#endif
 #endif
 #ifdef DEBUG_POLYGONS
 	VI_RSX_showDebugPause();
@@ -551,7 +558,35 @@ static void VI_RSX_showSPU()
 		y += 14;
 	}
 }
-#endif
+
+/* VRAM Texture Cache stats display */
+static void VI_RSX_showVRAMCache()
+{
+	vram_tex_stats_t vstats;
+	vram_tex_cache_get_stats(&vstats);
+	if (vstats.total_entries == 0 && vstats.misses == 0 && vstats.hits == 0) return;
+
+	GXColor vramColor = {255, 200, 100, 255};
+	menu::IplFont::getInstance().drawInit(vramColor);
+
+	char line[128];
+	int y = 350;
+	sprintf(line, "--- VRAM Texture Cache ---");
+	menu::IplFont::getInstance().drawString(10, y, line, 0.40, false);
+	y += 14;
+	sprintf(line, "Entries: %u  VRAM: %.2f MB", vstats.total_entries, vstats.total_vram_bytes / (1024.0f * 1024.0f));
+	menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
+	y += 14;
+	sprintf(line, "Hits: %u  Misses: %u  Hit%%: %u%%",
+		vstats.hits, vstats.misses,
+		(vstats.hits + vstats.misses > 0) ? (vstats.hits * 100 / (vstats.hits + vstats.misses)) : 0);
+	menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
+	y += 14;
+	sprintf(line, "Uploads: %u  Evictions: %u", vstats.total_uploads, vstats.evictions);
+	menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
+}
+
+#endif // PS3
 
 #ifdef DEBUG_POLYGONS
 static void VI_RSX_showDebugPause()
