@@ -1479,25 +1479,29 @@ void OGL_DrawTriangles()
 
 #ifdef PS3
 #ifdef DEBUG_POLYGONS
+	/* Record all polygon info (only when paused/capturing) */
+	if (g_debug_pause.paused)
 	{
-		static uint32_t poly_counter = 0;
 		for (int i_tri = 0; i_tri < OGL.numVertices; i_tri += 3) {
 			const GLVertex *v0 = &OGL.vertices[i_tri];
 			debug_poly_info_t info;
 			memset(&info, 0, sizeof(info));
-			info.index = poly_counter++;
+			info.index = g_poly_counter++;
 			info.num_vertices = 3;
 			info.z_values[0] = v0[0].z; info.z_values[1] = v0[1].z; info.z_values[2] = v0[2].z;
-			float minS = v0[0].s0, maxS = v0[0].s0;
-			float minT = v0[0].t0, maxT = v0[0].t0;
-			for (int j = 1; j < 3; j++) {
-				if (v0[j].s0 < minS) minS = v0[j].s0;
-				if (v0[j].s0 > maxS) maxS = v0[j].s0;
-				if (v0[j].t0 < minT) minT = v0[j].t0;
-				if (v0[j].t0 > maxT) maxT = v0[j].t0;
+			{
+				float minS = v0[0].s0, maxS = v0[0].s0;
+				float minT = v0[0].t0, maxT = v0[0].t0;
+				int j;
+				for (j = 1; j < 3; j++) {
+					if (v0[j].s0 < minS) minS = v0[j].s0;
+					if (v0[j].s0 > maxS) maxS = v0[j].s0;
+					if (v0[j].t0 < minT) minT = v0[j].t0;
+					if (v0[j].t0 > maxT) maxT = v0[j].t0;
+				}
+				info.uv_min_s = minS; info.uv_max_s = maxS;
+				info.uv_min_t = minT; info.uv_max_t = maxT;
 			}
-			info.uv_min_s = minS; info.uv_max_s = maxS;
-			info.uv_min_t = minT; info.uv_max_t = maxT;
 			info.shader_mode = (uint32_t)OGL.shader_mode;
 			info.alpha_mode = OGL.shader_alpha_mode;
 			info.uses_t0 = combiner.usesT0;
@@ -1511,32 +1515,27 @@ void OGL_DrawTriangles()
 		const GLVertex *v = &OGL.vertices[i];
 
 #ifdef DEBUG_POLYGONS
-		uint32_t tri_idx = g_debug_pause.frame_tri_index;
-		g_debug_pause.frame_tri_index++;
-		int highlight = g_debug_pause.paused && (tri_idx == g_debug_pause.poly_index);
-		if (g_debug_pause.paused && !highlight) continue;
+		/* Track per-frame triangle index for highlight comparison */
+		{
+			uint32_t tri_idx = g_debug_pause.frame_tri_index;
+			g_debug_pause.frame_tri_index++;
+			/* When frozen (not capturing), skip all polys - frame is already drawn */
+			if (g_debug_pause.frame_frozen) continue;
+		}
 #endif
 
-		// Count vertices in front of near plane
+		/* Count vertices in front of near plane */
 		int numFront = 0;
 		for (int j = 0; j < 3; j++) {
 			if (v[j].w > NEAR_CLIP_EPS) numFront++;
 		}
 
 		if (numFront == 3) {
-			// All 3 in front: render as-is (fast path)
-			for (int j = 0; j < 3; j++) {
-#ifdef DEBUG_POLYGONS
-				if (highlight) {
-					rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 0.0f, 1.0f, 1.0f);
-				} else {
-					rsxDrawVertex4f(context, OGL.vertexColor0_id, v[j].color.r, v[j].color.g,
-						v[j].color.b, v[j].color.a);
-				}
-#else
+			/* All 3 in front: render as-is (fast path) */
+			int j;
+			for (j = 0; j < 3; j++) {
 				rsxDrawVertex4f(context, OGL.vertexColor0_id, v[j].color.r, v[j].color.g,
 					v[j].color.b, v[j].color.a);
-#endif
 				if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, v[j].s0, v[j].t0);
 				else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, v[j].s1, v[j].t1);
 				else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);
@@ -1546,24 +1545,17 @@ void OGL_DrawTriangles()
 			// All 3 behind camera: skip entirely
 			continue;
 		} else {
-			// Triangle crosses near plane: clip and emit 1-2 sub-triangles
+			/* Triangle crosses near plane: clip and emit 1-2 sub-triangles */
 			GLVertex clipped[6];
 			int n = clipNearPlaneW(v, 3, clipped);
-			// Fan triangulate: emit (c0, ck, ck+1) for k=1..n-2
-			for (int k = 1; k < n - 1; k++) {
+			int k;
+			/* Fan triangulate: emit (c0, ck, ck+1) for k=1..n-2 */
+			for (k = 1; k < n - 1; k++) {
 				const GLVertex *tri[3] = { &clipped[0], &clipped[k], &clipped[k+1] };
-				for (int j = 0; j < 3; j++) {
-#ifdef DEBUG_POLYGONS
-					if (highlight) {
-						rsxDrawVertex4f(context, OGL.vertexColor0_id, 1.0f, 0.0f, 1.0f, 1.0f);
-					} else {
-						rsxDrawVertex4f(context, OGL.vertexColor0_id, tri[j]->color.r, tri[j]->color.g,
-							tri[j]->color.b, tri[j]->color.a);
-					}
-#else
+				int j;
+				for (j = 0; j < 3; j++) {
 					rsxDrawVertex4f(context, OGL.vertexColor0_id, tri[j]->color.r, tri[j]->color.g,
 						tri[j]->color.b, tri[j]->color.a);
-#endif
 					if (combiner.usesT0)		rsxDrawVertex2f(context, OGL.vertexTexcoord_id, tri[j]->s0, tri[j]->t0);
 					else if (combiner.usesT1)	rsxDrawVertex2f(context, OGL.vertexTexcoord_id, tri[j]->s1, tri[j]->t1);
 					else						rsxDrawVertex2f(context, OGL.vertexTexcoord_id, 0.0f, 0.0f);

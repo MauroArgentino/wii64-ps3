@@ -117,8 +117,9 @@ void VI_UpdateScreen()
 #endif
 		VI_RSX_showDebugPause();
 		flip();
-		/* After rendering the step frame, re-halt the CPU */
-		if (!g_debug_pause.frame_frozen) {
+		/* If we were capturing, the frame has now been flipped.
+		 * Transition to frozen state: halt CPU permanently. */
+		if (g_debug_pause.capturing) {
 			debug_pause_on_frame_done();
 		}
 		return;
@@ -599,7 +600,7 @@ static void VI_RSX_showDebugPause()
 	menu::IplFont::getInstance().drawInit(pauseColor);
 
 	char line[128];
-	sprintf(line, "=== PAUSED (R1+L1 resume, R2 step) ===");
+	sprintf(line, "=== PAUSED (R1+L1 resume, R2 navigate) ===");
 	menu::IplFont::getInstance().drawString(10, 210, line, 0.50, false);
 	sprintf(line, "Frame polys: %u  Viewing: #%u",
 		g_debug_pause.poly_count, g_debug_pause.poly_index);

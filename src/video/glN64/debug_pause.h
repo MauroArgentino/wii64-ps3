@@ -1,8 +1,11 @@
 /**
  * debug_pause.h - Debug Pause Mode & Polygon Inspector
  *
- * Allows pausing emulation with R1+L1 and inspecting polygons one by one.
- * Press R1+L1 to enter/exit pause. When paused, R2 advances one polygon.
+ * Two-phase freeze:
+ *   1. L1+R1 arms capture → next frame renders all polys (no skip), recorded
+ *   2. After that frame flips → freeze CPU permanently
+ *   3. R2 navigates captured polygon list (CPU stays halted)
+ *   4. L1+R1 again → resume game
  */
 
 #ifndef DEBUG_PAUSE_H
@@ -14,8 +17,8 @@
 extern "C" {
 #endif
 
-/* Max polygons recorded in the ring buffer */
-#define DEBUG_POLY_RING_SIZE 256
+/* Max polygons recorded per frozen frame */
+#define DEBUG_POLY_RING_SIZE 512
 
 /* Polygon snapshot captured at draw time */
 typedef struct {
@@ -43,17 +46,19 @@ typedef struct {
 /* Global debug pause state */
 typedef struct {
     volatile uint32_t paused;            /* 1 = emulation paused */
-    volatile uint32_t step;              /* 1 = advance one polygon, then pause */
+    volatile uint32_t capturing;         /* 1 = capturing current frame */
+    volatile uint32_t frame_frozen;      /* 1 = frame captured, CPU halted */
     volatile uint32_t poly_index;        /* current polygon being inspected */
-    volatile uint32_t poly_count;        /* total polygons in current frame */
-    volatile uint32_t frame_count;       /* frames since pause entered */
-    volatile uint32_t frame_tri_index;   /* per-frame triangle counter (reset each frame) */
-    volatile uint32_t frame_frozen;      /* 1 = frame is frozen, 0 = need to re-render */
+    volatile uint32_t poly_count;        /* total polygons captured */
+    volatile uint32_t frame_tri_index;   /* per-frame triangle counter */
     debug_poly_info_t ring[DEBUG_POLY_RING_SIZE];
     uint32_t ring_write;                 /* next write index */
 } debug_pause_state_t;
 
 extern debug_pause_state_t g_debug_pause;
+
+/* Per-frame polygon counter (reset each display list) */
+extern volatile uint32_t g_poly_counter;
 
 /**
  * Call from OGL_DrawTriangles to record polygon info.
@@ -61,33 +66,32 @@ extern debug_pause_state_t g_debug_pause;
 void debug_pause_record_poly(const debug_poly_info_t *info);
 
 /**
- * Check if we should block (called from OGL_DrawTriangles).
- * Returns 1 if drawing should proceed, 0 if blocked.
- */
-int debug_pause_should_draw(void);
-
-/**
- * Poll PS3 pad for debug hotkeys (R1+L1 toggle, R2 step).
- * Called from VI_UpdateScreen.
- */
-void debug_pause_poll(void);
-
-/**
  * Called at the start of each display list to reset per-frame counters.
  */
 void debug_pause_begin_frame(void);
 
 /**
- * CPU halt flag. When set, the interpreter loop spins without executing.
- * Set by debug_pause_poll (R2 step), cleared after one frame renders.
+ * Called from VI_UpdateScreen after a capture frame has been flipped.
+ * Transitions to frozen state.
+ */
+void debug_pause_on_frame_done(void);
+
+/**
+ * Poll PS3 pad for debug hotkeys (R1+L1 toggle, R2 step).
+ * Called from VI_UpdateScreen when paused.
+ */
+void debug_pause_poll(void);
+
+/**
+ * CPU halt flag. When set, interpreter spins without executing.
  */
 extern volatile int debug_pause_cpu_halt;
 
 /**
- * Called from VI_UpdateScreen after a step frame has been rendered.
- * Re-halts the CPU to freeze the frame.
+ * Called from the interpreter halt loop when CPU is frozen.
+ * Polls the pad directly since VI_UpdateScreen is not running.
  */
-void debug_pause_on_frame_done(void);
+void debug_pause_poll_halt(void);
 
 #ifdef __cplusplus
 }
