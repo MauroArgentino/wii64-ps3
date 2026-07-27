@@ -298,41 +298,6 @@ static const char *MWOMatrixText[] =
 };
 #endif
 
-// ZSort microcode constants (based on F3DEX)
-#define ZSORT_MTX_STACKSIZE		18
-#define ZSORT_MTX_MODELVIEW		0x00
-#define ZSORT_MTX_PROJECTION		0x01
-#define ZSORT_MTX_MUL			0x02
-#define ZSORT_MTX_LOAD			0x03
-#define ZSORT_MTX_NOPUSH		0x04
-#define ZSORT_MTX_PUSH			0x05
-
-#define ZSORT_TEXTURE_ENABLE	0x01
-#define ZSORT_SHADING_SMOOTH	0x02
-#define ZSORT_CULL_FRONT		0x04
-#define ZSORT_CULL_BACK		0x08
-#define ZSORT_CULL_BOTH		0x0C
-#define ZSORT_CLIPPING		0x10
-
-#define ZSORT_MV_VIEWPORT		0x01
-
-#define ZSORT_MWO_aLIGHT_1	0x01
-#define ZSORT_MWO_bLIGHT_1	0x02
-#define ZSORT_MWO_aLIGHT_2	0x03
-#define ZSORT_MWO_bLIGHT_2	0x04
-#define ZSORT_MWO_aLIGHT_3	0x05
-#define ZSORT_MWO_bLIGHT_3	0x06
-#define ZSORT_MWO_aLIGHT_4	0x07
-#define ZSORT_MWO_bLIGHT_4	0x08
-#define ZSORT_MWO_aLIGHT_5	0x09
-#define ZSORT_MWO_bLIGHT_5	0x0A
-#define ZSORT_MWO_aLIGHT_6	0x0B
-#define ZSORT_MWO_bLIGHT_6	0x0C
-#define ZSORT_MWO_aLIGHT_7	0x0D
-#define ZSORT_MWO_bLIGHT_7	0x0E
-#define ZSORT_MWO_aLIGHT_8	0x0F
-#define ZSORT_MWO_bLIGHT_8	0x10
-
 // These flags change between ucodes
 extern u32 G_MTX_STACKSIZE;
 extern u32 G_MTX_MODELVIEW;
