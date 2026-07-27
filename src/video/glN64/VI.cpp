@@ -53,10 +53,14 @@ extern "C" {
 
 VIInfo VI;
 
-// Forward declarations for PS3 OSD functions
 #ifdef PS3
+// Forward declarations for PS3 OSD functions
+#ifdef SHOW_DEBUG
 static void VI_RSX_showSPU();
+#endif
+#ifdef DEBUG_POLYGONS
 static void VI_RSX_showDebugPause();
+#endif
 #endif
 
 #if defined(__GX__)||defined(PS3)
@@ -292,13 +296,15 @@ extern char text[DEBUG_TEXT_HEIGHT][DEBUG_TEXT_WIDTH];
 #ifdef PS3
 static int gameInfoTimer = 0;
 static int gameInfoShown = 0;
-static char debugRenderState[6][128];
 
-// Debug cycle mode for testing blend/alpha combinations
+// Debug cycle variables (used across VI_RSX_updateDebugCycle, VI_RSX_applyDebugCycle, etc.)
 int debugCycleMode = 0;
 int debugCycleTimer = 0;
-int g_debugCycleOverride = -1; // -1=off, 0-11=force mode (MUST match OpenGL.cpp extern)
-static const int debugCycleInterval = 120; // ~2 seconds at 60fps
+int debugCycleInterval = 120;
+int g_debugCycleOverride = -1;
+
+#ifdef DEBUG
+static char debugRenderState[6][128];
 static const char* debugCycleNames[] = {
     "DEFAULT",
     "SRC_ALPHA/INV_SRC (alpha_mode=1)",
@@ -313,8 +319,10 @@ static const char* debugCycleNames[] = {
     "Force SRC_ALPHA/INV + AlphaTest(GEQUAL,1) + alpha_mode=1",
     "FORCE OPAQUE (ONE/ZERO, alpha_mode=0)"
 };
+#endif
 
 void VI_RSX_updateDebugCycle() {
+#ifdef DEBUG
     // Auto-cycle disabled - set debugCycleMode manually if needed
     // debugCycleTimer++;
     // if (debugCycleTimer >= debugCycleInterval) {
@@ -322,10 +330,13 @@ void VI_RSX_updateDebugCycle() {
     //     debugCycleMode = (debugCycleMode + 1) % 12;
     //     // Don't set g_debugCycleOverride - only affects OSD, not game rendering
     // }
+#endif
 }
 
 void VI_RSX_applyDebugCycle() {
+#ifdef DEBUG
     switch (debugCycleMode) {
+#endif
         case 0: // DEFAULT - use game's settings
             break;
         case 1: // SRC_ALPHA/INV_SRC with alpha_mode=1 (texel alpha)

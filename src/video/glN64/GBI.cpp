@@ -30,6 +30,7 @@
 #include "F3DDKR.h"
 #include "F3DWRUS.h"
 #include "F3DPD.h"
+#include "ZSort.h"
 #include "Types.h"
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 # include "Resource.h"

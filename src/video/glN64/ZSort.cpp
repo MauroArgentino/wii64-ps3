@@ -17,8 +17,6 @@
 #include "RSX_VideoBackend.h"
 #include <rsx/rsx.h>
 #include <rsx/gcm_sys.h>
-#include <sys/gcm_sys.h>
-#include <sys/gcm.h>
 #include <rsx/rsxutil.h>
 extern context_t *context;
 #endif
