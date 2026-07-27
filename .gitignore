@@ -15,3 +15,4 @@ python2.7
 gitk3y.txt
 pkg/USRDIR/
 decomp/
+src/video/glN64/Config_linux.cpp

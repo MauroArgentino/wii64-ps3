@@ -53,6 +53,7 @@ extern GameHackManager *g_game_hack_mgr;
 
 #ifdef PS3
 #include "../../platform/ps3/vram_tex_cache.h"
+#include "../../platform/ps3/spu_worker_pool.h"
 #include "RSX_VideoBackend.h"
 #endif // PS3
 
@@ -517,12 +518,28 @@ void TextureCache_Init()
 									   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
 									   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
 									   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-	cache.dummy->rsxTex.width		= cache.dummy->width;
-	cache.dummy->rsxTex.height		= cache.dummy->height;
+	cache.dummy->rsxTex.width		= (cache.dummy->width > 0) ? cache.dummy->width : 1;
+	cache.dummy->rsxTex.height		= (cache.dummy->height > 0) ? cache.dummy->height : 1;
 	cache.dummy->rsxTex.depth		= 1;
 	cache.dummy->rsxTex.location	= GCM_LOCATION_RSX;
 	cache.dummy->rsxTex.pitch		= cache.dummy->width*4;
 	cache.dummy->rsxTex.offset		= cache.dummy->rsxTextureOffset;
+
+	/* Load dummy texture into ALL RSX texture units except OGL.textureUnit_id.
+	   RPCS3 validates the FORMAT register of every unit during draw calls.
+	   Just disabling the unit (rsxTextureControl) doesn't clear the FORMAT
+	   register — it keeps whatever the RSX hardware defaults to (0x8001),
+	   which has format=0, dimension=0 → "texture_dimension" fatal error.
+	   Loading the dummy gives every unit valid format/dimension/offset. */
+	{
+		u32 _tu;
+		for (_tu = 0; _tu < 16; _tu++) {
+			if (_tu != (u32)OGL.textureUnit_id) {
+				rsxLoadTexture(context, (u8)_tu, &cache.dummy->rsxTex);
+				rsxTextureControl(context, (u8)_tu, GCM_TRUE, 0, 0, 0);
+			}
+		}
+	}
 #elif defined(__GX__)
 	//Dummy texture doesn't seem to be needed, so don't load into GX for now.
 //	cache.dummy->GXtexture = (u16*) memalign(32,cache.dummy->textureBytes);
@@ -1137,6 +1154,68 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 #endif // !__GX__
 }
 
+#ifdef PS3
+/* SPU-assisted texture upload: endian-swap + VRAM copy */
+static int spu_texture_upload(u32 *src32, u32 width, u32 height, u32 dst_pitch, u32 *dst_vram)
+{
+    if (!src32 || !dst_vram || width == 0 || height == 0) return -1;
+
+    spu_worker_pool_t *pool = spu_worker_pool_get_default();
+    if (!pool) return -1;
+
+    /* Use TEX_DECODE job to copy+swap from src32 (PPU EA) to dst_vram (PPU EA) */
+    spu_job_tex_decode_t job = {0};
+    job.hdr.job_type = SPU_JOB_TEX_DECODE;
+    job.hdr.job_id = spu_job_next_id();
+    job.hdr.payload_size = sizeof(job) - sizeof(job.hdr);
+    job.hdr.flags = TEX_DECODE_FLAG_BYTESWAP;
+    job.format = (spu_tex_format_t)7;
+    job.width = width;
+    job.height = height;
+    job.input_ea = (uint32_t)(uintptr_t)src32;
+    job.input_ea_high = (uint32_t)((uintptr_t)src32 >> 32);
+    job.output_ea = (uint32_t)(uintptr_t)dst_vram;
+    job.output_ea_high = (uint32_t)((uintptr_t)dst_vram >> 32);
+    job.output_pitch = dst_pitch;
+    job.palette_ea = 0;
+    job.palette_format = 0;
+    job.unpack_alignment = 4;
+
+    int ret = spu_worker_pool_submit(pool, &job.hdr, 0, NULL);  /* non-blocking */
+    if (ret != 0) return -1;
+
+    /* Poll for completion (up to ~50ms) */
+    spu_job_result_t result = {0};
+    uint32_t deadline = 0;
+    #ifdef PS3
+    {
+        uint32_t tb;
+        __asm__ __volatile__("mftb %0" : "=r" (tb));
+        deadline = tb + (400000 * 50);  /* ~50ms at 400MHz TB */
+    }
+    #endif
+    while (1) {
+        if (spu_worker_pool_try_get_result(pool, &result)) {
+            if (result.job_id == job.hdr.job_id) {
+                if (result.status != SPU_JOB_STATUS_DONE) {
+                    printf("[SPU Upload] Job failed: status=%d error=0x%x\n", result.status, result.error_code);
+                }
+                return (result.status == SPU_JOB_STATUS_DONE) ? 0 : -1;
+            }
+        }
+    #ifdef PS3
+        uint32_t tb;
+        __asm__ __volatile__("mftb %0" : "=r" (tb));
+        if (tb >= deadline) break;
+    #else
+        usleep(100);
+        if (++deadline > 500) break;
+    #endif
+    }
+    return -1;
+}
+#endif // PS3
+
 void TextureCache_Load( CachedTexture *texInfo )
 {
 	u32 *dest = NULL;
@@ -1160,6 +1239,9 @@ void TextureCache_Load( CachedTexture *texInfo )
 #ifdef PS3
 	// PS3 RSX only supports A8R8G8B8 textures. Force 32-bit (RGBA8) path
 	// for ALL formats so the RSX upload block always gets correctly-sized u32 data.
+	// Ensure minimum valid dimensions for RSX (must be > 0)
+	if (texInfo->realWidth == 0) texInfo->realWidth = 1;
+	if (texInfo->realHeight == 0) texInfo->realHeight = 1;
 	texInfo->textureBytes = (texInfo->realWidth * texInfo->realHeight) << 2;
 	if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
 	{
@@ -1496,7 +1578,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 #endif // !__GX__
 
 #ifdef PS3
-	/* PS3 RSX texture upload - single unified path */
+/* PS3 RSX texture upload - single unified path */
 	/* First, set ALL rsxTex fields (needed for rsxLoadTexture) */
 	{
 		u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
@@ -1513,11 +1595,23 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
 								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
 								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-		texInfo->rsxTex.width		= texInfo->realWidth;
-		texInfo->rsxTex.height		= texInfo->realHeight;
+texInfo->rsxTex.width		= (texInfo->realWidth > 0) ? texInfo->realWidth : 1;
+	texInfo->rsxTex.height		= (texInfo->realHeight > 0) ? texInfo->realHeight : 1;
 		texInfo->rsxTex.depth		= 1;
 		texInfo->rsxTex.location	= GCM_LOCATION_RSX;
 		texInfo->rsxTex.pitch		= rsxPitch;
+	}
+
+{
+		static int texLoadRscCount = 0;
+		if (texLoadRscCount < 5) {  /* Reduced from 10 to 5 */
+			printf("TEX_LOAD_RSX: fmt=0x%x dim=%d w=%d h=%d mipmap=%d offset=0x%x pitch=%d loc=%d ptr=%p\n",
+				texInfo->rsxTex.format, texInfo->rsxTex.dimension,
+				texInfo->rsxTex.width, texInfo->rsxTex.height,
+				texInfo->rsxTex.mipmap, texInfo->rsxTex.offset,
+				texInfo->rsxTex.pitch, texInfo->rsxTex.location, texInfo);
+			texLoadRscCount++;
+		}
 	}
 
 	if (!texInfo->frameBufferTexture)
@@ -1573,31 +1667,42 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 			}
 			else
 			{
-				/* Cache disabled or failed - direct upload fallback */
-				u32 rsxPitch2 = (texInfo->realWidth * 4 + 127) & ~127u;
-				u32 rsxBytes = rsxPitch2 * texInfo->realHeight;
-				texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
-				if (texInfo->rsxTextureBuffer)
-				{
-					u32 *src32 = dest;
-					u32 *dst32 = texInfo->rsxTextureBuffer;
-					u32 row, col;
-					memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
-					for (row = 0; row < texInfo->realHeight; row++)
-					{
-						u32 *srcRow = src32 + row * texInfo->realWidth;
-						u8 *dstRow = (u8*)dst32 + row * rsxPitch2;
-						for (col = 0; col < texInfo->realWidth; col++)
-						{
-							u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
-							((u32*)dstRow)[col] = swapped;
-						}
+					/* Cache disabled or failed - direct upload fallback */
+					if (texInfo->realWidth == 0 || texInfo->realHeight == 0) {
+						printf("TextureCache_Load: ERROR - Invalid dimensions %ux%u in fallback, skipping\n",
+						       texInfo->realWidth, texInfo->realHeight);
+						free(dest);
+						return;
 					}
-					rsxAddressToOffset(texInfo->rsxTextureBuffer, &texInfo->rsxTextureOffset);
-					texInfo->rsxTex.offset = texInfo->rsxTextureOffset;
-					texInfo->rsxTex.pitch = rsxPitch2;
+					u32 rsxPitch2 = (texInfo->realWidth * 4 + 127) & ~127u;
+					u32 rsxBytes = rsxPitch2 * texInfo->realHeight;
+					texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
+					if (texInfo->rsxTextureBuffer)
+					{
+						/* Try SPU-assisted upload (endian-swap + VRAM copy) */
+						if (spu_texture_upload(dest, texInfo->realWidth, texInfo->realHeight, rsxPitch2, texInfo->rsxTextureBuffer) != 0)
+						{
+							/* SPU unavailable - fallback to PPU byte-swap */
+							u32 *src32 = dest;
+							u32 *dst32 = texInfo->rsxTextureBuffer;
+							u32 row, col;
+							memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
+							for (row = 0; row < texInfo->realHeight; row++)
+							{
+								u32 *srcRow = src32 + row * texInfo->realWidth;
+								u8 *dstRow = (u8*)dst32 + row * rsxPitch2;
+								for (col = 0; col < texInfo->realWidth; col++)
+								{
+									u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+									((u32*)dstRow)[col] = swapped;
+								}
+							}
+						}
+						rsxAddressToOffset(texInfo->rsxTextureBuffer, &texInfo->rsxTextureOffset);
+						texInfo->rsxTex.offset = texInfo->rsxTextureOffset;
+						texInfo->rsxTex.pitch = rsxPitch2;
+					}
 				}
-			}
 		}
 		free(dest);
 	}
@@ -1609,18 +1714,23 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 		texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
 		if (texInfo->rsxTextureBuffer)
 		{
-			u32 *src32 = dest;
-			u32 *dst32 = texInfo->rsxTextureBuffer;
-			u32 row, col;
-			memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
-			for (row = 0; row < texInfo->realHeight; row++)
+			/* Try SPU-assisted upload (endian-swap + VRAM copy) */
+			if (spu_texture_upload(dest, texInfo->realWidth, texInfo->realHeight, rsxPitch, texInfo->rsxTextureBuffer) != 0)
 			{
-				u32 *srcRow = src32 + row * texInfo->realWidth;
-				u8 *dstRow = (u8*)dst32 + row * rsxPitch;
-				for (col = 0; col < texInfo->realWidth; col++)
+				/* SPU unavailable - fallback to PPU byte-swap */
+				u32 *src32 = dest;
+				u32 *dst32 = texInfo->rsxTextureBuffer;
+				u32 row, col;
+				memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
+				for (row = 0; row < texInfo->realHeight; row++)
 				{
-					u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
-					((u32*)dstRow)[col] = swapped;
+					u32 *srcRow = src32 + row * texInfo->realWidth;
+					u8 *dstRow = (u8*)dst32 + row * rsxPitch;
+					for (col = 0; col < texInfo->realWidth; col++)
+					{
+						u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+						((u32*)dstRow)[col] = swapped;
+					}
 				}
 			}
 			rsxAddressToOffset(texInfo->rsxTextureBuffer, &texInfo->rsxTextureOffset);
@@ -1709,6 +1819,43 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 	//TODO: Implement two texture units
 //	rsxFlushBuffer(context);
 	rsxInvalidateTextureCache(context,GCM_INVALIDATE_TEXTURE); //needed?
+
+	/* Debug: only log if texture looks invalid (prevents TTY spam) */
+	if (texture->rsxTex.width == 0 || texture->rsxTex.height == 0 || texture->rsxTex.offset == 0) {
+		printf("ACTIVATE WARNING: unit=%d fmt=0x%x dim=%d w=%d h=%d mipmap=%d offset=0x%x pitch=%d loc=%d\n",
+			OGL.textureUnit_id,
+			texture->rsxTex.format,
+			texture->rsxTex.dimension,
+			texture->rsxTex.width,
+			texture->rsxTex.height,
+			texture->rsxTex.mipmap,
+			texture->rsxTex.offset,
+			texture->rsxTex.pitch,
+			texture->rsxTex.location);
+	}
+
+	/* Rebuild rsxTex fields to guard against memory corruption.
+	 * Some path zeroes the 24-byte gcmTexture between TextureCache_Load
+	 * and this call.  Reconstruct from CachedTexture's scalar fields
+	 * which are always valid. */
+	texture->rsxTex.location	= GCM_LOCATION_RSX;
+	texture->rsxTex.cubemap		= GCM_FALSE;
+	texture->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
+	texture->rsxTex.format		= GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
+	texture->rsxTex.mipmap		= 1;
+	texture->rsxTex.width		= (texture->realWidth > 0) ? texture->realWidth : 1;
+	texture->rsxTex.height		= (texture->realHeight > 0) ? texture->realHeight : 1;
+	texture->rsxTex.depth		= 1;
+	texture->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
+	texture->rsxTex.offset		= texture->rsxTextureOffset;
+	texture->rsxTex.pitch		= (texture->realWidth * 4 + 127) & ~127u;
 
 	rsxLoadTexture(context,OGL.textureUnit_id,&texture->rsxTex);
 	rsxTextureControl(context,OGL.textureUnit_id,GCM_TRUE,0<<8,12<<8,GCM_TEXTURE_MAX_ANISO_1);

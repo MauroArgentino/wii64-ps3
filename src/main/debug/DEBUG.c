@@ -30,13 +30,13 @@ extern unsigned int diff_sec(long long start,long long end);
 #endif //__GX__
 
 #ifdef PS3
-#define TB_BUS_CLOCK				(lv2syscall0(147))					//1.6ghz
-#define TB_TIMER_CLOCK				(TB_BUS_CLOCK/4000)			//4th of the bus frequency
-
 extern u32 gettick();
 
-#define ticks_to_microsecs(ticks)	((((u64)(ticks)*8)/(u64)(TB_TIMER_CLOCK/125)))
-#define diff_sec(start,end)			((u32)((ticks_to_microsecs(end)-ticks_to_microsecs(start))/1000000))
+/* Timebase runs at ~400 KHz (bus_clock/4000). Compute seconds elapsed. */
+static int diff_sec(long long start, long long end)
+{
+	return (int)((u32)(end - start) / 400000u);
+}
 #endif // PS3
 
 static void check_heap_space(void){

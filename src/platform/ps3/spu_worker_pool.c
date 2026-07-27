@@ -1,167 +1,285 @@
 /**
  * spu_worker_pool.c - SPU Worker Pool Implementation
- * Manages N SPU workers with job queue for parallel graphics/audio processing.
- * Uses PSL1GHT sys/spu.h APIs (managed SPU threads).
+ *
+ * Wraps spu_manager to provide job-based dispatch.
+ * Finds free workers, dispatches texture decode and other jobs via mailbox.
+ * Tracks completion via per-worker event queues.
  */
 
 #include "spu_worker_pool.h"
 #include "spu_manager.h"
 #include <sys/spu.h>
 #include <sys/event_queue.h>
-#include <sys/thread.h>
-#include <sys/memory.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ppu-types.h>
 
-/* Per-worker state */
+/* Simple timing using Cell timebase register (PPC mftb instruction) */
+static inline uint32_t spu_get_time_us(void)
+{
+    uint32_t tb;
+    __asm__ __volatile__("mftb %0" : "=r" (tb));
+    /* Cell TB runs at ~800 KHz (bus_clock/2000 = 1.6GHz/2000).
+     * us = ticks / 800 */
+    return tb / 800u;
+}
+
+/* Job ID generator */
+static volatile uint32_t g_job_id_counter = 1;
+
+/* Pending job tracking (simple fixed-size table) */
+#define MAX_PENDING_JOBS 32
 typedef struct {
-    sys_spu_thread_t thread;
-    sys_event_queue_t eq;
-    sys_event_port_t port;
-    uint64_t event_key;
-    volatile int running;
+    uint32_t job_id;
     uint32_t worker_id;
-    volatile uint32_t jobs_completed;
-    volatile uint32_t total_cycles;
-    volatile uint64_t busy_start_us;
-    volatile uint32_t busy_us;
-    volatile uint32_t idle_us;
-    uint8_t is_audio;
-} spu_worker_t;
+    int      in_use;
+    uint32_t submit_tick;        /* gettick() when dispatched (u32 wrapping OK) */
+    spu_job_header_t header;
+} pending_job_t;
+
+static pending_job_t g_pending_jobs[MAX_PENDING_JOBS];
+
+/* Per-worker accumulated stats */
+typedef struct {
+    uint64_t total_busy_ticks;  /* sum of (completion - submit) for all completed jobs */
+    uint64_t interval_busy_us;  /* wall time (us) worker was busy since last poll */
+    uint64_t interval_idle_us;  /* wall time (us) worker was idle since last poll */
+    uint32_t jobs_completed;
+    uint32_t jobs_failed;
+    uint32_t last_poll_tick;    /* gettick() at last get_worker_stats() call */
+    uint32_t was_busy_at_poll;  /* busy flag snapshot at last poll */
+    uint32_t poll_initialized;  /* 1 if last_poll_tick has been set */
+} worker_timing_t;
+
+static worker_timing_t g_worker_timing[SPU_MAX_WORKERS];
+
+/* Timing helper: spu_get_time_us() returns microseconds via mftb.
+ * No conversion macros needed since all timing values are in microseconds. */
 
 /* Worker pool structure */
 struct spu_worker_pool {
-    spu_worker_t *workers;
     uint32_t num_workers;
-    sys_spu_group_t group;
-    sys_event_queue_t main_eq;
-    sys_event_port_t main_port;
     volatile int initialized;
-    uint32_t next_job_id;
     spu_pool_stats_t stats;
 };
 
-/* Forward declarations */
-static void spu_worker_shutdown(spu_worker_t *w);
+static spu_worker_pool_t g_pool;
 
-/* Global default pool */
-static spu_worker_pool_t *g_default_pool = NULL;
-static volatile uint32_t g_job_id_counter = 1;
+spu_worker_pool_t *spu_worker_pool_init(const spu_pool_config_t *config)
+{
+    (void)config;
 
-/* ============================================================
- * Pool Management
- * ============================================================ */
+    memset(&g_pool, 0, sizeof(g_pool));
+    memset(g_pending_jobs, 0, sizeof(g_pending_jobs));
+    memset(g_worker_timing, 0, sizeof(g_worker_timing));
 
-spu_worker_pool_t *spu_worker_pool_init(const spu_pool_config_t *config) {
-    spu_pool_config_t def_config = {4, 64*1024, 32};
-    if (!config) config = &def_config;
-
-    if (config->num_workers < 1 || config->num_workers > 6) {
-        fprintf(stderr, "[SPU Pool] Invalid worker count: %u (max 6)\n", config->num_workers);
-        return NULL;
+    g_pool.num_workers = spu_get_num_workers();
+    if (g_pool.num_workers == 0) {
+        /* SPU manager not initialized yet - try to init it */
+        int ret = spu_manager_init();
+        if (ret == 0) {
+            ret = spu_manager_start();
+        }
+        if (ret != 0) {
+            printf("[SPU Pool] Failed to initialize SPU manager: %d\n", ret);
+            return NULL;
+        }
+        g_pool.num_workers = spu_get_num_workers();
     }
 
-    spu_worker_pool_t *pool = (spu_worker_pool_t *)malloc(sizeof(spu_worker_pool_t));
-    if (!pool) return NULL;
-    memset(pool, 0, sizeof(*pool));
-
-    pool->num_workers = config->num_workers;
-    pool->workers = (spu_worker_t *)malloc(config->num_workers * sizeof(spu_worker_t));
-    if (!pool->workers) {
-        free(pool);
-        return NULL;
-    }
-    memset(pool->workers, 0, config->num_workers * sizeof(spu_worker_t));
-
-    /* Create main event queue for receiving results from all workers */
-    int ret = sysEventQueueCreate(&pool->main_eq, NULL, SYS_EVENT_QUEUE_KEY_LOCAL, 64);
-    if (ret != 0) {
-        fprintf(stderr, "[SPU Pool] sysEventQueueCreate failed: 0x%x\n", ret);
-        goto fail;
-    }
-
-    ret = sysEventPortCreate(&pool->main_port, SYS_EVENT_PORT_LOCAL, 0);
-    if (ret != 0) {
-        fprintf(stderr, "[SPU Pool] sysEventPortCreate failed: 0x%x\n", ret);
-        goto fail;
-    }
-
-    ret = sysEventPortConnectLocal(pool->main_port, pool->main_eq);
-    if (ret != 0) {
-        fprintf(stderr, "[SPU Pool] sysEventPortConnectLocal failed: 0x%x\n", ret);
-        goto fail;
-    }
-
-    pool->initialized = 1;
-    pool->next_job_id = 1;
-    memset(&pool->stats, 0, sizeof(spu_pool_stats_t));
-
-    g_default_pool = pool;
-    return pool;
-
-fail:
-    if (pool->main_port) sysEventPortDestroy(pool->main_port);
-    if (pool->main_eq) sysEventQueueDestroy(pool->main_eq, 0);
-    free(pool->workers);
-    free(pool);
-    return NULL;
+    g_pool.initialized = 1;
+    printf("[SPU Pool] Initialized with %d workers\n", g_pool.num_workers);
+    return &g_pool;
 }
 
-static void spu_worker_shutdown(spu_worker_t *w) {
-    w->running = 0;
-    if (w->port) sysEventPortDestroy(w->port);
-    if (w->eq) sysEventQueueDestroy(w->eq, 0);
+static uint32_t alloc_job_id(void)
+{
+    uint32_t id;
+    do {
+        id = g_job_id_counter;
+        g_job_id_counter = id + 1;
+    } while (id == 0);  /* skip 0 (invalid) */
+    return id;
 }
 
-/* ============================================================
- * Pool API
- * ============================================================ */
+static int find_free_slot(void)
+{
+    int i;
+    for (i = 0; i < MAX_PENDING_JOBS; i++) {
+        if (!g_pending_jobs[i].in_use) return i;
+    }
+    return -1;
+}
 
 int spu_worker_pool_submit(spu_worker_pool_t *pool, const spu_job_header_t *job_header,
-                           int blocking, spu_job_result_t *out_result) {
+                           int blocking, spu_job_result_t *out_result)
+{
+    int worker_id;
+    int slot;
+    uint32_t job_id;
+
     if (!pool || !pool->initialized || !job_header) return -3;
 
-    /* Assign job ID */
-    uint32_t job_id = __sync_fetch_and_add(&pool->next_job_id, 1);
-    if (job_id == 0) job_id = __sync_fetch_and_add(&pool->next_job_id, 1);
-
-    /* Stub: job submission will be implemented when SPU ELFs are ready.
-     * For now, immediately return a "done" result. */
-    if (out_result) {
-        out_result->job_id = job_id;
-        out_result->status = SPU_JOB_STATUS_DONE;
-        out_result->cycles_elapsed = 0;
-        out_result->error_code = 0;
+    /* Find a free SPU worker */
+    worker_id = spu_find_free_worker();
+    if (worker_id < 0) {
+        pool->stats.jobs_failed++;
+        return -1;  /* all workers busy */
     }
 
-    pool->stats.jobs_submitted++;
-    pool->stats.jobs_completed++;
+    /* Allocate a job slot */
+    slot = find_free_slot();
+    if (slot < 0) {
+        pool->stats.jobs_failed++;
+        return -1;
+    }
+
+    job_id = alloc_job_id();
+
+    /* Track the pending job */
+    g_pending_jobs[slot].job_id = job_id;
+    g_pending_jobs[slot].worker_id = worker_id;
+    g_pending_jobs[slot].in_use = 1;
+    g_pending_jobs[slot].submit_tick = spu_get_time_us();
+    memcpy(&g_pending_jobs[slot].header, job_header, sizeof(spu_job_header_t));
+
+    /* Mark worker as busy */
+    spu_set_worker_busy(worker_id, 1);
+
+    /* Dispatch based on job type */
+    switch (job_header->job_type) {
+    case SPU_JOB_TEX_DECODE: {
+        /* Cast to tex decode payload */
+        const spu_job_tex_decode_t *tex = (const spu_job_tex_decode_t *)job_header;
+
+/* Send command word: (SPU_CMD_TEX_DECODE << 24) | num_raw_params (11) */
+        spu_send_command_to(worker_id, SPU_CMD_TEX_DECODE, 11);
+
+        /* Send 11 raw 32-bit parameter words via mailbox.
+         * Retry on EBUSY (mailbox full) since the SPU consumes words
+         * as fast as it reads them. */
+        spu_send_raw_to(worker_id, tex->format);
+        spu_send_raw_to(worker_id, tex->width);
+        spu_send_raw_to(worker_id, tex->height);
+        spu_send_raw_to(worker_id, tex->input_ea);
+        spu_send_raw_to(worker_id, tex->output_ea);
+        spu_send_raw_to(worker_id, tex->palette_ea);
+        spu_send_raw_to(worker_id, tex->palette_format);
+        spu_send_raw_to(worker_id, job_header->flags);              /* 8th: flags */
+        spu_send_raw_to(worker_id, (uint32_t)((uint64_t)tex->input_ea >> 32));     /* 9th: input EA high */
+        spu_send_raw_to(worker_id, (uint32_t)((uint64_t)tex->output_ea >> 32));    /* 10th: output EA high */
+        spu_send_raw_to(worker_id, tex->output_pitch);            /* 11th: output pitch */
+
+        pool->stats.jobs_submitted++;
+        printf("[SPU Pool] TEX_DECODE job %d dispatched to worker %d (%dx%d fmt=%d flags=0x%x)\n",
+               job_id, worker_id, tex->width, tex->height, tex->format, job_header->flags);
+        break;
+    }
+
+    default:
+        printf("[SPU Pool] Unknown job type %d\n", job_header->job_type);
+        spu_set_worker_busy(worker_id, 0);
+        g_pending_jobs[slot].in_use = 0;
+        pool->stats.jobs_failed++;
+        return -2;
+    }
+
+    /* If blocking, wait for completion */
+    if (blocking && out_result) {
+        uint32_t evt_d2 = 0, evt_d3 = 0;
+        int ret = spu_wait_worker_event(worker_id, &evt_d2, &evt_d3, 5000000);
+        spu_set_worker_busy(worker_id, 0);
+        g_pending_jobs[slot].in_use = 0;
+
+        if (ret == 0) {
+            uint32_t elapsed_us_val = spu_get_time_us() - g_pending_jobs[slot].submit_tick;
+            g_worker_timing[worker_id].total_busy_ticks += (uint64_t)elapsed_us_val;
+            g_worker_timing[worker_id].jobs_completed++;
+            out_result->job_id = job_id;
+            out_result->status = SPU_JOB_STATUS_DONE;
+            out_result->cycles_elapsed = elapsed_us_val;
+            out_result->error_code = evt_d3;
+            pool->stats.jobs_completed++;
+            return 0;
+        } else {
+            g_worker_timing[worker_id].jobs_failed++;
+            out_result->job_id = job_id;
+            out_result->status = SPU_JOB_STATUS_ERROR;
+            out_result->error_code = 0xDEAD;
+            pool->stats.jobs_failed++;
+            return -1;
+        }
+    }
 
     return 0;
 }
 
-int spu_worker_pool_try_get_result(spu_worker_pool_t *pool, spu_job_result_t *out_result) {
-    if (!pool || !pool->initialized) return -1;
+int spu_worker_pool_try_get_result(spu_worker_pool_t *pool, spu_job_result_t *out_result)
+{
+    uint32_t i;
+    if (!pool || !pool->initialized || !out_result) return -1;
 
-    sys_event_t event;
-    int ret = sysEventQueueReceive(pool->main_eq, &event, 0);
-    if (ret == 0 && out_result) {
-        memcpy(out_result, &event, sizeof(spu_job_result_t));
-        pool->stats.jobs_completed++;
-        return 1;
+    /* Check all busy workers for completion events */
+    for (i = 0; i < pool->num_workers; i++) {
+        uint32_t evt_d2 = 0, evt_d3 = 0;
+        int ret = spu_try_worker_event(i, &evt_d2, &evt_d3);
+        if (ret == 1) {
+            /* Found an event - find the matching pending job */
+            int j;
+            for (j = 0; j < MAX_PENDING_JOBS; j++) {
+                if (g_pending_jobs[j].in_use && g_pending_jobs[j].worker_id == (int)i) {
+                    uint32_t elapsed_us_val = spu_get_time_us() - g_pending_jobs[j].submit_tick;
+                    g_worker_timing[i].total_busy_ticks += (uint64_t)elapsed_us_val;
+                    g_worker_timing[i].jobs_completed++;
+                    out_result->job_id = g_pending_jobs[j].job_id;
+                    out_result->status = SPU_JOB_STATUS_DONE;
+                    out_result->cycles_elapsed = elapsed_us_val;
+                    out_result->error_code = evt_d3;  /* SPU returns error in event data3 */
+                    spu_set_worker_busy(i, 0);
+                    g_pending_jobs[j].in_use = 0;
+                    pool->stats.jobs_completed++;
+                    return 1;
+                }
+            }
+        }
     }
     return 0;
 }
 
 int spu_worker_pool_wait_job(spu_worker_pool_t *pool, uint32_t job_id,
-                             uint64_t timeout_us, spu_job_result_t *out_result) {
+                             uint64_t timeout_us, spu_job_result_t *out_result)
+{
+    int j;
+    uint32_t worker_id;
+    uint32_t evt_d2, evt_d3;
+    int ret;
+
     if (!pool || !pool->initialized) return -2;
 
-    sys_event_t event;
-    int ret = sysEventQueueReceive(pool->main_eq, &event, timeout_us);
+    /* Find the pending job */
+    for (j = 0; j < MAX_PENDING_JOBS; j++) {
+        if (g_pending_jobs[j].in_use && g_pending_jobs[j].job_id == job_id) {
+            break;
+        }
+    }
+    if (j >= MAX_PENDING_JOBS) return -2;  /* job not found */
+
+    worker_id = g_pending_jobs[j].worker_id;
+    ret = spu_wait_worker_event(worker_id, &evt_d2, &evt_d3, timeout_us);
+    spu_set_worker_busy(worker_id, 0);
+    g_pending_jobs[j].in_use = 0;
+
     if (ret == 0) {
-        if (out_result) memcpy(out_result, &event, sizeof(spu_job_result_t));
+        uint32_t elapsed_us_val = spu_get_time_us() - g_pending_jobs[j].submit_tick;
+        g_worker_timing[worker_id].total_busy_ticks += (uint64_t)elapsed_us_val;
+        g_worker_timing[worker_id].jobs_completed++;
+        if (out_result) {
+            out_result->job_id = job_id;
+            out_result->status = SPU_JOB_STATUS_DONE;
+            out_result->cycles_elapsed = elapsed_us_val;
+            out_result->error_code = 0;
+        }
         pool->stats.jobs_completed++;
         return 0;
     }
@@ -173,20 +291,46 @@ void spu_worker_pool_get_stats(spu_worker_pool_t *pool, spu_pool_stats_t *out_st
 }
 
 int spu_worker_pool_get_worker_stats(spu_worker_pool_t *pool, spu_worker_stats_t *stats, int max_entries) {
-    if (!pool || !pool->initialized || !stats) return 0;
-    int count = pool->num_workers < max_entries ? pool->num_workers : max_entries;
+    int count;
     int i;
+    uint32_t now_tick;
+
+    if (!pool || !pool->initialized || !stats) return 0;
+
+    now_tick = spu_get_time_us();
+    count = (int)pool->num_workers < max_entries ? (int)pool->num_workers : max_entries;
+
     for (i = 0; i < count; i++) {
-        spu_worker_t *w = &pool->workers[i];
-        stats[i].worker_id = w->worker_id;
-        stats[i].jobs_completed = w->jobs_completed;
-        stats[i].total_cycles = w->total_cycles;
-        stats[i].is_audio = w->is_audio;
-        stats[i].busy_us = w->busy_us;
-        stats[i].idle_us = w->idle_us;
-        /* Reset interval counters */
-        w->busy_us = 0;
-        w->idle_us = 0;
+        worker_timing_t *wt = &g_worker_timing[i];
+        int is_busy_now;
+
+        is_busy_now = spu_get_worker_busy(i);
+
+        if (!wt->poll_initialized) {
+            wt->last_poll_tick = now_tick;
+            wt->was_busy_at_poll = (uint32_t)is_busy_now;
+            wt->poll_initialized = 1;
+        } else {
+            uint32_t elapsed_us;
+
+            elapsed_us = now_tick - wt->last_poll_tick;
+
+            if (wt->was_busy_at_poll) {
+                wt->interval_busy_us += elapsed_us;
+            } else {
+                wt->interval_idle_us += elapsed_us;
+            }
+
+            wt->last_poll_tick = now_tick;
+            wt->was_busy_at_poll = (uint32_t)is_busy_now;
+        }
+
+        stats[i].worker_id = (uint32_t)i;
+        stats[i].jobs_completed = wt->jobs_completed;
+        stats[i].busy_us = (uint32_t)(wt->interval_busy_us & 0xFFFFFFFF);
+        stats[i].idle_us = (uint32_t)(wt->interval_idle_us & 0xFFFFFFFF);
+        stats[i].total_cycles = (uint32_t)(wt->total_busy_ticks & 0xFFFFFFFF);
+        stats[i].is_audio = 0;
     }
     return count;
 }
@@ -194,50 +338,18 @@ int spu_worker_pool_get_worker_stats(spu_worker_pool_t *pool, spu_worker_stats_t
 void spu_worker_pool_destroy(spu_worker_pool_t *pool) {
     if (!pool) return;
     pool->initialized = 0;
-
-    {
-        uint32_t i;
-        for (i = 0; i < pool->num_workers; i++) {
-            spu_worker_shutdown(&pool->workers[i]);
-        }
-    }
-
-    if (pool->main_port) sysEventPortDestroy(pool->main_port);
-    if (pool->main_eq) sysEventQueueDestroy(pool->main_eq, 0);
-
-    free(pool->workers);
-    if (g_default_pool == pool) g_default_pool = NULL;
-    free(pool);
 }
 
 spu_worker_pool_t *spu_worker_pool_get_default(void) {
-    return g_default_pool;
+    return &g_pool;
 }
 
 uint32_t spu_job_next_id(void) {
-    return __sync_fetch_and_add(&g_job_id_counter, 1);
+    return alloc_job_id();
 }
 
-/* ============================================================
- * Job Implementations (Stubs - will be moved to SPU ELFs)
- * ============================================================ */
-
-int spu_job_tl_vertex_execute(const spu_job_tl_vertex_t *job) {
-    (void)job;
-    return 0;
-}
-
-int spu_job_tex_decode_execute(const spu_job_tex_decode_t *job) {
-    (void)job;
-    return 0;
-}
-
-int spu_job_vtx_validate_execute(const spu_job_vtx_validate_t *job) {
-    (void)job;
-    return 0;
-}
-
-int spu_job_audio_resample_execute(const void *job) {
-    (void)job;
-    return 0;
-}
+/* Job execute stubs (for PPU fallback path) */
+int spu_job_tl_vertex_execute(const spu_job_tl_vertex_t *job) { (void)job; return 0; }
+int spu_job_tex_decode_execute(const spu_job_tex_decode_t *job) { (void)job; return 0; }
+int spu_job_vtx_validate_execute(const spu_job_vtx_validate_t *job) { (void)job; return 0; }
+int spu_job_audio_resample_execute(const void *job) { (void)job; return 0; }

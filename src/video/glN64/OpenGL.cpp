@@ -289,6 +289,8 @@ void OGL_InitStates()
 	OGL.alpha_mode_id = rsxFragmentProgramGetConst(OGL.fpo,"alpha_mode");
 	OGL.shader_alpha_mode = 0.0f;
 	OGL.textureUnit_id = rsxFragmentProgramGetAttrib(OGL.fpo,"texture");
+	printf("OGL_InitStates: textureUnit_id=%d mode=%d alpha=%d\n",
+		OGL.textureUnit_id, OGL.mode_id, OGL.alpha_mode_id);
 
 	#elif defined(__GX__)
 	// TODO: Init GX variables here...

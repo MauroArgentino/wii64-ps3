@@ -55,6 +55,7 @@ extern "C" {
 #include "../ui/fileBrowser/fileBrowser.h"
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
 #include "../platform/ps3/spu_manager.h"
+#include "../platform/ps3/spu_worker_pool.h"
 }
 
 #include <stdio.h>
@@ -268,6 +269,11 @@ int main(int argc, char* argv[]){
 		if (spu_manager_start() == 0) {
 			printf("[MAIN] SPU manager started OK\n");
 			spu_send_command(SPU_CMD_PING, 0);
+
+			/* Initialize worker pool (job-based dispatch layer) */
+			if (spu_worker_pool_init(NULL) != NULL) {
+				printf("[MAIN] SPU worker pool init OK\n");
+			}
 		}
 	}
 

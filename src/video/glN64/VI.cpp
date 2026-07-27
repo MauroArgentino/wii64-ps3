@@ -57,6 +57,7 @@ VIInfo VI;
 // Forward declarations for PS3 OSD functions
 #ifdef PS3
 static void VI_RSX_showSPU();
+static void VI_RSX_showVRAMCache();
 static void VI_RSX_showDebugPause();
 #endif
 
@@ -553,9 +554,20 @@ static void VI_RSX_showSPU()
 		uint32_t total = busy + idle;
 		uint32_t pct = (total > 0) ? (busy * 100 / total) : 0;
 		const char *type = stats[i].is_audio ? "AUD" : "GFX";
-		sprintf(line, "SPU%d %s: %u%% busy  jobs:%u",
-			stats[i].worker_id, type, pct, stats[i].jobs_completed);
+		sprintf(line, "SPU%d %s: %3u%% busy  jobs:%u  avg:%uus",
+			stats[i].worker_id, type, pct, stats[i].jobs_completed,
+			(stats[i].jobs_completed > 0) ? (stats[i].total_cycles / stats[i].jobs_completed) : 0);
 		menu::IplFont::getInstance().drawString(10, y, line, 0.40, false);
+		y += 14;
+	}
+
+	/* Show pool-level stats */
+	{
+		spu_pool_stats_t pstats;
+		spu_worker_pool_get_stats(pool, &pstats);
+		sprintf(line, "Total: %u submitted  %u done  %u failed",
+			pstats.jobs_submitted, pstats.jobs_completed, pstats.jobs_failed);
+		menu::IplFont::getInstance().drawString(10, y, line, 0.38, false);
 		y += 14;
 	}
 }

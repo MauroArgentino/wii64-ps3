@@ -1,0 +1,27 @@
+[GO] Initializing dynarec memory (sysMemoryAllocate)...
+
+[DYNAREC] ========================================
+[DYNAREC] init_dynarec_memory() START (mapper API)
+[DYNAREC] ========================================
+[DYNAREC] Real PS3 hardware detected (lv1_peek OK, val=0xd0100b68)
+[DYNAREC] Step 0: Checking .text page attributes...
+[DYNAREC]   .text: sysGetPageAttribute(0x000000000015fc20) = 0
+[DYNAREC]     attribute    = 0x0000000000040000
+[DYNAREC]     access_right = 0x0000000000000008
+[DYNAREC]     page_size    = 65536
+[DYNAREC]     READ=0 WRITE=0 EXEC=0
+[DYNAREC] Step 1: Attempting memory mapper (sysMMapper) allocation...
+[DYNAREC] Step 1: sysMemContainerCreate(16777216)
+[DYNAREC]   result: res=0 container=1056964614
+[DYNAREC] Step 2: sysMMapperAllocateMemoryFromContainer(16777216, container, access=PPU|SPU)
+[DYNAREC]   result: res=-2147418110 mem_id=3490712264
+[DYNAREC]   FAILED: sysMMapperAllocateMemoryFromContainer returned -2147418110
+[DYNAREC]   Mapper allocation failed (EPERM = 0x80010002)
+[DYNAREC]   REAL PS3 DETECTED: LV2 in game OS mode does NOT allow RWX memory.
+[DYNAREC]   Attempting peek/poke NX bypass on sysMemoryAllocate...
+[DYNAREC] Falling back to sysMemoryAllocate...
+[DYNAREC]   result: res=0 addr=0x00000000200b0000
+[DYNAREC]   Fallback allocated (RW only, NOT executable)
+[DYNAREC]   Attempting peek/poke NX bypass...
+[DYNAREC]   Peek/poke: making 0x200b0000-zx executable...
+[DYNAREC]   Searching for HTAB containing VA=0x200b0000 (target PPN=0x200b)...

@@ -28,7 +28,7 @@ BUILD		:=	build_debug
 else
 BUILD		:=	build
 endif
-SOURCES		:=	src/main src/core/n64_audio src/core/n64_input src/core/n64_memory src/core/rsp src/core/r4300 src/core/r4300/ppc src/ui src/ui/libgui src/ui/fileBrowser src/platform/ps3 src/video/glN64
+SOURCES		:=	src/main src/main/debug src/core/n64_audio src/core/n64_input src/core/n64_memory src/core/rsp src/core/r4300 src/core/r4300/ppc src/ui src/ui/libgui src/ui/fileBrowser src/platform/ps3 src/video/glN64
 DATA		:=	data
 SHADERS		:=	src/platform/ps3/shaders
 INCLUDES	:= . $(SOURCES)
@@ -43,7 +43,7 @@ CONTENTID	:= UP0001-PS364GLN6_00-0000111122223333
 ifdef DEBUG
 CFLAGS		= -O0 -g3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ \
-			-DDEBUG_POLYGONS \
+			-DDEBUG_POLYGONS -DSHOW_DEBUG \
 			-include ../src/main/winlnxdefs.h \
 			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__
 else
@@ -105,7 +105,7 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 # automatically build a list of object files for our project
 #---------------------------------------------------------------------------------
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+CPPFILES	:=	$(filter-out Config_linux.cpp,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp))))
 sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
@@ -158,8 +158,9 @@ $(BUILD): spu_build
 
 #---------------------------------------------------------------------------------
 spu_build:
-	@if [ ! -f "$(SPU_EMBED_OBJ)" ]; then \
+	@if [ ! -f "$(SPU_EMBED_OBJ)" ] || [ "$(SPU_DIR)/spu_main.c" -nt "$(SPU_EMBED_OBJ)" ]; then \
 		echo "Compiling SPU program..."; \
+		rm -f $(SPU_DIR)/*.o $(SPU_DIR)/*.elf $(SPU_DIR)/*.bin $(SPU_EMBED_OBJ); \
 		$(SPU_CC) $(SPU_CFLAGS) -c $(SPU_DIR)/spu_main.c -o $(SPU_DIR)/spu_main.o; \
 		$(SPU_LD) $(SPU_LDFLAGS) -L$(PSL1GHT)/spu/lib $(SPU_DIR)/spu_main.o -lsputhread -o $(SPU_ELF); \
 		echo "Embedding SPU ELF into PPU object via bin2s..."; \
@@ -168,6 +169,16 @@ spu_build:
 	else \
 		echo "SPU pre-built artifacts found, skipping build"; \
 	fi
+
+#---------------------------------------------------------------------------------
+spu_rebuild:
+	@echo "Force rebuilding SPU program..."
+	@rm -f $(SPU_DIR)/*.o $(SPU_DIR)/*.elf $(SPU_DIR)/*.bin $(SPU_EMBED_OBJ)
+	@$(SPU_CC) $(SPU_CFLAGS) -c $(SPU_DIR)/spu_main.c -o $(SPU_DIR)/spu_main.o
+	@$(SPU_LD) $(SPU_LDFLAGS) -L$(PSL1GHT)/spu/lib $(SPU_DIR)/spu_main.o -lsputhread -o $(SPU_ELF)
+	@echo "Embedding SPU ELF into PPU object via bin2s..."
+	@$(SPU_BIN2S) -a 64 $(SPU_ELF) | $(SPU_AS) -o $(SPU_EMBED_OBJ)
+	@echo "SPU rebuild complete"
 
 #---------------------------------------------------------------------------------
 clean:

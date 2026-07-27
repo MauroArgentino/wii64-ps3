@@ -284,6 +284,9 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 #ifndef __GX__
 	current->texture->realWidth = pow2( (unsigned long)(current->width * OGL.scaleX) );
 	current->texture->realHeight = pow2( (unsigned long)(current->height * OGL.scaleY) );
+	// Ensure minimum dimensions for RSX
+	if (!current->texture->realWidth) current->texture->realWidth = 2;
+	if (!current->texture->realHeight) current->texture->realHeight = 2;
 	current->texture->textureBytes = current->texture->realWidth * current->texture->realHeight * 4;
 #else //!__GX__
 	//realWidth & realHeight should be multiple of 2 for EFB->Texture Copy
@@ -355,17 +358,17 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 		                                       (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
 		                                       (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
 		                                       (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT));
-		current->texture->rsxTex.width    = current->texture->realWidth;
-		current->texture->rsxTex.height   = current->texture->realHeight;
-		current->texture->rsxTex.depth    = 1;
-		current->texture->rsxTex.location = GCM_LOCATION_RSX;
-		current->texture->rsxTex.pitch    = current->texture->realWidth * 4;
-		current->texture->rsxTex.offset   = current->texture->rsxTextureOffset;
+current->texture->rsxTex.width    = (current->texture->realWidth > 0) ? current->texture->realWidth : 1;
+	current->texture->rsxTex.height   = (current->texture->realHeight > 0) ? current->texture->realHeight : 1;
+	current->texture->rsxTex.depth    = 1;
+	current->texture->rsxTex.location = GCM_LOCATION_RSX;
+	current->texture->rsxTex.pitch    = current->texture->rsxTex.width * 4;
+	current->texture->rsxTex.offset   = current->texture->rsxTextureOffset;
 
 		// Copy from color buffer to framebuffer texture
 		rsxSetTransferImage(context, GCM_TRANSFER_LOCAL_TO_LOCAL,
 			current->texture->rsxTextureOffset,
-			current->texture->realWidth * 4,
+			current->texture->rsxTex.width * 4,
 			0, 0,
 			color_offset[curr_fb],
 			color_pitch,

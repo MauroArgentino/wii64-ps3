@@ -205,6 +205,12 @@ static int vram_ptr_is_vram(const void *ptr) {
 static int vram_upload_texture(const void *src_data, uint32_t src_size,
                                uint32_t width, uint32_t height, uint32_t format,
                                uint32_t *out_offset, uint32_t *out_pitch) {
+    /* VALIDATE: width and height must be > 0 for RSX */
+    if (width == 0 || height == 0) {
+        printf("VRAM_TEX: ERROR - Invalid dimensions %ux%u for upload, aborting\n", width, height);
+        return -1;
+    }
+    printf("VRAM_TEX: Uploading %ux%u fmt=0x%x src_size=%u\n", width, height, format, src_size);
     /* RSX linear textures need 128-byte aligned pitch */
     uint32_t pitch = (width * 4 + 127) & ~127u;  /* RGBA8888 = 4 bytes/pixel */
     uint32_t vram_size = pitch * height;
@@ -222,7 +228,7 @@ static int vram_upload_texture(const void *src_data, uint32_t src_size,
         }
     }
 
-    /* Allocate VRAM */
+    /* Allocate VRAM memory for texture */
     vram_ptr = rsxMemalign(128, vram_size);
     if (!vram_ptr) {
         printf("VRAM_TEX: rsxMemalign NULL for %u bytes (%u KB)\n", vram_size, vram_size / 1024);
@@ -281,7 +287,17 @@ int vram_tex_cache_get_or_upload(const void *src_data, uint32_t src_size,
     vram_tex_cache_ensure_init();
     if (!g_vram_table || g_vram_disabled) return 0;
 
+    /* VALIDATE: width and height must be > 0 */
+    if (width == 0 || height == 0) {
+        printf("VRAM_TEX: ERROR - Invalid dimensions %ux%u in get_or_upload, treating as miss\n", width, height);
+        return 0;
+    }
+
     uint64_t hash = vram_compute_hash(src_data, src_size, has_palette, palette_crc);
+
+    /* DEBUG: Log texture being processed */
+    printf("VRAM_TEX: get_or_upload %ux%u fmt=0x%x pal=%d hash=0x%llx\n",
+           width, height, format, has_palette, hash);
 
     /* Lookup */
     int idx = vram_find_slot(hash, 0);

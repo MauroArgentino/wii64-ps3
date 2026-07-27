@@ -62,15 +62,21 @@ typedef enum {
     TEX_FMT_RGBA32 = 7,
 } spu_tex_format_t;
 
+/* SPU_JOB_TEX_DECODE flags (in job_header.flags) */
+#define TEX_DECODE_FLAG_BYTESWAP  0x1  /* Endian-swap RGBA32 output (for RSX) */
+
 typedef struct {
     spu_job_header_t hdr;
     spu_tex_format_t format;      // Source texture format
     uint32_t width;               // Texture width
     uint32_t height;              // Texture height
-    uint32_t input_ea;            // EA of source texture data
+    uint32_t input_ea;            // EA low 32 bits of source texture data
+    uint32_t input_ea_high;       // EA high 32 bits of source texture data
     uint32_t palette_ea;          // EA of palette (for CI formats), 0 if none
     uint32_t palette_format;      // G_TT_RGBA16=2, G_TT_IA16=3
-    uint32_t output_ea;           // EA for RGBA32 output
+    uint32_t output_ea;           // EA low 32 bits for RGBA32 output
+    uint32_t output_ea_high;      // EA high 32 bits for RGBA32 output
+    uint32_t output_pitch;        // Output row pitch in bytes (for VRAM alignment)
     uint32_t unpack_alignment;    // glPixelStorei UNPACK_ALIGNMENT (1 or 4)
 } spu_job_tex_decode_t;
 
