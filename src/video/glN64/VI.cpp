@@ -336,7 +336,6 @@ void VI_RSX_updateDebugCycle() {
 void VI_RSX_applyDebugCycle() {
 #ifdef DEBUG
     switch (debugCycleMode) {
-#endif
         case 0: // DEFAULT - use game's settings
             break;
         case 1: // SRC_ALPHA/INV_SRC with alpha_mode=1 (texel alpha)
@@ -413,6 +412,7 @@ void VI_RSX_applyDebugCycle() {
             rsxSetAlphaTestEnable(context, GCM_FALSE);
             break;
     }
+#endif
 }
 
 void VI_RSX_showFPS(){
