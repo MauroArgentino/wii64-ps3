@@ -420,6 +420,7 @@ void VI_RSX_showFPS(){
 	if(showFPSonScreen)
 		menu::IplFont::getInstance().drawString(10,35,caption, 1.0, false);
 
+#ifdef DEBUG
 	// Render state debug (shown whenever a ROM is loaded)
 	if (ROM_HEADER)
 	{
@@ -512,8 +513,9 @@ void VI_RSX_showFPS(){
 		menu::IplFont::getInstance().drawString(10, 75, gameInfo2, 0.6, false);
 		gameInfoTimer--;
 	}
-}
+#endif
 
+}
 void VI_RSX_resetGameInfo(void)
 {
 	gameInfoTimer = 300;  // show for ~5 seconds at 60fps

@@ -35,7 +35,7 @@ INCLUDES	:= . $(SOURCES)
 #LIBRARIES	:= -LJ:/PS3/PSDK3v2/MinGW/Lib
 
 # ID del contenido para el paquete de PS3 (Requerido para pkg_package)
-CONTENTID	:= UP0001-PS364GLN6_00-0000111122223333
+CONTENTID	:= UP0001-WII64PS31_00-0000000000000000
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -43,7 +43,7 @@ CONTENTID	:= UP0001-PS364GLN6_00-0000111122223333
 ifdef DEBUG
 CFLAGS		= -O0 -g3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ \
-			-DDEBUG_POLYGONS \
+			-DDEBUG_POLYGONS -DSHOW_DEBUG \
 			-include ../src/main/winlnxdefs.h \
 			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__
 else
