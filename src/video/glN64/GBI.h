@@ -23,7 +23,8 @@
 #define F3DPD		8
 #define F3DDKR		9
 #define F3DWRUS	    10
-#define NONE		11
+#define ZSORT		11
+#define NONE		12
 
 #ifdef MAINDEF
 const char *MicrocodeTypes[] =
@@ -39,13 +40,14 @@ const char *MicrocodeTypes[] =
 	"Perfect Dark",
 	"DKR/JFG",
 	"Waverace US",
+	"ZSort",
 	"None"
 };
 #else
 extern const char *MicrocodeTypes[];
 #endif
 
-static const int numMicrocodeTypes = 11;
+static const int numMicrocodeTypes = 12;
 
 
 // Fixed point conversion factors
@@ -648,6 +650,46 @@ extern u32 G_OBJ_RECTANGLE, G_OBJ_SPRITE, G_OBJ_MOVEMEM;
 extern u32 G_SELECT_DL, G_OBJ_RENDERMODE, G_OBJ_RECTANGLE_R;
 extern u32 G_OBJ_LOADTXTR, G_OBJ_LDTX_SPRITE, G_OBJ_LDTX_RECT, G_OBJ_LDTX_RECT_R;
 extern u32 G_RDPHALF_0;
+
+#define LIGHT_1	1
+#define LIGHT_2	2
+#define LIGHT_3	3
+#define LIGHT_4	4
+#define LIGHT_5	5
+#define LIGHT_6	6
+#define LIGHT_7	7
+#define LIGHT_8	8
+
+// ZSort microcode commands
+#define G_ZSORT_TRI1      0x80
+#define G_ZSORT_TRI2      0x81
+#define G_ZSORT_QUAD      0x82
+#define G_ZSORT_LOAD_UCODE 0x83
+#define G_ZSORT_SET_Z      0x84
+#define G_ZSORT_SET_ALPHA  0x85
+#define G_ZSORT_SET_DEPTH  0x86
+#define G_ZSORT_SETOTHERMODE_H  0x87
+#define G_ZSORT_SETOTHERMODE_L  0x88
+#define G_ZSORT_SETGEOMETRYMODE 0x88
+#define G_ZSORT_CLEARGEOMETRYMODE 0x89
+#define G_ZSORT_SPNOOP    0x8A
+#define G_ZSORT_DL        0x8B
+#define G_ZSORT_TRI1      0x80
+#define G_ZSORT_TRI2      0x81
+#define G_ZSORT_QUAD      0x82
+#define G_ZSORT_LOAD_UCODE 0x83
+#define G_ZSORT_SET_Z      0x84
+#define G_ZSORT_SET_ALPHA  0x85
+#define G_ZSORT_SET_DEPTH  0x86
+#define G_ZSORT_SETOTHERMODE_H  0x87
+#define G_ZSORT_SETOTHERMODE_L  0x88
+#define G_ZSORT_SETGEOMETRYMODE  0x88
+#define G_ZSORT_CLEARGEOMETRYMODE 0x89
+#define G_ZSORT_SPNOOP    0x8A
+#define G_ZSORT_DL        0x8B
+#define G_ZSORT_TRI1      0x80
+#define G_ZSORT_TRI2      0x81
+#define G_ZSORT_QUAD      0x82
 
 #define LIGHT_1	1
 #define LIGHT_2	2

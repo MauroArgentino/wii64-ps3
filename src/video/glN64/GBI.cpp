@@ -61,7 +61,10 @@ SpecialMicrocodeInfo specialMicrocodes[] =
 	{ F3DPD,	FALSE,	0x1c4f7869, (char*) "Perfect Dark" },
 
 	//This last one is for Mario Kart 64.
-	{ F3DEX,	FALSE,	0x0ace4c3f, (char*) "RSP Gfx ucode F3DEX         0.95 Toshitaka Yasumoto Nintendo." }
+	{ F3DEX,	FALSE,	0x0ace4c3f, (char*) "RSP Gfx ucode F3DEX         0.95 Toshitaka Yasumoto Nintendo." },
+
+	// ZSort microcode for Mario Kart 64
+	{ ZSORT,	FALSE,	0x00000000, (char*) "RSP Gfx ucode ZSort" },
 };
 
 u32 G_RDPHALF_1, G_RDPHALF_2, G_RDPHALF_CONT;
@@ -523,6 +526,7 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 			case F3DDKR:	F3DDKR_Init();	break;
 			case F3DWRUS:	F3DWRUS_Init();	break;
 			case F3DPD:		F3DPD_Init();	break;
+			case ZSORT:		ZSORT_Init();	break;
 		}
 	}
 
