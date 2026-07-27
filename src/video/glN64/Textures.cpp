@@ -252,14 +252,6 @@ inline u32 GetCI8IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 	return IA88_RGBA4444( val );
 }
 
-inline u32 GetCI8IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
-{
-	u16 val;
-	u32 index = ((u8*)src)[x^(i<<1)];
-	memcpy(&val, &TMEM[256 + (palette << 9) + (index << 1)], 2);
-	return IA88_RGBA8888( val );
-}
-
 inline u32 GetCI8RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
 {
 	u16 val;
