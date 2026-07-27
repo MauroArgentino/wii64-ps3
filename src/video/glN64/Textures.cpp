@@ -1570,6 +1570,17 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	texInfo->rsxTex.pitch		= rsxPitch;
 	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	free( dest );
+
+	// DEBUG: Log texture info for Kirby 64 debugging
+	static int texDebugCount = 0;
+	if (texDebugCount < 20) {
+		printf("TEX_DBG: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d rsxW=%d rsxH=%d pitch=%d offset=0x%x\n",
+			texInfo->format, texInfo->size, texInfo->lut, GetTexel,
+			texInfo->realWidth, texInfo->realHeight,
+			texInfo->rsxTex.width, texInfo->rsxTex.height,
+			texInfo->rsxTex.pitch, texInfo->rsxTex.offset);
+		texDebugCount++;
+	}
 #elif defined(__GX__)
 	//2xSaI textures will not be implemented for now.
 	if(texInfo->GXtexture != NULL)
