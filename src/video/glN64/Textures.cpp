@@ -176,8 +176,8 @@ inline u32 GetCI4IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 
 	color4B = ((u8*)src)[(x>>1)^(i<<1)];
 
-	if (x & 1) memcpy(&val, &TMEM[256 + (palette << 5) + ((color4B & 0x0F) << 1)], 2);
-	else       memcpy(&val, &TMEM[256 + (palette << 5) + ((color4B >> 4) << 1)], 2);
+	if (x & 1) memcpy(&val, &TMEM[256 + (palette << 4) + (color4B & 0x0F)], 2);
+	else       memcpy(&val, &TMEM[256 + (palette << 4) + (color4B >> 4)], 2);
 
 	return IA88_RGBA8888( val );
 }
@@ -189,8 +189,8 @@ inline u32 GetCI4RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
 
 	color4B = ((u8*)src)[(x>>1)^(i<<1)];
 
-	if (x & 1) memcpy(&val, &TMEM[256 + (palette << 5) + ((color4B & 0x0F) << 1)], 2);
-	else       memcpy(&val, &TMEM[256 + (palette << 5) + ((color4B >> 4) << 1)], 2);
+	if (x & 1) memcpy(&val, &TMEM[256 + (palette << 4) + (color4B & 0x0F)], 2);
+	else       memcpy(&val, &TMEM[256 + (palette << 4) + (color4B >> 4)], 2);
 
 	return RGBA5551_RGBA5551( val );
 }
@@ -202,8 +202,8 @@ inline u32 GetCI4RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 
 	color4B = ((u8*)src)[(x>>1)^(i<<1)];
 
-	if (x & 1) memcpy(&val, &TMEM[256 + (palette << 5) + ((color4B & 0x0F) << 1)], 2);
-	else       memcpy(&val, &TMEM[256 + (palette << 5) + ((color4B >> 4) << 1)], 2);
+	if (x & 1) memcpy(&val, &TMEM[256 + (palette << 4) + (color4B & 0x0F)], 2);
+	else       memcpy(&val, &TMEM[256 + (palette << 4) + (color4B >> 4)], 2);
 
 	return RGBA5551_RGBA8888( val );
 }
@@ -247,24 +247,28 @@ inline u32 GetI4_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 inline u32 GetCI8IA_RGBA4444( u64 *src, u16 x, u16 i, u8 palette )
 {
 	u16 val;
-	u32 index = ((u8*)src)[x^(i<<1)];
-	memcpy(&val, &TMEM[256 + (palette << 9) + (index << 1)], 2);
+	memcpy(&val, &TMEM[256 + ((u8*)src)[x^(i<<1)]], 2);
 	return IA88_RGBA4444( val );
+}
+
+inline u32 GetCI8IA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
+{
+	u16 val;
+	memcpy(&val, &TMEM[256 + ((u8*)src)[x^(i<<1)]], 2);
+	return IA88_RGBA8888( val );
 }
 
 inline u32 GetCI8RGBA_RGBA5551( u64 *src, u16 x, u16 i, u8 palette )
 {
 	u16 val;
-	u32 index = ((u8*)src)[x^(i<<1)];
-	memcpy(&val, &TMEM[256 + (palette << 9) + (index << 1)], 2);
+	memcpy(&val, &TMEM[256 + ((u8*)src)[x^(i<<1)]], 2);
 	return RGBA5551_RGBA5551( val );
 }
 
 inline u32 GetCI8RGBA_RGBA8888( u64 *src, u16 x, u16 i, u8 palette )
 {
 	u16 val;
-	u32 index = ((u8*)src)[x^(i<<1)];
-	memcpy(&val, &TMEM[256 + (palette << 9) + (index << 1)], 2);
+	memcpy(&val, &TMEM[256 + ((u8*)src)[x^(i<<1)]], 2);
 	return RGBA5551_RGBA8888( val );
 }
 
