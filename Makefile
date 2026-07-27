@@ -35,7 +35,7 @@ INCLUDES	:= . $(SOURCES)
 #LIBRARIES	:= -LJ:/PS3/PSDK3v2/MinGW/Lib
 
 # ID del contenido para el paquete de PS3 (Requerido para pkg_package)
-CONTENTID	:= UP0001-WII64PS31_00-0000000000000000
+CONTENTID	:= UP0001-WII64PS3N_00-0000000000000000
 
 #---------------------------------------------------------------------------------
 # options for code generation
