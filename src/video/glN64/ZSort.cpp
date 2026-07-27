@@ -37,12 +37,9 @@ static bool zsort_depth_test_enabled = true;
 #define G_ZSORT_SET_DEPTH  0x86
 
 // ZSort state
-static struct {
-    bool depth_test;
-    bool alpha_blend;
-    u32 z_value;
-    u8 alpha_threshold;
-} zsort_state;
+bool zsort_enabled = false;
+bool zsort_depth_test_enabled = true;
+struct ZSortState zsort_state = { true, false, 0, 0 };
 
 void ZSORT_Init()
 {

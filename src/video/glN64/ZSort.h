@@ -47,14 +47,4 @@ void ZSORT_SetOtherMode_L( u32 w0, u32 w1 );
 void ZSORT_SetGeometryMode( u32 w0, u32 w1 );
 void ZSORT_ClearGeometryMode( u32 w0, u32 w1 );
 
-// ZSort state
-extern bool zsort_enabled;
-extern bool zsort_depth_test_enabled;
-extern struct {
-    bool depth_test;
-    bool alpha_blend;
-    u32 z_value;
-    u8 alpha_threshold;
-} zsort_state;
-
 #endif // ZSORT_H
