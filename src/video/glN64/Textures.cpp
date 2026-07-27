@@ -794,8 +794,9 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 	}
 	else
 	{
-		GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
+GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
+	#ifdef DEBUG
 	// DEBUG: Log texture format for invisible faces investigation
 	static int texDebugCount = 0;
 	if (texDebugCount < 50) {
@@ -804,6 +805,7 @@ void TextureCache_LoadBackground( CachedTexture *texInfo )
 			texInfo->realWidth, texInfo->realHeight);
 		texDebugCount++;
 	}
+	#endif
 	glInternalFormat = GL_RGBA8;
 	glType = GL_UNSIGNED_BYTE;
 #else // !PS3
@@ -1203,14 +1205,15 @@ void TextureCache_Load( CachedTexture *texInfo )
 	{
 GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
+	#ifdef DEBUG
 	// DEBUG: Log texture format for invisible faces investigation
-	static int texDebugCount = 0;
 	if (texDebugCount < 50) {
 		printf("TEX: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d\n",
 			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
 			texInfo->realWidth, texInfo->realHeight);
 		texDebugCount++;
 	}
+	#endif
 	glInternalFormat = GL_RGBA8;
 	glType = GL_UNSIGNED_BYTE;
 #else // !PS3
@@ -1571,6 +1574,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	free( dest );
 
+	#ifdef DEBUG
 	// DEBUG: Log texture info for Kirby 64 debugging
 	if (texDebugCount < 20) {
 		printf("TEX_DBG: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d rsxW=%d rsxH=%d pitch=%d offset=0x%x\n",
@@ -1580,6 +1584,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 			texInfo->rsxTex.pitch, texInfo->rsxTex.offset);
 		texDebugCount++;
 	}
+#endif
 #elif defined(__GX__)
 	//2xSaI textures will not be implemented for now.
 	if(texInfo->GXtexture != NULL)
