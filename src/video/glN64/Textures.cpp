@@ -1572,10 +1572,9 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	free( dest );
 
 	// DEBUG: Log texture info for Kirby 64 debugging
-	static int texDebugCount = 0;
 	if (texDebugCount < 20) {
 		printf("TEX_DBG: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d rsxW=%d rsxH=%d pitch=%d offset=0x%x\n",
-			texInfo->format, texInfo->size, texInfo->lut, GetTexel,
+			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
 			texInfo->realWidth, texInfo->realHeight,
 			texInfo->rsxTex.width, texInfo->rsxTex.height,
 			texInfo->rsxTex.pitch, texInfo->rsxTex.offset);
