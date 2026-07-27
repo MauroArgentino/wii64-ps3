@@ -8,21 +8,6 @@
 
 #include "Types.h"
 
-// ZSort command opcodes
-#define G_ZSORT_TRI1      0x80
-#define G_ZSORT_TRI2      0x81
-#define G_ZSORT_QUAD      0x82
-#define G_ZSORT_LOAD_UCODE 0x83
-#define G_ZSORT_SET_Z      0x84
-#define G_ZSORT_SET_ALPHA  0x85
-#define G_ZSORT_SET_DEPTH  0x86
-#define G_ZSORT_SETOTHERMODE_H  0x87
-#define G_ZSORT_SETOTHERMODE_L  0x88
-#define G_ZSORT_SETGEOMETRYMODE  0x88
-#define G_ZSORT_CLEARGEOMETRYMODE 0x89
-#define G_ZSORT_SPNOOP    0x8A
-#define G_ZSORT_DL        0x8B
-
 // ZSort state
 extern bool zsort_enabled;
 extern bool zsort_depth_test_enabled;
@@ -52,10 +37,5 @@ void ZSORT_SetOtherMode_H( u32 w0, u32 w1 );
 void ZSORT_SetOtherMode_L( u32 w0, u32 w1 );
 void ZSORT_SetGeometryMode( u32 w0, u32 w1 );
 void ZSORT_ClearGeometryMode( u32 w0, u32 w1 );
-
-// ZSort state
-extern bool zsort_enabled;
-extern bool zsort_depth_test_enabled;
-extern struct ZSortState zsort_state;
 
 #endif // ZSORT_H

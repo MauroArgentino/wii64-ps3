@@ -22,50 +22,9 @@ extern gcmContextData *context;
 #endif
 
 // ZSort microcode state
-static bool zsort_enabled = false;
-static bool zsort_depth_test_enabled = true;
-
-// ZSort command opcodes (from N64 RSP ZSort microcode)
-#define G_ZSORT_TRI1      0x80
-#define G_ZSORT_TRI2      0x81
-#define G_ZSORT_QUAD      0x82
-#define G_ZSORT_LOAD_UCODE 0x83
-#define G_ZSORT_SET_Z      0x84
-#define G_ZSORT_SET_ALPHA  0x85
-#define G_ZSORT_SET_DEPTH  0x86
-#define G_ZSORT_SETOTHERMODE_H  0x87
-#define G_ZSORT_SETOTHERMODE_L  0x88
-#define G_ZSORT_SETGEOMETRYMODE  0x88
-#define G_ZSORT_CLEARGEOMETRYMODE 0x89
-#define G_ZSORT_SPNOOP    0x8A
-#define G_ZSORT_DL        0x8B
-#define G_ZSORT_TRI1      0x80
-#define G_ZSORT_TRI2      0x81
-#define G_ZSORT_QUAD      0x82
-#define G_ZSORT_LOAD_UCODE 0x83
-#define G_ZSORT_SET_Z      0x84
-#define G_ZSORT_SET_ALPHA  0x85
-#define G_ZSORT_SET_DEPTH  0x86
-#define G_ZSORT_SETOTHERMODE_H  0x87
-#define G_ZSORT_SETOTHERMODE_L  0x88
-#define G_ZSORT_SETGEOMETRYMODE  0x88
-#define G_ZSORT_CLEARGEOMETRYMODE 0x89
-#define G_ZSORT_SPNOOP    0x8A
-#define G_ZSORT_DL        0x8B
-#define G_ZSORT_TRI1      0x80
-#define G_ZSORT_TRI2      0x81
-#define G_ZSORT_QUAD      0x82
-
-// ZSort state
-struct ZSortState {
-    bool depth_test;
-    bool alpha_blend;
-    u32 z_value;
-    u8 alpha_threshold;
-};
-
 bool zsort_enabled = false;
 bool zsort_depth_test_enabled = true;
+
 struct ZSortState zsort_state = { true, false, 0, 0 };
 
 void ZSORT_Init()
