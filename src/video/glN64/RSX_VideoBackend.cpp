@@ -4,7 +4,6 @@
  * Supports configurable internal resolution with 1080p UI overlay.
  */
 
-#include "RSX_VideoBackend.h"
 #include <rsx/rsx.h>
 #include "../../ui/libgui/GraphicsRSX.h"
 #include "../../main/rsxutil.h"
@@ -35,6 +34,8 @@ void RSX_VideoInit() {
     g_video_config.fb_width = display_width;
     g_video_config.fb_height = display_height;
     g_video_config.fb_pitch = fb_pitch;
+    g_video_config.fb_offset[0] = 0;
+    g_video_config.fb_offset[1] = fb_pitch * display_height;
 
     g_video_config.initialized = 1;
 }
