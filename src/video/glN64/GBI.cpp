@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include "glN64.h"
 #include "GBI.h"
+#include "ZSort.h"
 #include "RDP.h"
 #include "RSP.h"
 #include "F3D.h"
@@ -30,7 +31,6 @@
 #include "F3DDKR.h"
 #include "F3DWRUS.h"
 #include "F3DPD.h"
-#include "ZSort.h"
 #include "Types.h"
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 # include "Resource.h"
@@ -89,6 +89,12 @@ u32 G_OBJ_RECTANGLE, G_OBJ_SPRITE, G_OBJ_MOVEMEM;
 u32 G_SELECT_DL, G_OBJ_RENDERMODE, G_OBJ_RECTANGLE_R;
 u32 G_OBJ_LOADTXTR, G_OBJ_LDTX_SPRITE, G_OBJ_LDTX_RECT, G_OBJ_LDTX_RECT_R;
 u32 G_RDPHALF_0;
+
+u32 G_ZOBJ, G_ZRDPCMD, G_ZSENDSIGNAL, G_ZWAITSIGNAL;
+u32 G_ZSETSUBDL, G_ZLINKSUBDL, G_ZMULT_MPMTX;
+u32 G_ZMTXCAT, G_ZMTXTRNSP;
+u32 G_ZLIGHTING_L, G_ZLIGHTING, G_ZXFMLIGHT, G_ZINTERPOLATE;
+u32 G_ZSETSCISSOR;
 
 u32 G_MTX_STACKSIZE;
 u32 G_MTX_MODELVIEW;
@@ -527,7 +533,7 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 			case F3DDKR:	F3DDKR_Init();	break;
 			case F3DWRUS:	F3DWRUS_Init();	break;
 			case F3DPD:		F3DPD_Init();	break;
-			case ZSORT:		ZSORT_Init();	break;
+			case ZSORT:		ZSort_Init();	break;
 		}
 	}
 

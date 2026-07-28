@@ -26,90 +26,7 @@
 #define ZSORT		11
 #define NONE		12
 
-// ZSort microcode constants
-#define ZSORT_MTX_STACKSIZE		18
-#define ZSORT_MTX_MODELVIEW		0x00
-#define ZSORT_MTX_PROJECTION		0x01
-#define ZSORT_MTX_MUL		0x02
-#define ZSORT_MTX_LOAD		0x03
-#define ZSORT_MTX_NOPUSH		0x04
-#define ZSORT_MTX_PUSH		0x05
-#define ZSORT_TEXTURE_ENABLE	0x06
-#define ZSORT_SHADING_SMOOTH	0x07
-#define ZSORT_CULL_FRONT		0x08
-#define ZSORT_CULL_BACK		0x09
-#define ZSORT_CULL_BOTH		0x0A
-#define ZSORT_CLIPPING		0x0B
-#define ZSORT_MV_VIEWPORT		0x0C
-#define ZSORT_MWO_aLIGHT_1		0x0D
-#define ZSORT_MWO_bLIGHT_1		0x0E
-#define ZSORT_MWO_aLIGHT_2		0x0F
-#define ZSORT_MWO_bLIGHT_2		0x10
-#define ZSORT_MWO_aLIGHT_3		0x11
-#define ZSORT_MWO_bLIGHT_3		0x11
-#define ZSORT_MWO_aLIGHT_4		0x12
-#define ZSORT_MWO_bLIGHT_4		0x13
-#define ZSORT_MWO_aLIGHT_5		0x14
-#define ZSORT_MWO_bLIGHT_5		0x14
-#define ZSORT_MWO_aLIGHT_6		0x15
-#define ZSORT_MWO_bLIGHT_6		0x15
-#define ZSORT_MWO_aLIGHT_7		0x16
-#define ZSORT_MWO_bLIGHT_7		0x16
-#define ZSORT_MWO_aLIGHT_8		0x17
-#define ZSORT_MWO_bLIGHT_8		0x18
-#define ZSORT_TEXTURE_ENABLE	0x19
-#define ZSORT_SHADING_SMOOTH	0x1A
-#define ZSORT_CULL_FRONT		0x1B
-#define ZSORT_CULL_BACK		0x1C
-#define ZSORT_CULL_BOTH		0x1D
-#define ZSORT_CLIPPING		0x1E
-#define ZSORT_MV_VIEWPORT		0x1F
-#define ZSORT_MWO_aLIGHT_1		0x0D
-#define ZSORT_MWO_bLIGHT_1		0x0E
-#define ZSORT_MWO_aLIGHT_2		0x0F
-#define ZSORT_MWO_bLIGHT_2		0x10
-#define ZSORT_MWO_aLIGHT_3		0x11
-#define ZSORT_MWO_bLIGHT_3		0x11
-#define ZSORT_MWO_aLIGHT_4		0x12
-#define ZSORT_MWO_bLIGHT_4		0x13
-#define ZSORT_MWO_aLIGHT_5		0x14
-#define ZSORT_MWO_bLIGHT_5		0x14
-#define ZSORT_MWO_aLIGHT_6		0x15
-#define ZSORT_MWO_bLIGHT_6		0x15
-#define ZSORT_MWO_aLIGHT_7		0x16
-#define ZSORT_MWO_bLIGHT_7		0x16
-#define ZSORT_MWO_aLIGHT_8		0x17
-#define ZSORT_MWO_bLIGHT_8		0x18
-#define ZSORT_TEXTURE_ENABLE	0x19
-#define ZSORT_SHADING_SMOOTH	0x1A
-#define ZSORT_CULL_FRONT		0x1B
-#define ZSORT_CULL_BACK		0x1C
-#define ZSORT_CULL_BOTH		0x1D
-#define ZSORT_CLIPPING		0x1E
-#define ZSORT_MV_VIEWPORT		0x1F
-#define ZSORT_MWO_aLIGHT_1		0x0D
-#define ZSORT_MWO_bLIGHT_1		0x0E
-#define ZSORT_MWO_aLIGHT_2		0x0F
-#define ZSORT_MWO_bLIGHT_2		0x10
-#define ZSORT_MWO_aLIGHT_3		0x11
-#define ZSORT_MWO_bLIGHT_3		0x11
-#define ZSORT_MWO_aLIGHT_4		0x12
-#define ZSORT_MWO_bLIGHT_4		0x13
-#define ZSORT_MWO_aLIGHT_5		0x14
-#define ZSORT_MWO_bLIGHT_5		0x14
-#define ZSORT_MWO_aLIGHT_6		0x15
-#define ZSORT_MWO_bLIGHT_6		0x15
-#define ZSORT_MWO_aLIGHT_7		0x16
-#define ZSORT_MWO_bLIGHT_7		0x16
-#define ZSORT_MWO_aLIGHT_8		0x17
-#define ZSORT_MWO_bLIGHT_8		0x18
-#define ZSORT_TEXTURE_ENABLE	0x19
-#define ZSORT_SHADING_SMOOTH	0x1A
-#define ZSORT_CULL_FRONT		0x1B
-#define ZSORT_CULL_BACK		0x1C
-#define ZSORT_CULL_BOTH		0x1D
-#define ZSORT_CLIPPING		0x1E
-#define ZSORT_MV_VIEWPORT		0x1F
+
 
 #ifdef MAINDEF
 const char *MicrocodeTypes[] =
@@ -735,45 +652,11 @@ extern u32 G_SELECT_DL, G_OBJ_RENDERMODE, G_OBJ_RECTANGLE_R;
 extern u32 G_OBJ_LOADTXTR, G_OBJ_LDTX_SPRITE, G_OBJ_LDTX_RECT, G_OBJ_LDTX_RECT_R;
 extern u32 G_RDPHALF_0;
 
-#define LIGHT_1	1
-#define LIGHT_2	2
-#define LIGHT_3	3
-#define LIGHT_4	4
-#define LIGHT_5	5
-#define LIGHT_6	6
-#define LIGHT_7	7
-#define LIGHT_8	8
-
-// ZSort microcode commands
-#define G_ZSORT_TRI1      0x80
-#define G_ZSORT_TRI2      0x81
-#define G_ZSORT_QUAD      0x82
-#define G_ZSORT_LOAD_UCODE 0x83
-#define G_ZSORT_SET_Z      0x84
-#define G_ZSORT_SET_ALPHA  0x85
-#define G_ZSORT_SET_DEPTH  0x86
-#define G_ZSORT_SETOTHERMODE_H  0x87
-#define G_ZSORT_SETOTHERMODE_L  0x88
-#define G_ZSORT_SETGEOMETRYMODE 0x88
-#define G_ZSORT_CLEARGEOMETRYMODE 0x89
-#define G_ZSORT_SPNOOP    0x8A
-#define G_ZSORT_DL        0x8B
-#define G_ZSORT_TRI1      0x80
-#define G_ZSORT_TRI2      0x81
-#define G_ZSORT_QUAD      0x82
-#define G_ZSORT_LOAD_UCODE 0x83
-#define G_ZSORT_SET_Z      0x84
-#define G_ZSORT_SET_ALPHA  0x85
-#define G_ZSORT_SET_DEPTH  0x86
-#define G_ZSORT_SETOTHERMODE_H  0x87
-#define G_ZSORT_SETOTHERMODE_L  0x88
-#define G_ZSORT_SETGEOMETRYMODE  0x88
-#define G_ZSORT_CLEARGEOMETRYMODE 0x89
-#define G_ZSORT_SPNOOP    0x8A
-#define G_ZSORT_DL        0x8B
-#define G_ZSORT_TRI1      0x80
-#define G_ZSORT_TRI2      0x81
-#define G_ZSORT_QUAD      0x82
+extern u32 G_ZOBJ, G_ZRDPCMD, G_ZSENDSIGNAL, G_ZWAITSIGNAL;
+extern u32 G_ZSETSUBDL, G_ZLINKSUBDL, G_ZMULT_MPMTX;
+extern u32 G_ZMTXCAT, G_ZMTXTRNSP;
+extern u32 G_ZLIGHTING_L, G_ZLIGHTING, G_ZXFMLIGHT, G_ZINTERPOLATE;
+extern u32 G_ZSETSCISSOR;
 
 #define LIGHT_1	1
 #define LIGHT_2	2
@@ -783,6 +666,7 @@ extern u32 G_RDPHALF_0;
 #define LIGHT_6	6
 #define LIGHT_7	7
 #define LIGHT_8	8
+
 
 #define G_DL_PUSH		0x00
 #define G_DL_NOPUSH		0x01
