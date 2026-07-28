@@ -34,6 +34,7 @@
 extern "C" {
 #include "../../main/rom.h"
 #include "../../main/compatibility.h"
+#include "../../main/game_hacks.h"
 }
 #endif // PS3
 
@@ -104,6 +105,8 @@ void VI_UpdateSize()
 void VI_UpdateScreen()
 {
 #ifdef PS3
+	GameHacks_ApplyPerFrame();
+
 	if (!OGL.frameReady)
 		return;
 

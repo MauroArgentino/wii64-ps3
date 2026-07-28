@@ -56,6 +56,18 @@ static const GameCompatEntry CompatDB[] = {
 	/* === BOOTABLE (1) === */
 	{ sl(0xA1E4E188), "Donkey Kong 64 (U)",         "DK6E", COMPAT_BOOTABLE, "FB textures, may crash" },
 	{ sl(0x34C7B426), "Donkey Kong 64 (E)",         "DK6P", COMPAT_BOOTABLE, "FB textures, may crash" },
+	{ sl(0xCA12B547), "Pokemon Snap (U)",            "PSUE", COMPAT_BOOTABLE, "Controller + picture hack applied" },
+	{ sl(0x7BB18D40), "Pokemon Snap (A)",            "PSAE", COMPAT_BOOTABLE, "Controller + picture hack applied" },
+	{ sl(0x4FF5976F), "Pokemon Snap (E)",            "PSPE", COMPAT_BOOTABLE, "Controller + picture hack applied" },
+	{ sl(0xEC0F690D), "Pokemon Snap (J)",            "PSJE", COMPAT_BOOTABLE, "Controller + picture hack applied" },
+	{ sl(0x8ECC02F0), "Top Gear Hyper-Bike (U)",     "THBU", COMPAT_BOOTABLE, "Playable fix applied" },
+	{ sl(0x5F3F49C6), "Top Gear Hyper-Bike (E)",     "THBE", COMPAT_BOOTABLE, "Playable fix applied" },
+	{ sl(0x845B0269), "Top Gear Hyper-Bike (J)",     "THBJ", COMPAT_BOOTABLE, "Playable fix applied" },
+	{ sl(0xD741CD80), "Top Gear Overdrive (U)",      "TOOU", COMPAT_BOOTABLE, "Playable fix applied" },
+	{ sl(0xD09BA538), "Top Gear Overdrive (E)",      "TOOE", COMPAT_BOOTABLE, "Playable fix applied" },
+	{ sl(0x0578F24F), "Top Gear Overdrive (J)",      "TOOJ", COMPAT_BOOTABLE, "Playable fix applied" },
+	{ sl(0x308DFEC8), "World Driver Championship (U)", "WDCE", COMPAT_BOOTABLE, "OsRecvMesg NOP applied" },
+	{ sl(0xAC062778), "World Driver Championship (E)", "WDPE", COMPAT_BOOTABLE, "OsRecvMesg NOP applied" },
 
 	/* === BROKEN (0) === */
 

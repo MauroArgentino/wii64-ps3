@@ -31,4 +31,7 @@ extern GameHacks gameHacks;
 /* Initialize from GameHackManager (call once after ROM load) */
 void GameHacks_Detect(void);
 
+/* Apply per-frame hacks (call once per video frame during emulation) */
+void GameHacks_ApplyPerFrame(void);
+
 #endif /* GAME_HACKS_H */

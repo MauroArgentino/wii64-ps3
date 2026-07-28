@@ -56,11 +56,8 @@ extern unsigned char *SP_DMEMb;
 extern u32 *SP_IMEM;
 extern u32 PIF_RAM[0x40/4];
 extern unsigned char *PIF_RAMb;
-#ifdef USE_EXPANSION
-	extern u32 *rdram;
-#else
-	extern u32 *rdram;
-#endif
+extern u32 *rdram;
+extern unsigned char *rdramb;
 extern u32 address, word;
 extern unsigned char byte;
 extern unsigned short hword;

@@ -417,7 +417,6 @@ int loadROM(fileBrowser_file* rom){
 
 	// Init everything for this ROM
 	init_memory();
-	GameHacks_Detect();
 	VI_RSX_resetGameInfo();
 
 	// Initialize and load GameHackManager for this ROM
@@ -426,6 +425,7 @@ int loadROM(fileBrowser_file* rom){
 		GameHackManager_Init(&g_game_hack_mgr);
 	}
 	GameHackManager_LoadForCRC(g_game_hack_mgr, ROM_HEADER->CRC1);
+	GameHacks_Detect();
 
 //	gfx_set_fb(xfb[0], xfb[1]);
 	// Adjust window settings based on the actual display resolution
