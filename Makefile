@@ -28,7 +28,7 @@ BUILD		:=	build_debug
 else
 BUILD		:=	build
 endif
-SOURCES		:=	src/main src/core/n64_audio src/core/n64_input src/core/n64_memory src/core/rsp src/core/r4300 src/core/r4300/ppc src/ui src/ui/libgui src/ui/fileBrowser src/platform/ps3 src/video/glN64
+SOURCES		:=	src/main src/main/debug src/core/n64_audio src/core/n64_input src/core/n64_memory src/core/rsp src/core/r4300 src/core/r4300/ppc src/ui src/ui/libgui src/ui/fileBrowser src/platform/ps3 src/video/glN64
 DATA		:=	data
 SHADERS		:=	src/platform/ps3/shaders
 INCLUDES	:= . $(SOURCES)
@@ -43,7 +43,7 @@ CONTENTID	:= UP0001-WII64PS3N_00-0000000000000000
 ifdef DEBUG
 CFLAGS		= -O0 -g3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ \
-			-DDEBUG_POLYGONS -DSHOW_DEBUG \
+			-DDEBUG_POLYGONS -DSHOW_DEBUG -DDEBUG \
 			-include ../src/main/winlnxdefs.h \
 			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__
 else

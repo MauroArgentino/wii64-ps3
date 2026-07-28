@@ -17,7 +17,7 @@
 #include "F3DEX.h"
 #include "F3DEX2.h"
 #include "N64.h"
-#include "RSP.h"	
+#include "RSP.h"
 #include "RDP.h"
 #include "gSP.h"
 #include "gDP.h"
@@ -42,17 +42,19 @@ void F3DEX2_MoveMem( u32 w0, u32 w1 )
 			RSP.PC[RSP.PCi] += 8;
 			break;
 		case G_MV_LIGHT:
-			u32 offset = _SHIFTR( w0, 8, 8 ) << 3;
-
-			if (offset >= 48)
+		{
+			u32 offset = _SHIFTR( w0, 5, 11 ) & 0x7F8;
+			u32 n = offset / 24;
+			if (n < 2)
 			{
-				gSPLight( w1, (offset - 24) / 24);
+				// gSPLookAt would be needed here - not implemented
 			}
-/*			else
+			else
 			{
-				// Do lookat stuff
-			}*/
+				gSPLight( w1, n - 1 );
+			}
 			break;
+		}
 	}
 }
 
@@ -69,10 +71,15 @@ void F3DEX2_Reserved1( u32 w0, u32 w1 )
 
 void F3DEX2_Tri1( u32 w0, u32 w1 )
 {
-	gSP1Triangle( _SHIFTR( w0, 17, 7 ), 
-		          _SHIFTR( w0, 9, 7 ), 
-				  _SHIFTR( w0, 1, 7 ), 
+	gSP1Triangle( _SHIFTR( w0, 17, 7 ),
+	              _SHIFTR( w0, 9, 7 ),
+				  _SHIFTR( w0, 1, 7 ),
 				  0 );
+}
+
+void F3DEX2_Line3D( u32 w0, u32 w1 )
+{
+	// Not implemented
 }
 
 void F3DEX2_PopMtx( u32 w0, u32 w1 )
@@ -85,7 +92,10 @@ void F3DEX2_MoveWord( u32 w0, u32 w1 )
 	switch (_SHIFTR( w0, 16, 8 ))
 	{
 		case G_MW_FORCEMTX:
-			// Handled in movemem
+			if (w1 == 0)
+				gSP.changed |= CHANGED_MATRIX;
+			else
+				gSP.changed &= ~CHANGED_MATRIX;
 			break;
 		case G_MW_MATRIX:
 			gSPInsertMatrix( _SHIFTR( w0, 0, 16 ), w1 );
@@ -97,47 +107,13 @@ void F3DEX2_MoveWord( u32 w0, u32 w1 )
 			gSPClipRatio( w1 );
 			break;
 		case G_MW_SEGMENT:
-			gSPSegment( _SHIFTR( w0, 0, 16 ) >> 2, w1 & 0x00FFFFFF );
+			gSPSegment( _SHIFTR( w0, 2, 4 ), w1 & 0x00FFFFFF );
 			break;
 		case G_MW_FOG:
-/*			s16 fm, fo, min, max;
-
-			fm = _SHIFTR( w1, 16, 16 );
-			fo = _SHIFTR( w1, 0, 16 );
-
-			min = 500 - (fo * (128000 / fm)) / 256;
-			max = (128000 / fm) + min;*/
-
 			gSPFogFactor( (s16)_SHIFTR( w1, 16, 16 ), (s16)_SHIFTR( w1, 0, 16 ) );
 			break;
 		case G_MW_LIGHTCOL:
-			switch (_SHIFTR( w0, 0, 16 ))
-			{
-				case F3DEX2_MWO_aLIGHT_1:
-					gSPLightColor( LIGHT_1, w1 );
-					break;
-				case F3DEX2_MWO_aLIGHT_2:
-					gSPLightColor( LIGHT_2, w1 );
-					break;
-				case F3DEX2_MWO_aLIGHT_3:
-					gSPLightColor( LIGHT_3, w1 );
-					break;
-				case F3DEX2_MWO_aLIGHT_4:
-					gSPLightColor( LIGHT_4, w1 );
-					break;
-				case F3DEX2_MWO_aLIGHT_5:
-					gSPLightColor( LIGHT_5, w1 );
-					break;
-				case F3DEX2_MWO_aLIGHT_6:
-					gSPLightColor( LIGHT_6, w1 );
-					break;
-				case F3DEX2_MWO_aLIGHT_7:
-					gSPLightColor( LIGHT_7, w1 );
-					break;
-				case F3DEX2_MWO_aLIGHT_8:
-					gSPLightColor( LIGHT_8, w1 );
-					break;
-			}
+			gSPLightColor( (_SHIFTR( w0, 0, 16 ) / 24) + 1, w1 );
 			break;
 		case G_MW_PERSPNORM:
 			gSPPerspNormalize( w1 );
@@ -147,87 +123,37 @@ void F3DEX2_MoveWord( u32 w0, u32 w1 )
 
 void F3DEX2_Texture( u32 w0, u32 w1 )
 {
-	gSPTexture( _FIXED2FLOAT( _SHIFTR( w1, 16, 16 ), 16 ), 
-		        _FIXED2FLOAT( _SHIFTR( w1, 0, 16 ), 16 ), 
-		        _SHIFTR( w0, 11, 3 ), 
-				_SHIFTR( w0, 8, 3 ), 
+	gSPTexture( _FIXED2FLOAT( _SHIFTR( w1, 16, 16 ), 16 ),
+		        _FIXED2FLOAT( _SHIFTR( w1, 0, 16 ), 16 ),
+		        _SHIFTR( w0, 11, 3 ),
+				_SHIFTR( w0, 8, 3 ),
 				_SHIFTR( w0, 1, 7 ) );
 }
 
 void F3DEX2_SetOtherMode_H( u32 w0, u32 w1 )
 {
-	switch (32 - _SHIFTR( w0, 8, 8 ) - (_SHIFTR( w0, 0, 8 ) + 1))
-	{
-		case G_MDSFT_PIPELINE:
-			gDPPipelineMode( w1 >> G_MDSFT_PIPELINE );
-			break;
-		case G_MDSFT_CYCLETYPE:
-			gDPSetCycleType( w1 >> G_MDSFT_CYCLETYPE );
-			break;
-		case G_MDSFT_TEXTPERSP:
-			gDPSetTexturePersp( w1 >> G_MDSFT_TEXTPERSP );
-			break;
-		case G_MDSFT_TEXTDETAIL:
-			gDPSetTextureDetail( w1 >> G_MDSFT_TEXTDETAIL );
-			break;
-		case G_MDSFT_TEXTLOD:
-			gDPSetTextureLOD( w1 >> G_MDSFT_TEXTLOD );
-			break;
-		case G_MDSFT_TEXTLUT:
-			gDPSetTextureLUT( w1 >> G_MDSFT_TEXTLUT );
-			break;
-		case G_MDSFT_TEXTFILT:
-			gDPSetTextureFilter( w1 >> G_MDSFT_TEXTFILT );
-			break;
-		case G_MDSFT_TEXTCONV:
-			gDPSetTextureConvert( w1 >> G_MDSFT_TEXTCONV );
-			break;
-		case G_MDSFT_COMBKEY:
-			gDPSetCombineKey( w1 >> G_MDSFT_COMBKEY );
-			break;
-		case G_MDSFT_RGBDITHER:
-			gDPSetColorDither( w1 >> G_MDSFT_RGBDITHER );
-			break;
-		case G_MDSFT_ALPHADITHER:
-			gDPSetAlphaDither( w1 >> G_MDSFT_ALPHADITHER );
-			break;
-		default:
-			u32 length = _SHIFTR( w0, 0, 8 ) + 1;
-			u32 shift = 32 - _SHIFTR( w0, 8, 8 ) - length;
-			u32 mask = ((1 << length) - 1) << shift;
+	u32 length = _SHIFTR( w0, 0, 8 ) + 1;
+	s32 shift = 32 - _SHIFTR( w0, 8, 8 ) - length;
+	if (shift < 0) shift = 0;
+	u32 mask = ((1 << length) - 1) << shift;
 
-			gDP.otherMode.h &= ~mask;
-			gDP.otherMode.h |= w1 & mask;
+	gDP.otherMode.h &= ~mask;
+	gDP.otherMode.h |= w1 & mask;
 
-			gDP.changed |= CHANGED_CYCLETYPE;
-			break;
-	}
+	gDP.changed |= CHANGED_CYCLETYPE;
 }
 
 void F3DEX2_SetOtherMode_L( u32 w0, u32 w1 )
 {
-	switch (32 - _SHIFTR( w0, 8, 8 ) - (_SHIFTR( w0, 0, 8 ) + 1))
-	{
-		case G_MDSFT_ALPHACOMPARE:
-			gDPSetAlphaCompare( w1 >> G_MDSFT_ALPHACOMPARE );
-			break;
-		case G_MDSFT_ZSRCSEL:
-			gDPSetDepthSource( w1 >> G_MDSFT_ZSRCSEL );
-			break;
-		case G_MDSFT_RENDERMODE:
-			gDPSetRenderMode( w1 & 0xCCCCFFFF, w1 & 0x3333FFFF );
-			break;
-		default:
-			u32 length = _SHIFTR( w0, 0, 8 ) + 1;
-			u32 shift = 32 - _SHIFTR( w0, 8, 8 ) - length;
-			u32 mask = ((1 << length) - 1) << shift;
+	u32 length = _SHIFTR( w0, 0, 8 ) + 1;
+	s32 shift = 32 - _SHIFTR( w0, 8, 8 ) - length;
+	if (shift < 0) shift = 0;
+	u32 mask = ((1 << length) - 1) << shift;
 
-			gDP.otherMode.l &= ~mask;
-			gDP.otherMode.l |= w1 & mask;
+	gDP.otherMode.l &= ~mask;
+	gDP.otherMode.l |= w1 & mask;
 
-			gDP.changed |= CHANGED_RENDERMODE | CHANGED_ALPHACOMPARE;
-			break;
-	}
+	gDP.changed |= CHANGED_RENDERMODE | CHANGED_ALPHACOMPARE;
 }
 
 void F3DEX2_GeometryMode( u32 w0, u32 w1 )
@@ -237,10 +163,19 @@ void F3DEX2_GeometryMode( u32 w0, u32 w1 )
 
 void F3DEX2_DMAIO( u32 w0, u32 w1 )
 {
+	gSP.DMAIO_address = RSP_SegmentToPhysical( w1 );
 }
 
 void F3DEX2_Special_1( u32 w0, u32 w1 )
 {
+	u32 param = _SHIFTR( w0, 0, 8 );
+	gSPDlistCount( param, w1 );
+}
+
+void gSPDlistCount( u32 param, u32 w1 )
+{
+	// Stub for F3DEX2 - display list counting
+	(void)param; (void)w1;
 }
 
 void F3DEX2_Special_2( u32 w0, u32 w1 )
@@ -253,13 +188,13 @@ void F3DEX2_Special_3( u32 w0, u32 w1 )
 
 void F3DEX2_Quad( u32 w0, u32 w1 )
 {
-	gSP2Triangles( _SHIFTR( w0, 17, 7 ), 
-		           _SHIFTR( w0, 9, 7 ), 
-				   _SHIFTR( w0, 1, 7 ), 
+	gSP2Triangles( _SHIFTR( w0, 17, 7 ),
+	               _SHIFTR( w0, 9, 7 ),
+				   _SHIFTR( w0, 1, 7 ),
 				   0,
-				   _SHIFTR( w1, 17, 7 ), 
-		           _SHIFTR( w1, 9, 7 ), 
-				   _SHIFTR( w1, 1, 7 ), 
+				   _SHIFTR( w1, 17, 7 ),
+	               _SHIFTR( w1, 9, 7 ),
+				   _SHIFTR( w1, 1, 7 ),
 				   0 );
 }
 
@@ -297,6 +232,5 @@ void F3DEX2_Init()
 	GBI_SetGBI( G_TRI1,					F3DEX2_TRI1,				F3DEX2_Tri1 );
 	GBI_SetGBI( G_TRI2,					F3DEX2_TRI2,				F3DEX_Tri2 );
 	GBI_SetGBI( G_QUAD,					F3DEX2_QUAD,				F3DEX2_Quad );
-//	GBI_SetGBI( G_LINE3D,				F3DEX2_LINE3D,				F3DEX2_Line3D );
+	GBI_SetGBI( G_LINE3D,				F3DEX2_LINE3D,				F3DEX2_Line3D );
 }
-

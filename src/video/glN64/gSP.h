@@ -94,12 +94,14 @@ struct gSPInfo
 		u32 address, width, height, format, size, palette;
 	} bgImage;
 
-	u32 geometryMode;
+u32 geometryMode;
 	s32 numLights;
 
 	u32 changed;
 
 	u32 status[4];
+
+	u32 DMAIO_address;
 
 	struct
 	{
@@ -116,7 +118,7 @@ void gSPDMAMatrix( u32 matrix, u8 index, u8 multiply );
 void gSPViewport( u32 v );
 void gSPForceMatrix( u32 mptr );
 void gSPLight( u32 l, s32 n );
-void gSPLookAt( u32 l );
+void gSPLookAt( u32 l, s32 n );
 void gSPVertex( u32 v, u32 n, u32 v0 );
 void gSPCIVertex( u32 v, u32 n, u32 v0 );
 void gSPDMAVertex( u32 v, u32 n, u32 v0 );
@@ -163,5 +165,10 @@ void gSPObjMatrix( u32 mtx );
 void gSPObjSubMatrix( u32 mtx );
 void gSPSetDMAOffsets( u32 mtxoffset, u32 vtxoffset );
 void gSPSetVertexColorBase( u32 base );
+void gSPDlistCount( u32 param, u32 w1 );
+void gSPCameraWorld( u32 addr );
+void gSPBranchLessW( u32 half1, u32 vtx, u32 wval );
+void gDPMemset( u32 value, u32 addr, u32 len );
+void gSPRelSegment( s32 seg, s32 base );
 #endif
 

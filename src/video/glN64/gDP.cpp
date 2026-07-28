@@ -17,6 +17,7 @@
 #endif // __GX__
 
 #ifdef PS3
+#include <stdio.h>
 #include <string.h>
 #endif // PS3
 
@@ -800,6 +801,9 @@ void gDPLoadTLUT( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 
 	u16 pal = (gDP.tiles[tile].tmem - 256) >> 4;
 
+	printf("[TLUT] Load: tile=%d tmem=0x%03X palette_field=%d pal_idx=%d count=%d fmt=%d size=%d\n",
+		tile, gDP.tiles[tile].tmem, gDP.tiles[tile].palette, pal, count, gDP.tiles[tile].format, gDP.tiles[tile].size);
+
 	int i = 0;
 	while (i < count)
 	{
@@ -828,10 +832,18 @@ void gDPLoadTLUT( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 
 	gDP.changed |= CHANGED_TMEM;
 
-#ifdef DEBUG
+	#ifdef DEBUG
+	{
+		static u32 tlutLogCount = 0;
+		if (tlutLogCount < 30) {
+			printf("[TLUT] tile=%d tmem=0x%03X count=%d palCRC=0x%08X\n",
+				tile, gDP.tiles[tile].tmem, count, gDP.paletteCRC256);
+			tlutLogCount++;
+		}
+	}
 	DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_TEXTURE, "gDPLoadTLUT( %i, %i, %i, %i, %i );\n",
 		tile, gDP.tiles[tile].uls, gDP.tiles[tile].ult, gDP.tiles[tile].lrs, gDP.tiles[tile].lrt );
-#endif
+	#endif
 }
 
 void gDPSetScissor( u32 mode, f32 ulx, f32 uly, f32 lrx, f32 lry )

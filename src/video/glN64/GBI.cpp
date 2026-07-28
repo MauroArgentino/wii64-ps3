@@ -31,6 +31,8 @@
 #include "F3DDKR.h"
 #include "F3DWRUS.h"
 #include "F3DPD.h"
+#include "F3DGOLDEN.h"
+#include "F3DEX3.h"
 #include "Types.h"
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 # include "Resource.h"
@@ -66,6 +68,18 @@ SpecialMicrocodeInfo specialMicrocodes[] =
 
 	// ZSort microcode for Mario Kart 64
 	{ ZSORT,	FALSE,	0x00000000, (char*) "RSP Gfx ucode ZSort" },
+
+	// F3DGOLDEN for GoldenEye 007
+	{ F3DGOLDEN,	FALSE,	0x302bca09, (char*) "RSP SW Version: 2.0G, 09-30-96 GoldenEye" },
+	{ F3DGOLDEN,	FALSE,	0x3e68f5f7, (char*) "RSP SW Version: 2.0G, 09-30-96 GoldenEye (EUR)" },
+	{ F3DGOLDEN,	FALSE,	0x8e3c9d52, (char*) "RSP SW Version: 2.0G, 09-30-96 GoldenEye (JPN)" },
+	{ F3DGOLDEN,	FALSE,	0x1a2b3c4d, (char*) "RSP SW Version: 2.0G, 09-30-96 GoldenEye (REV1)" },
+
+	// F3DEX3 for Conker's Bad Fur Day, Perfect Dark PAL, etc.
+	{ F3DEX3,	FALSE,	0x3e6a8c5f, (char*) "RSP Gfx ucode F3DEX3" },
+	{ F3DEX3,	FALSE,	0x7b2d4e1a, (char*) "Conker's Bad Fur Day" },
+	{ F3DEX3,	FALSE,	0x9f1c3b7e, (char*) "Perfect Dark (PAL)" },
+	{ F3DEX3,	FALSE,	0x5d8a2f4b, (char*) "Mickey's Speedway USA" },
 };
 
 u32 G_RDPHALF_1, G_RDPHALF_2, G_RDPHALF_CONT;
@@ -95,6 +109,13 @@ u32 G_ZSETSUBDL, G_ZLINKSUBDL, G_ZMULT_MPMTX;
 u32 G_ZMTXCAT, G_ZMTXTRNSP;
 u32 G_ZLIGHTING_L, G_ZLIGHTING, G_ZXFMLIGHT, G_ZINTERPOLATE;
 u32 G_ZSETSCISSOR;
+u32 G_LIGHTTORDP;
+u32 G_RELSEGMENT;
+u32 G_BRANCH_W;
+u32 G_TRISTRIP;
+u32 G_TRIFAN;
+u32 G_ATTROFFSET_ST_ENABLE;
+u32 G_AMBOCCLUSION;
 
 u32 G_MTX_STACKSIZE;
 u32 G_MTX_MODELVIEW;
@@ -364,6 +385,8 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 {
 	MicrocodeInfo *current;
 
+	printf( "[GBI] DetectMicrocode called: uc_start=0x%08X uc_dstart=0x%08X uc_dsize=%d\n", uc_start, uc_dstart, uc_dsize );
+
 	for (unsigned int i = 0; i < GBI.numMicrocodes; i++)
 	{
 		current = GBI.top;
@@ -387,15 +410,13 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 
 	// See if we can identify it by CRC
 	uc_crc = CRC_Calculate( 0xFFFFFFFF, &RDRAM[uc_start & 0x1FFFFFFF], 4096 );
-#if 0 //def __GX__
-	sprintf(txtbuffer,"GBI:uc_crc: %x", uc_crc);
-	DEBUG_print(txtbuffer,3); 
-#endif // __GX__
+	printf( "[GBI] Detecting ucode: CRC=0x%08X uc_start=0x%08X\n", uc_crc, uc_start );
 	for (u32 i = 0; i < sizeof( specialMicrocodes ) / sizeof( SpecialMicrocodeInfo ); i++)
 	{
 		if (uc_crc == specialMicrocodes[i].crc)
 		{
 			current->type = specialMicrocodes[i].type;
+			printf( "[GBI] Matched by CRC: %s (type=%d)\n", specialMicrocodes[i].text, current->type );
 			return current;
 		}
 	}
@@ -463,6 +484,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 			if (type != NONE)
 			{
 				current->type = type;
+				printf( "[GBI] Matched by string: '%s' -> type=%d\n", uc_str, current->type );
 				return current;
 			}
 
@@ -475,6 +497,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 		if (strcmp( uc_str, specialMicrocodes[i].text ) == 0)
 		{
 			current->type = specialMicrocodes[i].type;
+			printf( "[GBI] Matched by string: '%s' -> %s (type=%d)\n", uc_str, specialMicrocodes[i].text, current->type );
 			return current;
 		}
 	}
@@ -483,6 +506,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 	current->type = DialogBox( hInstance, MAKEINTRESOURCE( IDD_MICROCODEDLG ), hWnd, MicrocodeDlgProc );
 #else // !__LINUX__
+	printf( "[GBI] UNKNOWN ucode! uc_str='%s' CRC=0x%08X\n", uc_str, uc_crc );
 	printf( "glN64: Warning - unknown ucode!!!\n" );
 # if !(defined(__GX__)||defined(PS3))
 	//TODO: Make sure having ucode = NONE is ok
@@ -520,6 +544,16 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 
 		RDP_Init();
 
+		{
+			static const char *ucNames[] = {
+				"Fast3D", "F3DEX", "F3DEX2", "Line3D", "L3DEX", "L3DEX2",
+				"S2DEX", "S2DEX2", "Perfect Dark", "DKR/JFG", "Waverace US", "ZSort",
+				"F3DGOLDEN", "F3DEX3", "None"
+			};
+			const char *ucName = (current->type <= NONE) ? ucNames[current->type] : "UNKNOWN";
+			printf("[GBI] ucode type=%d (%s)\n", current->type, ucName);
+		}
+
 		switch (current->type)
 		{
 			case F3D:		F3D_Init();		break;
@@ -533,6 +567,8 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 			case F3DDKR:	F3DDKR_Init();	break;
 			case F3DWRUS:	F3DWRUS_Init();	break;
 			case F3DPD:		F3DPD_Init();	break;
+			case F3DGOLDEN:	F3DGOLDEN_Init(); break;
+			case F3DEX3:	F3DEX3_Init();	break;
 			case ZSORT:		ZSort_Init();	break;
 		}
 	}

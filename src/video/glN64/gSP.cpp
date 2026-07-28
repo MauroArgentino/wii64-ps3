@@ -548,8 +548,9 @@ void gSPLight( u32 l, s32 n )
 #endif
 }
 
-void gSPLookAt( u32 l )
+void gSPLookAt( u32 l, s32 n )
 {
+	(void)l; (void)n;
 }
 
 void gSPVertex( u32 v, u32 n, u32 v0 )
@@ -2093,4 +2094,24 @@ void gSPObjMatrix( u32 mtx )
 
 void gSPObjSubMatrix( u32 mtx )
 {
+}
+
+void gSPCameraWorld( u32 addr )
+{
+	(void)addr;
+}
+
+void gSPBranchLessW( u32 half1, u32 vtx, u32 wval )
+{
+	(void)half1; (void)vtx; (void)wval;
+}
+
+void gDPMemset( u32 value, u32 addr, u32 len )
+{
+	(void)value; (void)addr; (void)len;
+}
+
+void gSPRelSegment( s32 seg, s32 base )
+{
+	(void)seg; (void)base;
 }

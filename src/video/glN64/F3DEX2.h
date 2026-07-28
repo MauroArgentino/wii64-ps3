@@ -71,8 +71,8 @@
 #define	F3DEX2_BRANCH_Z			0x04
 #define	F3DEX2_TRI1				0x05
 #define F3DEX2_TRI2				0x06
-#define F3DEX2_QUAD				0x07
-//#define F3DEX2_LINE3D			0x08
+#define	F3DEX2_QUAD				0x07
+#define F3DEX2_LINE3D			0x08
 
 
 void F3DEX2_Mtx( u32 w0, u32 w1 );
@@ -86,7 +86,7 @@ void F3DEX2_Texture( u32 w0, u32 w1 );
 void F3DEX2_SetOtherMode_H( u32 w0, u32 w1 );
 void F3DEX2_SetOtherMode_L( u32 w0, u32 w1 );
 void F3DEX2_GeometryMode( u32 w0, u32 w1 );
-//void F3DEX2_Line3D( u32 w0, u32 w1 );
+void F3DEX2_Line3D( u32 w0, u32 w1 );
 void F3DEX2_DMAIO( u32 w0, u32 w1 );
 void F3DEX2_Special_1( u32 w0, u32 w1 );
 void F3DEX2_Special_2( u32 w0, u32 w1 );

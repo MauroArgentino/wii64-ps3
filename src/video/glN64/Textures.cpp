@@ -22,6 +22,8 @@
 #include "../../main/GameHackManager.h"
 extern GameHackManager *g_game_hack_mgr;
 
+static int texDebugCount = 0;
+
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 # include <windows.h>
 #else
@@ -798,7 +800,6 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
 	#ifdef DEBUG
 	// DEBUG: Log texture format for invisible faces investigation
-	static int texDebugCount = 0;
 	if (texDebugCount < 50) {
 		printf("TEX: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d\n",
 			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
@@ -1206,12 +1207,27 @@ void TextureCache_Load( CachedTexture *texInfo )
 GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
 	#ifdef DEBUG
-	// DEBUG: Log texture format for invisible faces investigation
-	if (texDebugCount < 50) {
-		printf("TEX: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d\n",
-			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
-			texInfo->realWidth, texInfo->realHeight);
-		texDebugCount++;
+	{
+		/* Log every texture load: format, size, palette, tmem, dimensions */
+		static u32 texLogCount = 0;
+		const char *fmtName = (texInfo->format <= 4) ? ImageFormatText[texInfo->format] : "???";
+		const char *szName = (texInfo->size <= 3) ? ImageSizeText[texInfo->size] : "???";
+
+		if (GetTexel == GetNone) {
+			/* CRITICAL: This texture format is not handled - will render as black */
+			printf("[TEX] UNHANDLED: fmt=%s size=%s lut=%d tmem=0x%03X pal=%d w=%d h=%d line=%d\n",
+				fmtName, szName, gDP.otherMode.textureLUT,
+				texInfo->tMem, texInfo->palette,
+				texInfo->realWidth, texInfo->realHeight, texInfo->line);
+		}
+		else if (texLogCount < 100) {
+			printf("[TEX] load #%d: fmt=%s size=%s lut=%d tmem=0x%03X pal=%d w=%d h=%d line=%d addr=0x%08X\n",
+				texLogCount, fmtName, szName, gDP.otherMode.textureLUT,
+				texInfo->tMem, texInfo->palette,
+				texInfo->realWidth, texInfo->realHeight, texInfo->line,
+				texInfo->address);
+			texLogCount++;
+		}
 	}
 	#endif
 	glInternalFormat = GL_RGBA8;
@@ -1503,28 +1519,110 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 
 	} 	//	cache.enable2xSaI
 #else // __GX__
-	j = 0;
-	for (y = 0; y < texInfo->realHeight; y++)
+#if 0 /* DISABLED for testing - 32-bit interleaved read may cause green squares on title screens */
+	if (texInfo->size == G_IM_SIZ_32b)
 	{
-		ty = min(y, clampTClamp) & maskTMask;
+		/* 32-bit textures use interleaved TMEM layout.
+		 * GL reference: _getTextureDestData() lines 1311-1346.
+		 * GR (lower 16 bits) and AB (upper 16 bits) are stored in
+		 * separate halves of TMEM (offset 0x400 u16 apart).
+		 * The address within each half is XORed with (ty&1)?3:1
+		 * to handle line interleaving.  No swapword needed on
+		 * big-endian PS3. */
+		const u16 *tmem16 = (const u16 *)&TMEM[texInfo->tMem];
+		u32 tbase = texInfo->tMem << 2;
+		u32 wid_64 = texInfo->clampWidth << 2;
+		u32 line32, taddr, tline, xorval;
+		u16 gr, ab;
 
-		if (y & mirrorTBit)
-			ty ^= maskTMask;
+		if (wid_64 & 15)
+			wid_64 += 16;
+		wid_64 &= 0xFFFFFFF0;
+		wid_64 >>= 3;
 
-		src = &TMEM[texInfo->tMem] + line * ty;
-
-		i = (ty & 1) << 1;
-		for (x = 0; x < texInfo->realWidth; x++)
+		line32 = texInfo->line << 1;
+		line32 = (line32 - wid_64) << 3;
+		if (wid_64 < 1)
+			wid_64 = 1;
 		{
-			tx = min(x, clampSClamp) & maskSMask;
+			u32 w = wid_64 << 1;
+			line32 = w + (line32 >> 2);
+		}
 
-			if (x & mirrorSBit)
-				tx ^= maskSMask;
+		j = 0;
+		for (y = 0; y < texInfo->realHeight; y++)
+		{
+			ty = min(y, clampTClamp) & maskTMask;
+			if (y & mirrorTBit)
+				ty ^= maskTMask;
 
-			if (glInternalFormat == GL_RGBA8)
-				((u32*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
-			else
-				((u16*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
+			tline = tbase + line32 * ty;
+			xorval = (ty & 1) ? 3 : 1;
+
+			for (x = 0; x < texInfo->realWidth; x++)
+			{
+				tx = min(x, clampSClamp) & maskSMask;
+				if (x & mirrorSBit)
+					tx ^= maskSMask;
+
+				taddr = ((tline + tx) ^ xorval) & 0x3ff;
+				gr = tmem16[taddr];
+				ab = tmem16[taddr | 0x400];
+				((u32*)dest)[j++] = (ab << 16) | gr;
+			}
+		}
+	}
+	else
+#endif /* 0 */
+	if (texInfo->format == G_IM_FMT_YUV)
+	{
+		/* YUV textures: read YUV pairs and convert to RGBA.
+		 * GL reference: _getTextureDestData() lines 1347-1356.
+		 * Each 32-bit word contains y1,v,y0,u — produces 2 pixels. */
+		u32 t16line;
+
+		j = 0;
+		t16line = line << 1;
+		for (y = 0; y < texInfo->realHeight; y++)
+		{
+			src = &TMEM[texInfo->tMem] + t16line * y;
+			for (x = 0; x < texInfo->realWidth / 2; x++)
+			{
+				u32 t = ((u32 *)src)[x];
+				u8 y1 = (u8)(t & 0xFF);
+				u8 v  = (u8)((t >> 8) & 0xFF);
+				u8 y0 = (u8)((t >> 16) & 0xFF);
+				u8 u  = (u8)((t >> 24) & 0xFF);
+				((u32*)dest)[j++] = 0xFF000000 | (y0 << 16) | (v << 8) | u;
+				((u32*)dest)[j++] = 0xFF000000 | (y1 << 16) | (v << 8) | u;
+			}
+		}
+	}
+	else
+	{
+		j = 0;
+		for (y = 0; y < texInfo->realHeight; y++)
+		{
+			ty = min(y, clampTClamp) & maskTMask;
+
+			if (y & mirrorTBit)
+				ty ^= maskTMask;
+
+			src = &TMEM[texInfo->tMem] + line * ty;
+
+			i = (ty & 1) << 1;
+			for (x = 0; x < texInfo->realWidth; x++)
+			{
+				tx = min(x, clampSClamp) & maskSMask;
+
+				if (x & mirrorSBit)
+					tx ^= maskSMask;
+
+				if (glInternalFormat == GL_RGBA8)
+					((u32*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
+				else
+					((u16*)dest)[j++] = GetTexel( src, tx, i, texInfo->palette );
+			}
 		}
 	}
 #endif // !__GX__
@@ -1982,6 +2080,10 @@ void TextureCache_Update( u32 t )
 		FrameBuffer_ActivateBufferTexture( t, gDP.loadTile->frameBuffer );
 		return;
 	}*/
+
+	/* MK64 height hack: force even texture height (GLideN64 hack_MK64) */
+	if (gameHacks.mk64HeightHack && (height % 2) != 0)
+		height--;
 
  	clampWidth = gSP.textureTile[t]->clamps ? tileWidth : width;
 	clampHeight = gSP.textureTile[t]->clampt ? tileHeight : height;

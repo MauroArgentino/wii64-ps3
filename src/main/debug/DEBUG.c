@@ -30,13 +30,8 @@ extern unsigned int diff_sec(long long start,long long end);
 #endif //__GX__
 
 #ifdef PS3
-#define TB_BUS_CLOCK				(lv2syscall0(147))					//1.6ghz
-#define TB_TIMER_CLOCK				(TB_BUS_CLOCK/4000)			//4th of the bus frequency
-
-extern u32 gettick();
-
-#define ticks_to_microsecs(ticks)	((((u64)(ticks)*8)/(u64)(TB_TIMER_CLOCK/125)))
-#define diff_sec(start,end)			((u32)((ticks_to_microsecs(end)-ticks_to_microsecs(start))/1000000))
+#include <lv2/systime.h>
+#define diff_sec(start,end) ((u32)(((end)-(start))/1000000000LL))
 #endif // PS3
 
 static void check_heap_space(void){
@@ -49,7 +44,7 @@ static void check_heap_space(void){
 void DEBUG_update() {
 	int i;
 #ifdef PS3
-	long long nowTick = gettick();
+	long long nowTick = sysGetSystemTime();
 #else
 	long long nowTick = gettime();
 #endif
@@ -109,7 +104,7 @@ void DEBUG_print(char* string,int pos){
 #ifdef __GX__
 			texttimes[pos] = gettime();
 #else
-			texttimes[pos] = gettick();
+			texttimes[pos] = sysGetSystemTime();
 #endif
 		}
 }

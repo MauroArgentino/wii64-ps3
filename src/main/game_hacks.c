@@ -313,6 +313,11 @@ void GameHacks_Detect(void)
 	curCRC[0] = ROM_HEADER->CRC1;
 	curCRC[1] = ROM_HEADER->CRC2;
 
+	/* MK64: force even texture height to fix shadow/particle rendering */
+	if (strncmp((char *)ROM_HEADER->nom, "MARIOKART64", 11) == 0) {
+		gameHacks.mk64HeightHack = 1;
+	}
+
 	/* Pokemon Snap (U) */
 	if (curCRC[0] == 0xCA12B547 && curCRC[1] == 0x71FA4EE4) {
 		hack_pkm_snap_u();

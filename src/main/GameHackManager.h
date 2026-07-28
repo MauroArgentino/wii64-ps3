@@ -26,6 +26,7 @@ typedef struct {
     uint8_t internalHeight;      // Internal 3D render height (default 480)
     uint16_t displayWidth;       // Display width (1920 for 1080p)
     uint16_t displayHeight;      // Display height (1080 for 1080p)
+    uint8_t mk64HeightHack;     // Force even texture height for MK64
 } GameHacks;
 
 /* Opaque manager handle */

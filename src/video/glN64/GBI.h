@@ -24,7 +24,9 @@
 #define F3DDKR		9
 #define F3DWRUS	    10
 #define ZSORT		11
-#define NONE		12
+#define F3DGOLDEN	12
+#define F3DEX3		13
+#define NONE		14
 
 
 
@@ -43,13 +45,15 @@ const char *MicrocodeTypes[] =
 	"DKR/JFG",
 	"Waverace US",
 	"ZSort",
+	"F3DGOLDEN",
+	"F3DEX3",
 	"None"
 };
 #else
 extern const char *MicrocodeTypes[];
 #endif
 
-static const int numMicrocodeTypes = 12;
+static const int numMicrocodeTypes = 15;
 
 
 // Fixed point conversion factors
@@ -634,6 +638,7 @@ extern u32 G_RDPHALF_1, G_RDPHALF_2, G_RDPHALF_CONT;
 extern u32 G_SPNOOP;
 extern u32 G_SETOTHERMODE_H, G_SETOTHERMODE_L;
 extern u32 G_DL, G_ENDDL, G_CULLDL, G_BRANCH_Z;
+extern u32 G_BRANCH_W;
 extern u32 G_LOAD_UCODE;
 extern u32 G_MOVEMEM, G_MOVEWORD;
 extern u32 G_MTX, G_POPMTX;
@@ -643,6 +648,7 @@ extern u32 G_DMA_IO, G_DMA_DL, G_DMA_TRI, G_DMA_MTX, G_DMA_VTX, G_DMA_OFFSETS;
 extern u32 G_SPECIAL_1, G_SPECIAL_2, G_SPECIAL_3;
 extern u32 G_VTX, G_MODIFYVTX, G_VTXCOLORBASE;
 extern u32 G_TRI1, G_TRI2, G_TRI4;
+extern u32 G_TRISTRIP, G_TRIFAN;
 extern u32 G_QUAD, G_LINE3D;
 extern u32 G_RESERVED0, G_RESERVED1, G_RESERVED2, G_RESERVED3;
 extern u32 G_SPRITE2D_BASE;
@@ -657,6 +663,10 @@ extern u32 G_ZSETSUBDL, G_ZLINKSUBDL, G_ZMULT_MPMTX;
 extern u32 G_ZMTXCAT, G_ZMTXTRNSP;
 extern u32 G_ZLIGHTING_L, G_ZLIGHTING, G_ZXFMLIGHT, G_ZINTERPOLATE;
 extern u32 G_ZSETSCISSOR;
+extern u32 G_LIGHTTORDP;
+extern u32 G_RELSEGMENT;
+extern u32 G_ATTROFFSET_ST_ENABLE;
+extern u32 G_AMBOCCLUSION;
 
 #define LIGHT_1	1
 #define LIGHT_2	2
