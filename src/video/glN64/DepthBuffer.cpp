@@ -1,25 +1,32 @@
-/**
- * glN64_GX - DepthBuffer.cpp
- * Copyright (C) 2003 Orkin
- *
- * glN64 homepage: http://gln64.emulation64.com
- * Wii64 homepage: http://www.emulatemii.com
- *
-**/
-
 #ifdef PS3
 #include "../../main/winlnxdefs.h"
 #undef NULL
 #define NULL 0
 #elif defined(__GX__)
 #include <gccore.h>
-#endif // __GX__
+#endif
 
 #include <malloc.h>
 #include "DepthBuffer.h"
 #include "Types.h"
+#include "gSP.h"
+#include "gDP.h"
 
 DepthBufferInfo depthBuffer;
+
+static void _buildZlut()
+{
+	for (u32 i = 0; i < 0x40000; i++) {
+		u32 exponent = 0;
+		u32 testbit = 1 << 17;
+		while ((i & testbit) != 0u && exponent < 7) {
+			exponent++;
+			testbit = 1 << (17 - exponent);
+		}
+		u32 mantissa = (i >> (6 - (6 < exponent ? 6 : exponent))) & 0x7ff;
+		depthBuffer.zLUT[i] = (u16)(((exponent << 11) | mantissa) << 2);
+	}
+}
 
 void DepthBuffer_Init()
 {
@@ -27,6 +34,9 @@ void DepthBuffer_Init()
 	depthBuffer.top = NULL;
 	depthBuffer.bottom = NULL;
 	depthBuffer.numBuffers = 0;
+	depthBuffer.zLUT = (u16*)malloc(0x40000 * sizeof(u16));
+	if (depthBuffer.zLUT != NULL)
+		_buildZlut();
 }
 
 void DepthBuffer_RemoveBottom()
@@ -36,20 +46,19 @@ void DepthBuffer_RemoveBottom()
 	if (depthBuffer.bottom == depthBuffer.top)
 		depthBuffer.top = NULL;
 
-	free( depthBuffer.bottom );
+	free(depthBuffer.bottom);
 
-    depthBuffer.bottom = newBottom;
-	
+	depthBuffer.bottom = newBottom;
+
 	if (depthBuffer.bottom != NULL)
 		depthBuffer.bottom->lower = NULL;
 
 	depthBuffer.numBuffers--;
 }
 
-void DepthBuffer_Remove( DepthBuffer *buffer )
+void DepthBuffer_Remove(DepthBuffer *buffer)
 {
-	if ((buffer == depthBuffer.bottom) &&
-		(buffer == depthBuffer.top))
+	if (buffer == depthBuffer.bottom && buffer == depthBuffer.top)
 	{
 		depthBuffer.top = NULL;
 		depthBuffer.bottom = NULL;
@@ -74,12 +83,12 @@ void DepthBuffer_Remove( DepthBuffer *buffer )
 		buffer->lower->higher = buffer->higher;
 	}
 
-	free( buffer );
+	free(buffer);
 
 	depthBuffer.numBuffers--;
 }
 
-void DepthBuffer_RemoveBuffer( u32 address )
+void DepthBuffer_RemoveBuffer(u32 address)
 {
 	DepthBuffer *current = depthBuffer.bottom;
 
@@ -87,7 +96,7 @@ void DepthBuffer_RemoveBuffer( u32 address )
 	{
 		if (current->address == address)
 		{
-			DepthBuffer_Remove( current );
+			DepthBuffer_Remove(current);
 			return;
 		}
 		current = current->higher;
@@ -96,10 +105,11 @@ void DepthBuffer_RemoveBuffer( u32 address )
 
 DepthBuffer *DepthBuffer_AddTop()
 {
-	DepthBuffer *newtop = (DepthBuffer*)malloc( sizeof( DepthBuffer ) );
+	DepthBuffer *newtop = (DepthBuffer*)malloc(sizeof(DepthBuffer));
 
 	newtop->lower = depthBuffer.top;
 	newtop->higher = NULL;
+	newtop->width = 0;
 
 	if (depthBuffer.top)
 		depthBuffer.top->higher = newtop;
@@ -107,14 +117,14 @@ DepthBuffer *DepthBuffer_AddTop()
 	if (!depthBuffer.bottom)
 		depthBuffer.bottom = newtop;
 
-    depthBuffer.top = newtop;
+	depthBuffer.top = newtop;
 
 	depthBuffer.numBuffers++;
 
 	return newtop;
 }
 
-void DepthBuffer_MoveToTop( DepthBuffer *newtop )
+void DepthBuffer_MoveToTop(DepthBuffer *newtop)
 {
 	if (newtop == depthBuffer.top)
 		return;
@@ -140,20 +150,23 @@ void DepthBuffer_Destroy()
 {
 	while (depthBuffer.bottom)
 		DepthBuffer_RemoveBottom();
-
 	depthBuffer.top = NULL;
+
+	if (depthBuffer.zLUT != NULL) {
+		free(depthBuffer.zLUT);
+		depthBuffer.zLUT = NULL;
+	}
 }
 
-void DepthBuffer_SetBuffer( u32 address )
+void DepthBuffer_SetBuffer(u32 address)
 {
 	DepthBuffer *current = depthBuffer.top;
 
-	// Search through saved depth buffers
 	while (current != NULL)
 	{
 		if (current->address == address)
 		{
-			DepthBuffer_MoveToTop( current );
+			DepthBuffer_MoveToTop(current);
 			depthBuffer.current = current;
 			return;
 		}
@@ -164,11 +177,12 @@ void DepthBuffer_SetBuffer( u32 address )
 
 	current->address = address;
 	current->cleared = TRUE;
+	current->width = gDP.colorImage.width;
 
 	depthBuffer.current = current;
 }
 
-DepthBuffer *DepthBuffer_FindBuffer( u32 address )
+DepthBuffer *DepthBuffer_FindBuffer(u32 address)
 {
 	DepthBuffer *current = depthBuffer.top;
 
@@ -180,4 +194,13 @@ DepthBuffer *DepthBuffer_FindBuffer( u32 address )
 	}
 
 	return NULL;
+}
+
+void DepthBuffer_Clear()
+{
+	if (depthBuffer.current != NULL)
+		depthBuffer.current->cleared = TRUE;
+
+	for (DepthBuffer *buf = depthBuffer.bottom; buf != NULL; buf = buf->higher)
+		buf->cleared = TRUE;
 }
