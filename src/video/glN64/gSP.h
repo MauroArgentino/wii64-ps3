@@ -92,6 +92,8 @@ struct gSPInfo
 	struct
 	{
 		u32 address, width, height, format, size, palette;
+		f32 imageX, imageY;
+		f32 scaleW, scaleH;
 	} bgImage;
 
 u32 geometryMode;
@@ -100,6 +102,15 @@ u32 geometryMode;
 	u32 changed;
 
 	u32 status[4];
+
+	u32 objRendermode;
+
+	struct
+	{
+		u32 addr;
+		u8 sid;
+		u32 flag;
+	} selectDL;
 
 	u32 DMAIO_address;
 
@@ -170,5 +181,7 @@ void gSPCameraWorld( u32 addr );
 void gSPBranchLessW( u32 half1, u32 vtx, u32 wval );
 void gDPMemset( u32 value, u32 addr, u32 len );
 void gSPRelSegment( s32 seg, s32 base );
+void gSPSetStatus( u32 sid, u32 val );
+void RDP_TexRect( u32 w0, u32 w1 );
 #endif
 

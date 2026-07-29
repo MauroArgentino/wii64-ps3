@@ -156,6 +156,7 @@ static const int numMicrocodeTypes = 15;
 #define G_MW_FORCEMTX		0x0C
 #define G_MW_POINTS			0x0C
 #define	G_MW_PERSPNORM		0x0E
+#define G_MW_GENSTAT		0x10
 
 #define G_MWO_NUMLIGHT		0x00
 #define G_MWO_CLIP_RNX		0x04
@@ -262,6 +263,8 @@ extern u32 G_MWO_aLIGHT_8, G_MWO_bLIGHT_8;
 
 #define G_TX_MIRROR		0x1
 #define G_TX_CLAMP		0x2
+#define G_TX_NOMIRROR	0x0
+#define G_TX_WRAP		0x3
 
 #ifdef DEBUG
 static const char *ImageFormatText[] =

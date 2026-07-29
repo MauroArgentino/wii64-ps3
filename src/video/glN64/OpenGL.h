@@ -71,6 +71,7 @@ struct GLVertex
 		float r, g, b, a;
 	} color, secondaryColor;
 	float s0, t0, s1, t1;
+	float s, t;  // S2DEX needs these
 	float fog;
 #ifdef __GX__
 	float zPrime;

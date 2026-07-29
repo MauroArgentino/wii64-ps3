@@ -1,4 +1,5 @@
 export PS3SDK=c:/PSDK3v2
+export GCC_COLORS='locus=01;35:error=01;31:warning=01;33'
 export PATH := $(PS3SDK)/mingw/msys/1.0/bin:$(PS3SDK)/mingw/bin:$(PS3SDK)/ps3dev/bin:$(PS3SDK)/ps3dev/ppu/bin:$(PS3SDK)/ps3dev/spu/bin:$(PATH)
 #export PSL1GHT=J:/PS3/PSDK3v2/psl1ght
 #export PS3DEV=j:/PS3/PSDK3v2/ps3dev
