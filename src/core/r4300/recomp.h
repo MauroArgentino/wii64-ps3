@@ -33,6 +33,8 @@
 
 typedef struct _precomp_instr
 {
+   void (*ops)(void);
+   u32 addr;
    union
      {
 	struct

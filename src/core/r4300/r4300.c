@@ -35,6 +35,7 @@
 #include "interrupt.h"
 #include "macros.h"
 #include "recomp.h"
+#include "wii64_cached_interp.h"
 #include "Invalid_Code.h"
 #include "ppc/Recompile.h"
 #include "../../platform/ps3/PS3DynarecMemoryManager.h"
@@ -239,6 +240,16 @@ void go()
 		pure_interpreter();
 		dynacore = 2;
 		printf("[GO] Pure interpreter returned, stop=%d\n", r4300.stop);
+	} else if(dynacore == 3) {
+		dynacore = 0;
+		interpcore = 2;
+		printf("[GO] Starting cached interpreter\n");
+		init_cached_blocks();
+		run_cached_interpreter();
+		free_cached_blocks();
+		PC = NULL;
+		dynacore = 3;
+		printf("[GO] Cached interpreter returned, stop=%d\n", r4300.stop);
 	} else {
 		interpcore = 0;
 		dynacore = 1;
