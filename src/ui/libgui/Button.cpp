@@ -189,6 +189,7 @@ void Button::setSelectedFocusImage(Image *image)
 }
 
 #define SCROLL_PERIOD 4.0f
+#define SCROLL_SPEED 8.0f   // pixels per second, constant regardless of text length
 
 void Button::drawComponent(Graphics& gfx)
 {
@@ -268,7 +269,7 @@ void Button::drawComponent(Graphics& gfx)
 	{
 		int strWidth, strHeight;
 		unsigned long CurrentTime;
-		float scrollWidth, time_sec, scrollOffset;
+		float scrollWidth, time_sec, scrollOffset, scrollPeriod;
 		gfx.enableScissor(x + labelScissor, y, width - 2*labelScissor, height);
 		if(active)	IplFont::getInstance().drawInit(labelColor);
 		else		IplFont::getInstance().drawInit(inactiveColor);
@@ -286,10 +287,12 @@ void Button::drawComponent(Graphics& gfx)
 				strHeight = IplFont::getInstance().getStringHeight(*buttonText, fontSize);
 				scrollWidth = IplFont::getInstance().getStringWidth(*buttonText, fontSize)-width+2*labelScissor;
 				scrollWidth = scrollWidth < 0.0f ? 0.0 : scrollWidth;
+				scrollPeriod = 2.0f * scrollWidth / SCROLL_SPEED;
+				if (scrollPeriod < SCROLL_PERIOD) scrollPeriod = SCROLL_PERIOD;
 				CurrentTime = ticks_to_microsecs(gettick());
 				time_sec = (float)(CurrentTime - StartTime)/1000000.0f;
-				if (time_sec > SCROLL_PERIOD) StartTime = ticks_to_microsecs(gettick());
-				scrollOffset = fabsf(fmodf(time_sec,SCROLL_PERIOD)-SCROLL_PERIOD/2)/(SCROLL_PERIOD/2);
+				if (time_sec > scrollPeriod) StartTime = ticks_to_microsecs(gettick());
+				scrollOffset = fabsf(fmodf(time_sec,scrollPeriod)-scrollPeriod/2)/(scrollPeriod/2);
 				IplFont::getInstance().drawString((int) (x+labelScissor-(int)(scrollOffset*scrollWidth)), (int) (y+(height-strHeight)/2), *buttonText, fontSize, false);
 				break;
 			case LABEL_SCROLLONFOCUS:
@@ -298,10 +301,12 @@ void Button::drawComponent(Graphics& gfx)
 					strHeight = IplFont::getInstance().getStringHeight(*buttonText, fontSize);
 					scrollWidth = IplFont::getInstance().getStringWidth(*buttonText, fontSize)-width+2*labelScissor;
 					scrollWidth = scrollWidth < 0.0f ? 0.0 : scrollWidth;
+					scrollPeriod = 2.0f * scrollWidth / SCROLL_SPEED;
+					if (scrollPeriod < SCROLL_PERIOD) scrollPeriod = SCROLL_PERIOD;
 					CurrentTime = ticks_to_microsecs(gettick());
 					time_sec = (float)(CurrentTime - StartTime)/1000000.0f;
-					if (time_sec > SCROLL_PERIOD) StartTime = ticks_to_microsecs(gettick());
-					scrollOffset = fabsf(fmodf(time_sec,SCROLL_PERIOD)-SCROLL_PERIOD/2)/(SCROLL_PERIOD/2);
+					if (time_sec > scrollPeriod) StartTime = ticks_to_microsecs(gettick());
+					scrollOffset = fabsf(fmodf(time_sec,scrollPeriod)-scrollPeriod/2)/(scrollPeriod/2);
 					IplFont::getInstance().drawString((int) (x+labelScissor-(int)(scrollOffset*scrollWidth)), (int) (y+(height-strHeight)/2), *buttonText, fontSize, false);
 				}
 				else
