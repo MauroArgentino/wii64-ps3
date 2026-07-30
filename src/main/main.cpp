@@ -416,7 +416,11 @@ int loadROM(fileBrowser_file* rom){
 	}
 
 	// Init everything for this ROM
-	init_memory();
+	if (init_memory()) {
+		printf("[MAIN] Fatal: init_memory() failed. Aborting ROM load.\n");
+		hasLoadedROM = FALSE;
+		return -1;
+	}
 	VI_RSX_resetGameInfo();
 
 	// Initialize and load GameHackManager for this ROM

@@ -214,11 +214,24 @@ int init_memory()
    // Allocate large arrays from heap to reduce BSS
    if (!rdram) {
       rdram = (u32 *)malloc(RDRAM_SIZE);
+      if (!rdram) {
+         printf("[MEM] Fatal: failed to allocate rdram (%d bytes)\n", RDRAM_SIZE);
+         rdramb = NULL;
+         return -1;
+      }
       rdramb = (unsigned char *)rdram;
    }
    if (!tlb_LUT_r) {
       tlb_LUT_r = (u32 *)malloc(0x100000 * sizeof(u32));
+      if (!tlb_LUT_r) {
+         printf("[MEM] Fatal: failed to allocate tlb_LUT_r\n");
+         return -1;
+      }
       tlb_LUT_w = (u32 *)malloc(0x100000 * sizeof(u32));
+      if (!tlb_LUT_w) {
+         printf("[MEM] Fatal: failed to allocate tlb_LUT_w\n");
+         return -1;
+      }
    }
    
    //swap rom
@@ -1162,21 +1175,25 @@ void read_rdramFBd()
 
 void write_rdram()
 {
+   if (!rdramb) { trash = word; return; }
    *((u32 *)(rdramb + (address & MEMMASK))) = word;
 }
 
 void write_rdramb()
 {
+   if (!rdramb) { trash = byte; return; }
    *((rdramb + ((address & MEMMASK)^S8))) = byte;
 }
 
 void write_rdramh()
 {
+   if (!rdramb) { trash = hword; return; }
    *(unsigned short *)((rdramb + ((address & MEMMASK)^S16))) = hword;
 }
 
 void write_rdramd()
 {
+   if (!rdramb) { trash = (u32)(dword >> 32); trash = (u32)(dword & 0xFFFFFFFF); return; }
    *((u32 *)(rdramb + (address & MEMMASK))) = dword >> 32;
    *((u32 *)(rdramb + (address & MEMMASK) + 4 )) = dword & 0xFFFFFFFF;
 }

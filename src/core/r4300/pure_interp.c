@@ -44,6 +44,7 @@
 
 static void invalidate_func(unsigned int addr){
   PowerPC_block* block = blocks_get(addr>>12);
+  if (!block) return;
 	PowerPC_func* func = find_func(&block->funcs, addr);
 	if(func)
 		RecompCache_Free(func->start_addr);

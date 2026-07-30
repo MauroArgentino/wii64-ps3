@@ -48,6 +48,7 @@ u32 *tlb_LUT_w = NULL;
 
 u32 virtual_to_physical_address(u32 addresse, int w)
 {
+   if (!tlb_LUT_r || !tlb_LUT_w) { TLB_refill_exception(addresse, w); return 0x00000000; }
    if (addresse >= 0x7f000000 && addresse < 0x80000000)
      {
 	if (gameHacks.goldeneye_tlb)
@@ -145,6 +146,7 @@ u32 virtual_to_physical_address(u32 addresse, int w)
 int probe_nop(u32 address)
 {
    u32 a;
+   if (!rdram || !tlb_LUT_r) return 0;
    if (address < 0x80000000 || address > 0xc0000000)
      {
 	if (tlb_LUT_r[address>>12])

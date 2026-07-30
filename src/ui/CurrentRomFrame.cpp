@@ -191,7 +191,10 @@ void Func_ResetROM()
 		romClosed_gfx();
 		free_memory();
 		
-		init_memory();
+		if (init_memory()) {
+			menu::MessageBox::getInstance().setMessage("Error: out of memory");
+			return;
+		}
 		romOpen_gfx();
 		romOpen_audio();
 		romOpen_input();

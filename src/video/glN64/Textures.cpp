@@ -1082,41 +1082,49 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
 	u32 rsxBytes = rsxPitch * texInfo->realHeight;
 	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
-	memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
+	if (texInfo->rsxTextureBuffer)
 	{
-		u32 *src32 = dest;
-		u32 *dst32 = texInfo->rsxTextureBuffer;
-		for (u32 row = 0; row < texInfo->realHeight; row++)
+		memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
 		{
-			u32 *srcRow = src32 + row * texInfo->realWidth;
-			u8 *dstRow = (u8*)dst32 + row * rsxPitch;
-			for (u32 col = 0; col < texInfo->realWidth; col++)
+			u32 *src32 = dest;
+			u32 *dst32 = texInfo->rsxTextureBuffer;
+			for (u32 row = 0; row < texInfo->realHeight; row++)
 			{
-				u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
-				((u32*)dstRow)[col] = swapped;
+				u32 *srcRow = src32 + row * texInfo->realWidth;
+				u8 *dstRow = (u8*)dst32 + row * rsxPitch;
+				for (u32 col = 0; col < texInfo->realWidth; col++)
+				{
+					u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+					((u32*)dstRow)[col] = swapped;
+				}
 			}
 		}
+		texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
+		rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
+		texInfo->rsxTex.format		= texInfo->rsxFmt;
+		texInfo->rsxTex.mipmap		= 1;
+		texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
+		texInfo->rsxTex.cubemap		= GCM_FALSE;
+		texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
+		texInfo->rsxTex.width		= texInfo->realWidth;
+		texInfo->rsxTex.height		= texInfo->realHeight;
+		texInfo->rsxTex.depth		= 1;
+		texInfo->rsxTex.location	= GCM_LOCATION_RSX;
+		texInfo->rsxTex.pitch		= rsxPitch;
+		texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	}
-	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
-	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
-	texInfo->rsxTex.format		= texInfo->rsxFmt;
-	texInfo->rsxTex.mipmap		= 1;
-	texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
-	texInfo->rsxTex.cubemap		= GCM_FALSE;
-	texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-	texInfo->rsxTex.width		= texInfo->realWidth;
-	texInfo->rsxTex.height		= texInfo->realHeight;
-	texInfo->rsxTex.depth		= 1;
-	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= rsxPitch;
-	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
+	else
+	{
+		printf("[TEX] RSX OOM: failed to allocate %d bytes for background texture (w=%d h=%d)\n",
+			rsxBytes, texInfo->realWidth, texInfo->realHeight);
+	}
 	free( swapped );
 	free( dest );
 #elif defined(__GX__)
@@ -1276,6 +1284,11 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
 #endif // PS3
 	dest = (u32*)malloc( texInfo->textureBytes );
+	if (!dest) {
+		printf("[TEX] Out of memory: failed to allocate %d bytes for texture dest\n", texInfo->textureBytes);
+		texInfo->rsxTextureBuffer = NULL;
+		return;
+	}
 #else // !__GX__
 	if ((texInfo->format == G_IM_FMT_CI) && (gDP.otherMode.textureLUT == G_TT_IA16))
 	{
@@ -1635,41 +1648,49 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
 	u32 rsxBytes = rsxPitch * texInfo->realHeight;
 	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
-	memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
+	if (texInfo->rsxTextureBuffer)
 	{
-		u32 *src32 = dest;
-		u32 *dst32 = texInfo->rsxTextureBuffer;
-		for (u32 row = 0; row < texInfo->realHeight; row++)
+		memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
 		{
-			u32 *srcRow = src32 + row * texInfo->realWidth;
-			u8 *dstRow = (u8*)dst32 + row * rsxPitch;
-			for (u32 col = 0; col < texInfo->realWidth; col++)
+			u32 *src32 = dest;
+			u32 *dst32 = texInfo->rsxTextureBuffer;
+			for (u32 row = 0; row < texInfo->realHeight; row++)
 			{
-				u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
-				((u32*)dstRow)[col] = swapped;
+				u32 *srcRow = src32 + row * texInfo->realWidth;
+				u8 *dstRow = (u8*)dst32 + row * rsxPitch;
+				for (u32 col = 0; col < texInfo->realWidth; col++)
+				{
+					u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
+					((u32*)dstRow)[col] = swapped;
+				}
 			}
 		}
+		texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
+		rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
+		texInfo->rsxTex.format		= texInfo->rsxFmt;
+		texInfo->rsxTex.mipmap		= 1;
+		texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
+		texInfo->rsxTex.cubemap		= GCM_FALSE;
+		texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
+								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
+		texInfo->rsxTex.width		= texInfo->realWidth;
+		texInfo->rsxTex.height		= texInfo->realHeight;
+		texInfo->rsxTex.depth		= 1;
+		texInfo->rsxTex.location	= GCM_LOCATION_RSX;
+		texInfo->rsxTex.pitch		= rsxPitch;
+		texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
 	}
-	texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
-	rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
-	texInfo->rsxTex.format		= texInfo->rsxFmt;
-	texInfo->rsxTex.mipmap		= 1;
-	texInfo->rsxTex.dimension	= GCM_TEXTURE_DIMS_2D;
-	texInfo->rsxTex.cubemap		= GCM_FALSE;
-	texInfo->rsxTex.remap		= ((GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_TYPE_REMAP << GCM_TEXTURE_REMAP_TYPE_A_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_B << GCM_TEXTURE_REMAP_COLOR_B_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
-							   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-	texInfo->rsxTex.width		= texInfo->realWidth;
-	texInfo->rsxTex.height		= texInfo->realHeight;
-	texInfo->rsxTex.depth		= 1;
-	texInfo->rsxTex.location	= GCM_LOCATION_RSX;
-	texInfo->rsxTex.pitch		= rsxPitch;
-	texInfo->rsxTex.offset		= texInfo->rsxTextureOffset;
+	else
+	{
+		printf("[TEX] RSX OOM: failed to allocate %d bytes for texture (w=%d h=%d)\n",
+			rsxBytes, texInfo->realWidth, texInfo->realHeight);
+	}
 	free( dest );
 
 	#ifdef DEBUG
@@ -1760,6 +1781,12 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
 void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 {
 #ifdef PS3
+	if (!texture || !texture->rsxTextureBuffer)
+	{
+		// Texture allocation failed or NULL - activate dummy texture to avoid crash
+		TextureCache_ActivateDummy(t);
+		return;
+	}
 	//TODO: Implement two texture units
 //	rsxFlushBuffer(context);
 	rsxInvalidateTextureCache(context,GCM_INVALIDATE_TEXTURE); //needed?

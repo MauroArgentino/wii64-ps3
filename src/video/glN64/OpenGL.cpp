@@ -282,6 +282,11 @@ void OGL_InitStates()
 
 	OGL.fp_ucode = rsxFragmentProgramGetUCode(OGL.fpo,&OGL.fpsize);
 	OGL.fp_buffer = (u32*)rsxMemalign(64,OGL.fpsize);
+	if (!OGL.fp_buffer)
+	{
+		printf("[OGL] Fatal: rsxMemalign failed for fp_buffer (%d bytes)\n", OGL.fpsize);
+		return;
+	}
 	memcpy(OGL.fp_buffer,OGL.fp_ucode,OGL.fpsize);
 	rsxAddressToOffset(OGL.fp_buffer,&OGL.fp_offset);
 

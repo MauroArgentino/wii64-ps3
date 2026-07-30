@@ -98,6 +98,8 @@ void dma_pi_read()
 {
    int i;
 
+   if (!rdram) return;
+
    if (pi_register.pi_cart_addr_reg >= 0x08000000 &&
        pi_register.pi_cart_addr_reg < 0x08010000)
      {
@@ -127,6 +129,8 @@ void dma_pi_write()
 {
    u32 longueur;
    int i;
+
+   if (!rdram) return;
 
    if (pi_register.pi_cart_addr_reg < 0x10000000)
      {
@@ -267,6 +271,7 @@ void dma_pi_write()
 void dma_sp_write()
 {
    int i;
+   if (!rdram) return;
    if ((sp_register.sp_mem_addr_reg & 0x1000) > 0)
      {
 	for (i=0; i<((sp_register.sp_rd_len_reg & 0xFFF)+1); i++)
@@ -284,6 +289,7 @@ void dma_sp_write()
 void dma_sp_read()
 {
    int i;
+   if (!rdram) return;
    if ((sp_register.sp_mem_addr_reg & 0x1000) > 0)
      {
 	for (i=0; i<((sp_register.sp_wr_len_reg & 0xFFF)+1); i++)
@@ -301,6 +307,7 @@ void dma_sp_read()
 void dma_si_write()
 {
    int i;
+   if (!rdram) return;
    if (si_register.si_pif_addr_wr64b != 0x1FC007C0)
      {
 //	printf("unknown SI use\n");
@@ -316,6 +323,7 @@ void dma_si_write()
 void dma_si_read()
 {
    int i;
+   if (!rdram) return;
    if (si_register.si_pif_addr_rd64b != 0x1FC007C0)
      {
 //	printf("unknown SI use\n");

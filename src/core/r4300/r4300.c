@@ -192,10 +192,15 @@ void init_blocks()
    if (!blocks) {
       blocks = (PowerPC_block **)calloc(0x100000, sizeof(PowerPC_block *));
    }
+   if (!blocks) {
+      printf("[R4300] Fatal: failed to allocate blocks array\n");
+      return;
+   }
    invalid_code_alloc();
    for (i=0; i<0x100000; i++) { invalid_code_set(i, 1); blocks_set(i, NULL); }
 #ifndef PPC_DYNAREC
    blocks[0xa4000000>>12] = malloc(sizeof(precomp_block));
+   if (!blocks[0xa4000000>>12]) return;
    blocks[0xa4000000>>12]->code = NULL;
    blocks[0xa4000000>>12]->block = NULL;
    blocks[0xa4000000>>12]->jumps_table = NULL;
@@ -203,6 +208,7 @@ void init_blocks()
    blocks[0xa4000000>>12]->end = 0xa4001000;
 #else
    PowerPC_block* temp_block = malloc(sizeof(PowerPC_block));
+   if (!temp_block) return;
    blocks_set(0xa4000000>>12, temp_block);
    temp_block->funcs = NULL;
    temp_block->start_address = 0xa4000000;
