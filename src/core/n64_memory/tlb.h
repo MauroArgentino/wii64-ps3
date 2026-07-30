@@ -34,19 +34,18 @@
 typedef struct _tlb
 {
    short mask;
-   s32 vpn2;
+   u32 vpn2;
    char g;
    unsigned char asid;
-   s32 pfn_even;
+   u32 pfn_even;
    char c_even;
    char d_even;
    char v_even;
-   s32 pfn_odd;
+   u32 pfn_odd;
    char c_odd;
    char d_odd;
    char v_odd;
    char r;
-   //long check_parity_mask;
    
    u32 start_even;
    u32 end_even;
@@ -61,5 +60,7 @@ extern u32 *tlb_LUT_w;
 void tlb_mem2_init();
 u32 virtual_to_physical_address(u32 addresse, int w);
 int probe_nop(u32 address);
+void tlb_unmap(int index);
+void tlb_map(int index);
 
 #endif
