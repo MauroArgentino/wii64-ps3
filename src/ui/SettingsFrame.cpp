@@ -36,10 +36,12 @@ extern "C" {
 #include "../ui/fileBrowser/fileBrowser.h"
 #ifdef PS3
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
+#include <sys/stat.h>
 #else //PS3
 #include "../ui/fileBrowser/fileBrowser-libfat.h"
-#include "../ui/fileBrowser/fileBrowser-CARD.h"
-#endif //!PS3
+#include <sys/stat.h>
+#include <sys/dirent.h>
+#endif //PS3
 }
 
 void Func_TabGeneral();
@@ -56,7 +58,7 @@ void Func_SaveStateSD();
 void Func_SaveStateUSB();
 void Func_CpuPureInterp();
 void Func_CpuDynarec();
-void Func_SaveSettingsSD();
+void Func_SaveSettingsHDD();
 void Func_SaveSettingsUSB();
 
 void Func_ShowFpsOn();
@@ -97,19 +99,19 @@ void Func_ReturnFromSettingsFrame();
 
 static char FRAME_STRINGS[37][23] =
 	{ "General",
-	  "Video",
-	  "Input",
-	  "Audio",
-	  "Saves",
-	//Strings for General tab [5]
-	  "Native Saves Device",
-	  "Save States Device",
-	  "Select CPU Core",
-	  "Save settings.cfg",
-	  "SD",
-	  "USB",
-	  "CardA",
-	  "CardB",
+"Video",
+  "Input",
+  "Audio",
+  "Saves",
+  //Strings for General tab [5]
+  "Native Saves Device",
+  "Save States Device",
+  "Select CPU Core",
+  "Save settings.cfg",
+  "HDD",
+  "USB",
+  "CardA",
+  "CardB",
 	  "Pure Interp",
 	  "Dynarec",
 	//Strings for Video tab [15]
@@ -171,7 +173,7 @@ struct ButtonInfo
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[10],	360.0,	170.0,	 70.0,	56.0,	 6,	11,	 9,	 9,	Func_SaveStateUSB,		Func_ReturnFromSettingsFrame }, // Save State: USB
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[13],	295.0,	240.0,	160.0,	56.0,	 9,	13,	12,	12,	Func_CpuPureInterp,		Func_ReturnFromSettingsFrame }, // CPU: Pure Interp
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[14],	465.0,	240.0,	130.0,	56.0,	10,	14,	11,	11,	Func_CpuDynarec,		Func_ReturnFromSettingsFrame }, // CPU: Dynarec
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	11,	 0,	14,	14,	Func_SaveSettingsSD,	Func_ReturnFromSettingsFrame }, // Save Settings: SD
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	11,	 0,	14,	14,	Func_SaveSettingsHDD,	Func_ReturnFromSettingsFrame }, // Save Settings: HDD
 	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[10],	360.0,	310.0,	 70.0,	56.0,	11,	 0,	13,	13,	Func_SaveSettingsUSB,	Func_ReturnFromSettingsFrame }, // Save Settings: USB
 	//Buttons for Video Tab (starts at button[15])
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	100.0,	 75.0,	56.0,	 1,	18,	16,	16,	Func_ShowFpsOn,			Func_ReturnFromSettingsFrame }, // Show FPS: On
@@ -620,15 +622,18 @@ void Func_CpuDynarec()
 
 extern void writeConfig(FILE* f);
 
-void Func_SaveSettingsSD()
+void Func_SaveSettingsHDD()
 {
-#ifndef PS3
 	fileBrowser_file* configFile_file;
-	int (*configFile_init)(fileBrowser_file*) = fileBrowser_libfat_init;
+	int (*configFile_init)(fileBrowser_file*) = fileBrowser_ps3_init;
 	int num_written = 0;
-	configFile_file = &saveDir_libfat_Default;
+	configFile_file = &saveDir_ps3_Default;
 	if(configFile_init(configFile_file)) {                //only if device initialized ok
-		FILE* f = fopen( "sd:/wii64/settings.cfg", "wb" );  //attempt to open file
+		// Ensure the directory exists
+		mkdir("/dev_hdd0/game/WII64PS3N", 0777);
+		mkdir("/dev_hdd0/game/WII64PS3N/config", 0777);
+		
+		FILE* f = fopen( "/dev_hdd0/game/WII64PS3N/config/settings.cfg", "wb" ); //attempt to open file
 		if(f) {
 			writeConfig(f);                                   //write out the config
 			fclose(f);
@@ -636,10 +641,9 @@ void Func_SaveSettingsSD()
 		}
 	}
 	if (num_written == 1)
-		menu::MessageBox::getInstance().setMessage("Saved settings.cfg to SD");
+		menu::MessageBox::getInstance().setMessage("Saved settings.cfg to HDD");
 	else
-#endif //!PS3
-		menu::MessageBox::getInstance().setMessage("Error saving settings.cfg to SD");
+		menu::MessageBox::getInstance().setMessage("Error saving settings.cfg to HDD");
 }
 
 void Func_SaveSettingsUSB()

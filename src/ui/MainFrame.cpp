@@ -193,6 +193,7 @@ void Func_Credits()
 	strcat(CreditsInfo,"tehpola - core\n");
 	strcat(CreditsInfo,"sepp256 - graphics & menu\n");
 	strcat(CreditsInfo,"emu_kidid - general coding\n");
+	strcat(CreditsInfo,"MauroArgento - refactor - upgrade\n");
 	strcat(CreditsInfo,"\n");
 	strcat(CreditsInfo,"Special Thanks To:\n");
 	strcat(CreditsInfo,"       drmr - for menu graphics\n");

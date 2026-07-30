@@ -99,3 +99,15 @@ Known RPCS3 crash: "VM: Access violation writing location 0x0 (unmapped memory)"
 
 **ROM load** (`main.cpp`, `CurrentRomFrame.cpp`):
 - Check `init_memory()` return value → show error and abort load on failure
+
+## TLB refactoring (addressed 2026-07-30)
+
+`pure_interp.c` had ~220 lines of duplicated map/unmap LUT logic in `TLBWI()` and `TLBWR()`, differing only by index (`Index&0x3F` vs `Random`).
+
+Extracted into shared functions in `tlb.c`:
+- `tlb_unmap(int index)` — clears LUT entries for a TLB entry
+- `tlb_map(int index)` — populates LUT entries from a TLB entry
+
+Also fixed: `TLBWR()` dead code had `i>>2` where `i>>12` was intended (`#ifdef USE_TLB_CACHE` path, never built).
+
+**Signedness fix**: `tlb.h` fields `vpn2`, `pfn_even`, `pfn_odd` changed from `s32` to `u32` — addresses are unsigned in the N64; signed types can cause incorrect sign-extension in comparisons on addresses > 0x80000000.

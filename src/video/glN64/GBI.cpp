@@ -384,8 +384,10 @@ void GBI_Destroy()
 MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 {
 	MicrocodeInfo *current;
-
+	
+	#ifdef DEBUG
 	printf( "[GBI] DetectMicrocode called: uc_start=0x%08X uc_dstart=0x%08X uc_dsize=%d\n", uc_start, uc_dstart, uc_dsize );
+	#endif
 
 	for (unsigned int i = 0; i < GBI.numMicrocodes; i++)
 	{
