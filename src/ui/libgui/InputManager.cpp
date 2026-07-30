@@ -22,6 +22,9 @@
 #include "FocusManager.h"
 #include "CursorManager.h"
 //#include "../gc_input/controller.h"
+#ifdef PS3
+#include <io/pad.h>
+#endif
 
 
 void ShutdownWii();
@@ -66,7 +69,22 @@ void Input::refreshInput()
 	wiiPad = WPAD_Data(0);
 #endif
 #else //__GX__
-	//TODO
+#ifdef PS3
+	padInfo2 padInfo;
+	if (ioPadGetInfo2(&padInfo) == 0) {
+		for (int i = 0; i < PS3_MAX_PADS; i++) {
+			if (padInfo.port_status[i] & 1) {
+				padData paddata;
+				if (ioPadGetData(i, &paddata) == 0) {
+					if (paddata.len)
+						ps3Buttons[i] = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
+				}
+			} else {
+				ps3Buttons[i] = 0;
+			}
+		}
+	}
+#endif
 #endif //!__GX__
 }
 

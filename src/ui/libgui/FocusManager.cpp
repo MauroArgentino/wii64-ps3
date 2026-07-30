@@ -58,23 +58,11 @@ void Focus::updateFocus()
 #endif
 //	PADStatus* gcPad = Input::getInstance().getPad();
 #ifndef __GX__
-	padInfo padinfo;
-	padData paddata;
 	u16 buttonsPS3[7];
+	u16* cachedButtons = Input::getInstance().getPS3Buttons();
 
-	ioPadGetInfo(&padinfo);
-	for(int i=0; i<7; i++){		//Check ports 0~6
-		if(padinfo.status[i])
-		{
-			ioPadGetData(i, &paddata);
-			if (paddata.len)
-				buttonsPS3[i] = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
-			else
-				buttonsPS3[i] = previousButtonsPS3[i];
-			//dbg_printf("pad %d buttons %4x, Cross %d, len %d\r\n", i, buttonsPS3[i], paddata.BTN_CROSS, paddata.len);
-		}
-		else
-			buttonsPS3[i] = 0;
+	for(int i=0; i<7; i++){
+		buttonsPS3[i] = cachedButtons[i];
 	}
 #endif
 

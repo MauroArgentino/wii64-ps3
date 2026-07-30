@@ -22,6 +22,10 @@
 #define INPUTMANAGER_H
 
 #include "GuiTypes.h"
+#ifdef PS3
+#include <ppu-types.h>
+#define PS3_MAX_PADS 7
+#endif
 
 namespace menu {
 
@@ -36,6 +40,9 @@ public:
 	PADStatus* getPad();
 #endif //__GX__
 	void clearInputData();
+#ifdef PS3
+	u16* getPS3Buttons() { return ps3Buttons; }
+#endif
 	static Input& getInstance()
 	{
 		static Input obj;
@@ -50,6 +57,9 @@ private:
 #endif //__GX__
 #ifdef HW_RVL
 	WPADData *wiiPad;
+#endif
+#ifdef PS3
+	u16 ps3Buttons[PS3_MAX_PADS];
 #endif
 
 };

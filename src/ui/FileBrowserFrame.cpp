@@ -26,12 +26,14 @@
 #include "libgui/resources.h"
 #include "libgui/MessageBox.h"
 #include "libgui/FocusManager.h"
+#include "libgui/InputManager.h"
 #include "libgui/CursorManager.h"
 
 extern "C" {
 #include "../ui/fileBrowser/fileBrowser.h"
 #ifdef PS3
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
+#include <io/pad.h>
 #else //PS3
 #include "../ui/fileBrowser/fileBrowser-libfat.h"
 #include "../ui/fileBrowser/fileBrowser-DVD.h"
@@ -150,6 +152,8 @@ static int				num_entries;
 static int				current_page;
 static int				max_page;
 
+static u16 previousButtonsPS3[PS3_MAX_PADS] = {0};  // For PS3 R1/L1 navigation
+
 void fileBrowserFrame_OpenDirectory(fileBrowser_file* dir);
 void fileBrowserFrame_Error(fileBrowser_file* dir, int error_code);
 void fileBrowserFrame_FillPage();
@@ -159,100 +163,30 @@ void FileBrowserFrame::drawChildren(menu::Graphics &gfx)
 {
 	if(isVisible())
 	{
-		/*TODO Implement for PS3
-#ifdef HW_RVL
-		WPADData* wiiPad = menu::Input::getInstance().getWpad();
-#endif
-		for (int i=0; i<4; i++)
+// PS3 pad input handling for page navigation (R1/L1) - uses cached data from Input::refreshInput()
+#ifdef PS3
 		{
-			u16 currentButtonsGC = PAD_ButtonsHeld(i);
-			if (currentButtonsGC ^ previousButtonsGC[i])
-			{
-				u16 currentButtonsDownGC = (currentButtonsGC ^ previousButtonsGC[i]) & currentButtonsGC;
-				previousButtonsGC[i] = currentButtonsGC;
-				if (currentButtonsDownGC & PAD_TRIGGER_R)
-				{
-					//move to next set & return
-					if(current_page+1 < max_page) 
-					{
-						current_page +=1;
-						fileBrowserFrame_FillPage();
-						menu::Focus::getInstance().clearPrimaryFocus();
-					}
-					break;
-				}
-				else if (currentButtonsDownGC & PAD_TRIGGER_L)
-				{
-					//move to the previous set & return
-					if(current_page > 0) 
-					{
-						current_page -= 1;
-						fileBrowserFrame_FillPage();
-						menu::Focus::getInstance().clearPrimaryFocus();
-					}
-					break;
-				}
-			}
-#ifdef HW_RVL
-			else if (wiiPad[i].btns_h ^ previousButtonsWii[i])
-			{
-				u32 currentButtonsDownWii = (wiiPad[i].btns_h ^ previousButtonsWii[i]) & wiiPad[i].btns_h;
-				previousButtonsWii[i] = wiiPad[i].btns_h;
-				if (wiiPad[i].exp.type == WPAD_EXP_CLASSIC)
-				{
-					if (currentButtonsDownWii & WPAD_CLASSIC_BUTTON_FULL_R)
-					{
-						//move to next set & return
-						if(current_page+1 < max_page) 
-						{
-							current_page +=1;
-							fileBrowserFrame_FillPage();
-							menu::Focus::getInstance().clearPrimaryFocus();
-						}
-						break;
-					}
-					else if (currentButtonsDownWii & WPAD_CLASSIC_BUTTON_FULL_L)
-					{
-						//move to the previous set & return
-						if(current_page > 0) 
-						{
-							current_page -= 1;
-							fileBrowserFrame_FillPage();
-							menu::Focus::getInstance().clearPrimaryFocus();
-						}
-						break;
-					}
-				}
-				else
-				{
-					if (currentButtonsDownWii & WPAD_BUTTON_PLUS)
-					{
-						//move to next set & return
-						if(current_page+1 < max_page) 
-						{
-							current_page +=1;
-							fileBrowserFrame_FillPage();
-							menu::Focus::getInstance().clearPrimaryFocus();
-						}
-						break;
-					}
-					else if (currentButtonsDownWii & WPAD_BUTTON_MINUS)
-					{
-						//move to the previous set & return
-						if(current_page > 0) 
-						{
-							current_page -= 1;
-							fileBrowserFrame_FillPage();
-							menu::Focus::getInstance().clearPrimaryFocus();
-						}
-						break;
-					}
-				}
-			}
-#endif //HW_RVL
-		}*/
+			u16* cachedButtons = menu::Input::getInstance().getPS3Buttons();
+			for (int i = 0; i < PS3_MAX_PADS; i++) {
+				u16 currentButtons = cachedButtons[i];
+				u16 currentButtonsDown = (currentButtons ^ previousButtonsPS3[i]) & currentButtons;
+				previousButtonsPS3[i] = currentButtons;
 
-		//Draw buttons
+				if ((currentButtonsDown & PS3_BTN_R1) && (current_page+1 < max_page)) {
+					current_page += 1;
+					fileBrowserFrame_FillPage();
+					menu::Focus::getInstance().clearPrimaryFocus();
+				}
+				if ((currentButtonsDown & PS3_BTN_L1) && (current_page > 0)) {
+					current_page -= 1;
+					fileBrowserFrame_FillPage();
+					menu::Focus::getInstance().clearPrimaryFocus();
+				}
+			}
+		}
+#endif
+
+	//Draw buttons
 		menu::ComponentList::const_iterator iteration;
 		for (iteration = componentList.begin(); iteration != componentList.end(); iteration++)
 		{
