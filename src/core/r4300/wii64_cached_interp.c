@@ -13,6 +13,8 @@ extern u32 op;
 extern tlb tlb_e[32];
 extern u32 *tlb_LUT_r;
 
+#define RDRAM_WORDS 0x100000
+
 // op function declarations (defined in wii64_cached_ops.c)
 void cached_interp_SLL(void); void cached_interp_SRL(void); void cached_interp_SRA(void);
 void cached_interp_SLLV(void); void cached_interp_SRLV(void); void cached_interp_SRAV(void);
@@ -74,6 +76,7 @@ void cached_interp_NI(void); void cached_interp_NOP(void);
 void cached_interp_FIN_BLOCK(void); void cached_interp_NOTCOMPILED(void);
 void cached_interp_NOTCOMPILED2(void);
 void cached_interp_ERET(void);
+void cached_interp_TLB_REFILL(void);
 void cached_interp_MFC0(void); void cached_interp_MTC0(void);
 void cached_interp_TLBR(void); void cached_interp_TLBWI(void);
 void cached_interp_TLBWR(void); void cached_interp_TLBP(void);
@@ -112,19 +115,32 @@ void cached_interp_C_OLE_D(void); void cached_interp_C_ULE_D(void);
 
 struct cached_interp ci;
 
-static u32 read_inst(u32 addr)
+u32 read_inst(u32 addr)
 {
    if (addr >= 0x80000000 && addr < 0x80800000)
-      return rdram[(addr & 0xFFFFFF) / 4];
+   {
+      u32 index = (addr & 0xFFFFFF) / 4;
+      if (index < RDRAM_WORDS)
+         return rdram[index];
+      return 0;
+   }
    else if (addr >= 0xa4000000 && addr < 0xa4001000)
-      return SP_DMEM[(addr & 0xFFF) / 4];
+       return SP_DMEM[(addr & 0xFFF) / 4];
    else if (addr >= 0x1fc00000 && addr < 0x1fc01000)
       return ((u32*)ROM_HEADER)[(addr & 0xFFF) / 4];
    else if (tlb_LUT_r)
    {
-      u32 paddr = virtual_to_physical_address(addr, 0);
-      if (paddr >= 0x80000000 && paddr < 0x80800000)
-         return rdram[(paddr & 0xFFFFFF) / 4];
+      u32 paddr = tlb_LUT_r[addr >> 12];
+      if (paddr)
+      {
+         paddr = (paddr & 0xFFFFF000) | (addr & 0xFFF);
+         if (paddr >= 0x80000000 && paddr < 0x80800000)
+         {
+            u32 index = (paddr & 0xFFFFFF) / 4;
+            if (index < RDRAM_WORDS)
+               return rdram[index];
+         }
+      }
    }
    return 0;
 }
@@ -221,6 +237,7 @@ void cached_interp_init_block(u32 address)
    if (b == NULL)
    {
       b = (struct precomp_block*)malloc(sizeof(struct precomp_block));
+      if (!b) return;
       b->block = NULL;
       b->start = address & ~0xFFF;
       b->end = (address & ~0xFFF) + 0x1000;
@@ -253,13 +270,12 @@ void cached_interp_init_block(u32 address)
    }
    else
    {
-      u32 paddr = virtual_to_physical_address(b->start, 2);
+      u32 paddr = tlb_LUT_r ? tlb_LUT_r[b->start >> 12] : 0;
       if (paddr)
       {
-         ci.invalid_code[paddr >> 12] = 0;
+         paddr = virtual_to_physical_address(b->start, 2);
          cached_interp_init_block(paddr);
          paddr += b->end - b->start - 4;
-         ci.invalid_code[paddr >> 12] = 0;
          cached_interp_init_block(paddr);
       }
    }
@@ -295,8 +311,9 @@ static void r4300_decode(precomp_instr* inst, u32 iw, u32 next_iw, struct precom
          case 0x06: inst->ops = cached_interp_SRLV; break;
          case 0x07: inst->ops = cached_interp_SRAV; break;
          case 0x08: inst->ops = cached_interp_JR; break;
-         case 0x09: inst->ops = cached_interp_JALR; break;
-         case 0x0D: inst->ops = cached_interp_BREAK; break;
+          case 0x09: inst->ops = cached_interp_JALR; break;
+          case 0x0C: inst->ops = cached_interp_SYSCALL; break;
+          case 0x0D: inst->ops = cached_interp_BREAK; break;
          case 0x0F: inst->ops = cached_interp_SYNC; break;
          case 0x10: inst->ops = cached_interp_MFHI; break;
          case 0x11: inst->ops = cached_interp_MTHI; break;
@@ -343,8 +360,12 @@ static void r4300_decode(precomp_instr* inst, u32 iw, u32 next_iw, struct precom
          default: inst->ops = cached_interp_NI; break;
       }
       if (inst->f.r.nrd == 0 && funct != 0x08 && funct != 0x09
-          && funct != 0x0D && funct != 0x0F
-          && funct != 0x11 && funct != 0x13)
+          && funct != 0x0C && funct != 0x0D && funct != 0x0F
+          && funct != 0x11 && funct != 0x13
+          && funct != 0x18 && funct != 0x19 && funct != 0x1A && funct != 0x1B
+          && funct != 0x1C && funct != 0x1D && funct != 0x1E && funct != 0x1F
+          && funct != 0x30 && funct != 0x31 && funct != 0x32 && funct != 0x33
+          && funct != 0x34 && funct != 0x36)
          inst->ops = cached_interp_NOP;
    }
    else if (opcode == 0x01)
@@ -363,12 +384,12 @@ static void r4300_decode(precomp_instr* inst, u32 iw, u32 next_iw, struct precom
          case 0x11: inst->ops = cached_interp_BGEZAL; break;
          case 0x12: inst->ops = cached_interp_BLTZALL; break;
          case 0x13: inst->ops = cached_interp_BGEZALL; break;
-         case 0x18: inst->ops = cached_interp_TGEI; break;
-         case 0x19: inst->ops = cached_interp_TGEIU; break;
-         case 0x1A: inst->ops = cached_interp_TLTI; break;
-         case 0x1B: inst->ops = cached_interp_TLTIU; break;
-         case 0x1C: inst->ops = cached_interp_TEQI; break;
-         case 0x1E: inst->ops = cached_interp_TNEI; break;
+          case 0x08: inst->ops = cached_interp_TGEI; break;
+          case 0x09: inst->ops = cached_interp_TGEIU; break;
+          case 0x0A: inst->ops = cached_interp_TLTI; break;
+          case 0x0B: inst->ops = cached_interp_TLTIU; break;
+          case 0x0C: inst->ops = cached_interp_TEQI; break;
+          case 0x0E: inst->ops = cached_interp_TNEI; break;
          default: inst->ops = cached_interp_NI; break;
       }
    }
@@ -429,7 +450,7 @@ static void r4300_decode(precomp_instr* inst, u32 iw, u32 next_iw, struct precom
              {
                 case 0x00: inst->ops = cached_interp_MFC0; break;
                 case 0x04: inst->ops = cached_interp_MTC0; break;
-                case 0x08:
+                case 0x10:
                    switch (funct)
                    {
                       case 0x01: inst->ops = cached_interp_TLBR; break;
@@ -446,32 +467,31 @@ static void r4300_decode(precomp_instr* inst, u32 iw, u32 next_iw, struct precom
           }
          case 0x11:
          {
-            if ((iw & 0x3E) == 0x00 && funct == 0x00)
+            if (rs == 0x00)
                inst->ops = cached_interp_MFC1;
-            else if ((iw & 0x3E) == 0x20 && funct == 0x00)
+            else if (rs == 0x01)
                inst->ops = cached_interp_DMFC1;
-            else if ((iw & 0x3E) == 0x02 && funct == 0x00)
+            else if (rs == 0x02)
                inst->ops = cached_interp_CFC1;
-            else if ((iw & 0x3E) == 0x04 && funct == 0x00)
+            else if (rs == 0x04)
                inst->ops = cached_interp_MTC1;
-            else if ((iw & 0x3E) == 0x24 && funct == 0x00)
+            else if (rs == 0x05)
                inst->ops = cached_interp_DMTC1;
-            else if ((iw & 0x3E) == 0x06 && funct == 0x00)
+            else if (rs == 0x06)
                inst->ops = cached_interp_CTC1;
-             else if ((iw & 0x1F) == 0x10) {
-                inst->f.i.immediate = imm;
-                inst->ops = cached_interp_BC1F;
-             } else if ((iw & 0x1F) == 0x11) {
-                inst->f.i.immediate = imm;
-                inst->ops = cached_interp_BC1T;
-             } else if ((iw & 0x1F) == 0x12) {
-                inst->f.i.immediate = imm;
-                inst->ops = cached_interp_BC1FL;
-             } else if ((iw & 0x1F) == 0x13) {
-                inst->f.i.immediate = imm;
-                 inst->ops = cached_interp_BC1TL;
-              }
-             else
+            else if (rs == 0x08)
+            {
+               inst->f.i.immediate = imm;
+               switch (rt)
+               {
+                  case 0x00: inst->ops = cached_interp_BC1F; break;
+                  case 0x02: inst->ops = cached_interp_BC1T; break;
+                  case 0x04: inst->ops = cached_interp_BC1FL; break;
+                  case 0x06: inst->ops = cached_interp_BC1TL; break;
+                  default: inst->ops = cached_interp_NI; break;
+               }
+            }
+            else
             {
                u32 fmt = (iw >> 21) & 0x1F;
                u32 ft = (iw >> 16) & 0x1F;
@@ -576,11 +596,11 @@ static void r4300_decode(precomp_instr* inst, u32 iw, u32 next_iw, struct precom
       inst->f.i.rt = r4300.gpr + rt;
       inst->f.i.immediate = imm;
 
-      if (rt == 0) { inst->ops = cached_interp_NOP; return; }
+       if (rt == 0 && opcode <= 0x27) { inst->ops = cached_interp_NOP; return; }
 
-      switch (opcode)
-      {
-         case 0x20: inst->ops = cached_interp_LB; break;
+       switch (opcode)
+       {
+          case 0x20: inst->ops = cached_interp_LB; break;
          case 0x21: inst->ops = cached_interp_LH; break;
          case 0x22: inst->ops = cached_interp_LWL; break;
          case 0x23: inst->ops = cached_interp_LW; break;
@@ -658,9 +678,24 @@ void cached_interp_recompile_block(u32 address)
    int i, length, length2, finished;
    precomp_instr* inst;
    struct precomp_block* block = ci.blocks[address >> 12];
-   u32 iw[0x400];
+   u32 iw[0x402];
 
    if (!block) return;
+   if (!block->block) return;
+
+   if (block->start >= 0xc0000000 || block->end < 0x80000000)
+   {
+      u32 entry = (address - block->start) >> 2;
+      u32 paddr = tlb_LUT_r ? tlb_LUT_r[block->start >> 12] : 0;
+      if (!paddr && entry < (block->end - block->start) / 4)
+      {
+         block->block[entry].addr = address;
+         block->block[entry].ops = cached_interp_TLB_REFILL;
+         block->block[entry + 1].addr = address + 4;
+         block->block[entry + 1].ops = cached_interp_FIN_BLOCK;
+         return;
+      }
+   }
 
    length = (block->end - block->start) / 4;
    length2 = length - 2 + (length >> 2);
@@ -698,8 +733,8 @@ void cached_interp_recompile_block(u32 address)
       {
          inst = block->block + i;
          inst->addr = block->start + i * 4;
-         inst->ops = cached_interp_FIN_BLOCK;
-      }
+          inst->ops = cached_interp_FIN_BLOCK;
+       }
    }
 }
 
@@ -709,7 +744,19 @@ void cached_interpreter_jump_to(u32 address)
    if (ci.invalid_code[address >> 12])
       cached_interp_init_block(address);
    ci.actual = ci.blocks[address >> 12];
+   if (!ci.actual || !ci.actual->block) return;
    PC = ci.actual->block + ((address - ci.actual->start) >> 2);
+}
+
+void cached_interp_take_exception(void)
+{
+   u32 target = r4300.skip_jump ? r4300.skip_jump : r4300.pc;
+   r4300.pc = target;
+   if (ci.invalid_code[target >> 12])
+      cached_interp_init_block(target);
+   ci.actual = ci.blocks[target >> 12];
+   if (!ci.actual || !ci.actual->block) { r4300.stop = 1; return; }
+   PC = ci.actual->block + ((target - ci.actual->start) >> 2);
 }
 
 static void generic_jump_to(u32 address)
@@ -721,6 +768,7 @@ static void generic_jump_to(u32 address)
       cached_interp_recompile_block(address);
    }
    ci.actual = ci.blocks[address >> 12];
+   if (!ci.actual || !ci.actual->block) return;
    PC = ci.actual->block + ((address - ci.actual->start) >> 2);
 }
 
@@ -741,8 +789,8 @@ void invalidate_cached_code(u32 address, u32 size)
       i = addr >> 12;
       if (ci.invalid_code[i] == 0)
       {
-         if (ci.blocks[i] == NULL ||
-             ci.blocks[i]->block[(addr & 0xfff) / 4].ops != cached_interp_NOTCOMPILED)
+          if (ci.blocks[i] == NULL || ci.blocks[i]->block == NULL ||
+              ci.blocks[i]->block[(addr & 0xfff) / 4].ops != cached_interp_NOTCOMPILED)
          {
             ci.invalid_code[i] = 1;
             addr = (addr & ~0xfff) | 0xffc;
@@ -762,18 +810,68 @@ void run_cached_interpreter(void)
    cached_interp_recompile_block(r4300.pc);
 
    ci.actual = ci.blocks[r4300.pc >> 12];
+   if (!ci.actual || !ci.actual->block) return;
    PC = ci.actual->block + ((r4300.pc - ci.actual->start) >> 2);
 
    while (!r4300.stop)
    {
+      Count += 2;
+      if (!PC) { r4300.stop = 1; break; }
+      if (ci.actual && ci.actual->block)
+      {
+         u32 length = (ci.actual->end - ci.actual->start) / 4;
+         precomp_instr* block_end = ci.actual->block + length + 1 + (length >> 2);
+         if (PC < ci.actual->block || PC >= block_end)
+         {
+            r4300.stop = 1;
+            break;
+         }
+      }
+      if (!PC->ops)
+      {
+         r4300.stop = 1;
+         break;
+      }
+      r4300.pc = PC->addr;
       PC->ops();
+      if (r4300.next_interrupt <= Count)
+      {
+         u32 pc_before_int = r4300.pc;
+         gen_interrupt();
+         if (r4300.pc != pc_before_int)
+            cached_interpreter_jump_to(r4300.pc);
+      }
    }
+}
+
+void cached_interp_TLB_REFILL(void)
+{
+   u32 vaddr = PC->addr;
+   TLB_refill_exception(vaddr, 2);
+   if (ci.invalid_code[r4300.pc >> 12])
+      cached_interp_init_block(r4300.pc);
+   ci.actual = ci.blocks[r4300.pc >> 12];
+   if (!ci.actual || !ci.actual->block)
+   {
+      printf("TLB_REFILL stuck at 0x%08x (vector 0x%08x)\n", vaddr, r4300.pc);
+      r4300.stop = 1;
+      return;
+   }
+   PC = ci.actual->block + ((r4300.pc - ci.actual->start) >> 2);
+   PC->ops();
 }
 
 void cached_interp_FIN_BLOCK(void)
 {
    u32 addr = (PC - 1)->addr + 4;
+   precomp_instr* old = PC;
    generic_jump_to(addr);
+   if (PC == old)
+   {
+      printf("FIN_BLOCK stuck at 0x%08x\n", addr);
+      r4300.stop = 1;
+      return;
+   }
    PC->ops();
 }
 
@@ -781,6 +879,12 @@ void cached_interp_NOTCOMPILED(void)
 {
    u32 addr = PC->addr;
    cached_interp_recompile_block(addr);
+   if (PC->ops == cached_interp_NOTCOMPILED)
+   {
+      printf("NOTCOMPILED stuck at 0x%08x\n", addr);
+      r4300.stop = 1;
+      return;
+   }
    PC->ops();
 }
 
@@ -791,7 +895,10 @@ void cached_interp_NOTCOMPILED2(void)
 
 void cached_interp_NI(void)
 {
-   printf("NI at 0x%08x\n", PC->addr);
+   u32 iw = read_inst(PC->addr);
+   printf("NI at 0x%08x (iw=0x%08x op=%d rs=%d rt=%d rd=%d funct=0x%02x)\n",
+          PC->addr, iw, (iw >> 26) & 0x3F, (iw >> 21) & 0x1F,
+          (iw >> 16) & 0x1F, (iw >> 11) & 0x1F, iw & 0x3F);
    r4300.stop = 1;
    PC++;
 }

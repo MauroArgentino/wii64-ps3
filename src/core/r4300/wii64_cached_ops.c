@@ -12,6 +12,15 @@
 
 extern u32 op;
 
+#define CACHED_MEM_EXC() \
+   do { \
+      if (r4300.pc != PC->addr) \
+      { \
+         cached_interp_take_exception(); \
+         return; \
+      } \
+   } while (0)
+
 void cached_interp_SLL(void)
 {
    rrd32 = (u32)(rrt32) << rsa;
@@ -264,8 +273,10 @@ void cached_interp_TEQ(void)
 {
    if (rrs == rrt)
    {
-      printf("trap exception in teq\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -274,8 +285,10 @@ void cached_interp_TGE(void)
 {
    if (rrs >= rrt)
    {
-      printf("trap exception in tge\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -284,8 +297,10 @@ void cached_interp_TGEU(void)
 {
    if ((u64)rrs >= (u64)rrt)
    {
-      printf("trap exception in tgeu\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -294,8 +309,10 @@ void cached_interp_TLT(void)
 {
    if (rrs < rrt)
    {
-      printf("trap exception in tlt\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -304,8 +321,10 @@ void cached_interp_TLTU(void)
 {
    if ((u64)rrs < (u64)rrt)
    {
-      printf("trap exception in tltu\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -314,8 +333,10 @@ void cached_interp_TNE(void)
 {
    if (rrs != rrt)
    {
-      printf("trap exception in tne\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -358,16 +379,16 @@ void cached_interp_DSRA32(void)
 
 void cached_interp_SYSCALL(void)
 {
-   r4300.pc = PC->addr;
+   Cause = (8 << 2);
    exception_general();
-   PC++;
+   cached_interpreter_jump_to(r4300.pc);
 }
 
 void cached_interp_BREAK(void)
 {
-   printf("BREAK\n");
-   r4300.stop = 1;
-   PC++;
+   Cause = (9 << 2);
+   exception_general();
+   cached_interpreter_jump_to(r4300.pc);
 }
 
 void cached_interp_SYNC(void)
@@ -378,8 +399,11 @@ void cached_interp_SYNC(void)
 static void do_branch_taken(s32 offset)
 {
    u32 target = PC->addr + 4 + offset;
-   (PC + 1)->ops();
-   cached_interpreter_jump_to(target);
+   u32 old_pc = r4300.pc;
+   PC++;
+   PC->ops();
+   if (r4300.pc == old_pc)
+      cached_interpreter_jump_to(target);
 }
 
 static void do_branch_not_taken(void)
@@ -391,8 +415,11 @@ static void do_branch_not_taken(void)
 static void do_branch_likely_taken(s32 offset)
 {
    u32 target = PC->addr + 4 + offset;
-   (PC + 1)->ops();
-   cached_interpreter_jump_to(target);
+   u32 old_pc = r4300.pc;
+   PC++;
+   PC->ops();
+   if (r4300.pc == old_pc)
+      cached_interpreter_jump_to(target);
 }
 
 static void do_branch_likely_not_taken(void)
@@ -402,102 +429,104 @@ static void do_branch_likely_not_taken(void)
 
 void cached_interp_BLTZ(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs < 0)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BGEZ(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs >= 0)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BLTZL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs < 0)
-      do_branch_taken(iimmediate << 2);
+      do_branch_likely_taken(iimmediate << 2);
    else
-      do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+      do_branch_likely_not_taken();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BGEZL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs >= 0)
-      do_branch_taken(iimmediate << 2);
+      do_branch_likely_taken(iimmediate << 2);
    else
-      do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+      do_branch_likely_not_taken();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BLTZAL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    r4300.gpr[31] = PC->addr + 8;
    if (irs < 0)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BGEZAL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    r4300.gpr[31] = PC->addr + 8;
    if (irs >= 0)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BLTZALL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    r4300.gpr[31] = PC->addr + 8;
    if (irs < 0)
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BGEZALL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    r4300.gpr[31] = PC->addr + 8;
    if (irs >= 0)
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_TGEI(void)
 {
    if (irs >= iimmediate)
    {
-      printf("trap exception in tgei\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -506,8 +535,10 @@ void cached_interp_TGEIU(void)
 {
    if ((u64)irs >= (u64)(s32)iimmediate)
    {
-      printf("trap exception in tgeiu\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -516,8 +547,10 @@ void cached_interp_TLTI(void)
 {
    if (irs < iimmediate)
    {
-      printf("trap exception in tlti\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -526,8 +559,10 @@ void cached_interp_TLTIU(void)
 {
    if ((u64)irs < (u64)(s32)iimmediate)
    {
-      printf("trap exception in tltiu\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -536,8 +571,10 @@ void cached_interp_TEQI(void)
 {
    if (irs == iimmediate)
    {
-      printf("trap exception in teqi\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
@@ -546,36 +583,45 @@ void cached_interp_TNEI(void)
 {
    if (irs != iimmediate)
    {
-      printf("trap exception in tnei\n");
-      r4300.stop = 1;
+      Cause = (13 << 2);
+      exception_general();
+      cached_interpreter_jump_to(r4300.pc);
+      return;
    }
    PC++;
 }
 
 void cached_interp_J(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    u32 target = (PC->addr & 0xF0000000) | (jinst_index << 2);
-   (PC + 1)->ops();
-   cached_interpreter_jump_to(target);
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   u32 old_pc = r4300.pc;
+   PC++;
+   PC->ops();
+   if (r4300.pc == old_pc)
+      cached_interpreter_jump_to(target);
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_JAL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    r4300.gpr[31] = PC->addr + 8;
    u32 target = (PC->addr & 0xF0000000) | (jinst_index << 2);
-   (PC + 1)->ops();
-   cached_interpreter_jump_to(target);
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   u32 old_pc = r4300.pc;
+   PC++;
+   PC->ops();
+   if (r4300.pc == old_pc)
+      cached_interpreter_jump_to(target);
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_JR(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    u32 addr = rrs32;
    if (addr & 3)
    {
@@ -584,15 +630,18 @@ void cached_interp_JR(void)
       PC++;
       return;
    }
-   (PC + 1)->ops();
-   cached_interpreter_jump_to(addr);
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   u32 old_pc = r4300.pc;
+   PC++;
+   PC->ops();
+   if (r4300.pc == old_pc)
+      cached_interpreter_jump_to(addr);
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_JALR(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    u32 addr = rrs32;
    if (addr & 3)
    {
@@ -602,98 +651,105 @@ void cached_interp_JALR(void)
       return;
    }
    rrd = (s64)((PC + 1)->addr + 4);
-   (PC + 1)->ops();
-   cached_interpreter_jump_to(addr);
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   u32 old_pc = r4300.pc;
+   PC++;
+   PC->ops();
+   if (r4300.pc == old_pc)
+      cached_interpreter_jump_to(addr);
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BEQ(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs32 == irt32)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BNE(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
+#ifdef BYPASS_CIC_CHECKSUM
+   if (PC->addr == 0x800001ac || PC->addr == 0x800001b8)
+      do_branch_not_taken();
+   else
+#endif
    if (irs32 != irt32)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BLEZ(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs32 <= 0)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BGTZ(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs32 > 0)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BEQL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs32 == irt32)
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BNEL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs32 != irt32)
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BLEZL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs32 <= 0)
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BGTZL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (irs32 > 0)
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_ADDI(void)
@@ -770,6 +826,7 @@ void cached_interp_LB(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_byte_in_memory();
+   CACHED_MEM_EXC();
    sign_extendedb(*PC->f.i.rt);
    PC++;
 }
@@ -780,6 +837,7 @@ void cached_interp_LH(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_hword_in_memory();
+   CACHED_MEM_EXC();
    sign_extendedh(*PC->f.i.rt);
    PC++;
 }
@@ -790,6 +848,7 @@ void cached_interp_LW(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    sign_extended(*PC->f.i.rt);
    PC++;
 }
@@ -800,6 +859,7 @@ void cached_interp_LBU(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_byte_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -809,6 +869,7 @@ void cached_interp_LHU(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_hword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -818,6 +879,7 @@ void cached_interp_LWU(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -827,6 +889,7 @@ void cached_interp_SB(void)
    address = iimmediate + irs32;
    byte = (unsigned char)(irt & 0xFF);
    write_byte_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -836,6 +899,7 @@ void cached_interp_SH(void)
    address = iimmediate + irs32;
    hword = (unsigned short)(irt & 0xFFFF);
    write_hword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -845,6 +909,7 @@ void cached_interp_SW(void)
    address = iimmediate + irs32;
    word = (u32)(irt & 0xFFFFFFFF);
    write_word_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -856,6 +921,7 @@ void cached_interp_LWL(void)
    address = addr & ~3;
    rdword = &aligned_val;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    u32 val = (u32)(aligned_val & 0xFFFFFFFF);
    switch (addr & 3)
    {
@@ -876,6 +942,7 @@ void cached_interp_LWR(void)
    address = addr & ~3;
    rdword = &aligned_val;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    u32 val = (u32)(aligned_val & 0xFFFFFFFF);
    switch (addr & 3)
    {
@@ -897,6 +964,7 @@ void cached_interp_SWL(void)
    address = addr & ~3;
    rdword = &old_word;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    u32 mem = (u32)(old_word & 0xFFFFFFFF);
    switch (addr & 3)
    {
@@ -908,6 +976,7 @@ void cached_interp_SWL(void)
    word = val;
    address = addr & ~3;
    write_word_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -920,6 +989,7 @@ void cached_interp_SWR(void)
    address = addr & ~3;
    rdword = &old_word;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    u32 mem = (u32)(old_word & 0xFFFFFFFF);
    switch (addr & 3)
    {
@@ -931,6 +1001,7 @@ void cached_interp_SWR(void)
    word = val;
    address = addr & ~3;
    write_word_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -942,6 +1013,7 @@ void cached_interp_LDL(void)
    address = addr & ~7;
    rdword = &aligned_val;
    read_dword_in_memory();
+   CACHED_MEM_EXC();
    u64 val = aligned_val;
    switch (addr & 7)
    {
@@ -965,6 +1037,7 @@ void cached_interp_LDR(void)
    address = addr & ~7;
    rdword = &aligned_val;
    read_dword_in_memory();
+   CACHED_MEM_EXC();
    u64 val = aligned_val;
    switch (addr & 7)
    {
@@ -990,6 +1063,7 @@ void cached_interp_SDL(void)
    address = aligned;
    rdword = &old_word;
    read_dword_in_memory();
+   CACHED_MEM_EXC();
    switch (addr & 7)
    {
       case 0: val = (val >> 56) | (old_word & 0x00FFFFFFFFFFFFFFULL); break;
@@ -1004,6 +1078,7 @@ void cached_interp_SDL(void)
    dword = val;
    address = aligned;
    write_dword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -1017,6 +1092,7 @@ void cached_interp_SDR(void)
    address = aligned;
    rdword = &old_word;
    read_dword_in_memory();
+   CACHED_MEM_EXC();
    switch (addr & 7)
    {
       case 0: break;
@@ -1031,48 +1107,53 @@ void cached_interp_SDR(void)
    dword = val;
    address = aligned;
    write_dword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
 void cached_interp_LWC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    r4300.pc = PC->addr;
    address = lfoffset + r4300.gpr[lfbase];
    unsigned long long int temp;
    rdword = &temp;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    *((s32*)r4300.fpr_single[lfft]) = (s32)(temp & 0xFFFFFFFF);
    PC++;
 }
 
 void cached_interp_SWC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    r4300.pc = PC->addr;
    address = lfoffset + r4300.gpr[lfbase];
    word = *((u32*)r4300.fpr_single[lfft]);
    write_word_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
 void cached_interp_LDC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    r4300.pc = PC->addr;
    address = lfoffset + r4300.gpr[lfbase];
    rdword = (unsigned long long int*)r4300.fpr_double[lfft];
    read_dword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
 void cached_interp_SDC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    r4300.pc = PC->addr;
    address = lfoffset + r4300.gpr[lfbase];
    dword = *((u64*)r4300.fpr_double[lfft]);
    write_dword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -1096,6 +1177,7 @@ void cached_interp_LL(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_word_in_memory();
+   CACHED_MEM_EXC();
    sign_extended(*PC->f.i.rt);
    r4300.llbit = 1;
    PC++;
@@ -1109,6 +1191,7 @@ void cached_interp_SC(void)
       address = iimmediate + irs32;
       word = (u32)(irt & 0xFFFFFFFF);
       write_word_in_memory();
+      CACHED_MEM_EXC();
       r4300.llbit = 0;
       irt = 1;
    }
@@ -1137,6 +1220,7 @@ void cached_interp_LD(void)
    address = iimmediate + irs32;
    rdword = (unsigned long long int*)PC->f.i.rt;
    read_dword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -1146,6 +1230,7 @@ void cached_interp_SD(void)
    address = iimmediate + irs32;
    dword = irt;
    write_dword_in_memory();
+   CACHED_MEM_EXC();
    PC++;
 }
 
@@ -1161,19 +1246,18 @@ void cached_interp_CACHE(void)
 
 void cached_interp_ERET(void)
 {
-   update_count();
    if (Status & 0x4)
    {
-      printf("error in ERET\n");
-      r4300.stop = 1;
-      PC++;
-      return;
+      Status &= 0xFFFFFFFB;
+      r4300.pc = (ErrorEPC == 0xFFFFFFFF) ? EPC : ErrorEPC;
    }
-   Status &= 0xFFFFFFFD;
-   r4300.pc = EPC;
+   else
+   {
+      Status &= 0xFFFFFFFD;
+      r4300.pc = EPC;
+   }
    r4300.llbit = 0;
    check_interrupt();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
    cached_interpreter_jump_to(r4300.pc);
 }
 
@@ -1227,8 +1311,6 @@ void cached_interp_MTC0(void)
       case 8:
          break;
       case 9:
-         update_count();
-         if (r4300.next_interrupt <= Count) gen_interrupt();
          translate_event_queue(val & 0xFFFFFFFF);
          Count = val & 0xFFFFFFFF;
          break;
@@ -1236,23 +1318,20 @@ void cached_interp_MTC0(void)
          EntryHi = val & 0xFFFFE0FF;
          break;
       case 11:
-         update_count();
          remove_event(COMPARE_INT);
          add_interrupt_event_count(COMPARE_INT, val);
          Compare = val;
          Cause &= 0xFFFF7FFF;
          break;
-      case 12:
-         if ((val & 0x04000000) != (Status & 0x04000000))
-         {
-            shuffle_fpr_data(Status, val);
-            set_fpr_pointers(val);
-         }
-         Status = val;
-         check_interrupt();
-         update_count();
-         if (r4300.next_interrupt <= Count) gen_interrupt();
-         break;
+       case 12:
+          if ((val & 0x04000000) != (Status & 0x04000000))
+          {
+             shuffle_fpr_data(Status, val);
+             set_fpr_pointers(val);
+          }
+          Status = val;
+          check_interrupt();
+          break;
       case 14:
          EPC = val;
          break;
@@ -1311,7 +1390,6 @@ void cached_interp_TLBWI(void)
 
 void cached_interp_TLBWR(void)
 {
-   update_count();
    Random = (Count / 2 % (32 - Wired)) + Wired;
    int idx = Random;
    tlb_unmap(idx);
@@ -1499,7 +1577,7 @@ static void cached_fpu_op_d(u32 funct)
 
 void cached_interp_MFC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    u32 reg = PC->f.r.nrd;
    LOW_WORD(irt) = *((s32*)r4300.fpr_single[reg]);
    sign_extended(irt);
@@ -1508,7 +1586,7 @@ void cached_interp_MFC1(void)
 
 void cached_interp_DMFC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    u32 reg = PC->f.r.nrd;
    irt = *((s64*)r4300.fpr_double[reg]);
    PC++;
@@ -1516,7 +1594,7 @@ void cached_interp_DMFC1(void)
 
 void cached_interp_CFC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    u32 reg = PC->f.r.nrd;
    if (reg == 31)
       irt32 = (s32)r4300.fcr31;
@@ -1528,7 +1606,7 @@ void cached_interp_CFC1(void)
 
 void cached_interp_MTC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    u32 reg = PC->f.r.nrd;
    *((s32*)r4300.fpr_single[reg]) = irt32;
    PC++;
@@ -1536,7 +1614,7 @@ void cached_interp_MTC1(void)
 
 void cached_interp_DMTC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    u32 reg = PC->f.r.nrd;
    *((s64*)r4300.fpr_double[reg]) = irt;
    PC++;
@@ -1544,7 +1622,7 @@ void cached_interp_DMTC1(void)
 
 void cached_interp_CTC1(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    u32 reg = PC->f.r.nrd;
    if (reg == 31)
       r4300.fcr31 = irt32;
@@ -1553,297 +1631,297 @@ void cached_interp_CTC1(void)
 
 void cached_interp_BC1F(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (!(r4300.fcr31 & 0x00800000))
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BC1T(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (r4300.fcr31 & 0x00800000)
       do_branch_taken(iimmediate << 2);
    else
       do_branch_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BC1FL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (!(r4300.fcr31 & 0x00800000))
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_BC1TL(void)
 {
-   r4300.pc = PC->addr;
+   r4300.delay_slot = 1;
+   r4300.pc = (PC + 1)->addr;
    if (r4300.fcr31 & 0x00800000)
       do_branch_likely_taken(iimmediate << 2);
    else
       do_branch_likely_not_taken();
-   update_count();
-   if (r4300.next_interrupt <= Count) gen_interrupt();
+   r4300.delay_slot = 0;
 }
 
 void cached_interp_ADD_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x00); PC++;
 }
 
 void cached_interp_SUB_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x01); PC++;
 }
 
 void cached_interp_MUL_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x02); PC++;
 }
 
 void cached_interp_DIV_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x03); PC++;
 }
 
 void cached_interp_SQRT_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x04); PC++;
 }
 
 void cached_interp_ABS_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x05); PC++;
 }
 
 void cached_interp_MOV_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x06); PC++;
 }
 
 void cached_interp_NEG_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x07); PC++;
 }
 
 void cached_interp_ADD_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x00); PC++;
 }
 
 void cached_interp_SUB_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x01); PC++;
 }
 
 void cached_interp_MUL_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x02); PC++;
 }
 
 void cached_interp_DIV_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x03); PC++;
 }
 
 void cached_interp_SQRT_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x04); PC++;
 }
 
 void cached_interp_ABS_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x05); PC++;
 }
 
 void cached_interp_MOV_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x06); PC++;
 }
 
 void cached_interp_NEG_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x07); PC++;
 }
 
 void cached_interp_CVT_D_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x21); PC++;
 }
 
 void cached_interp_CVT_D_W(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x21); PC++;
 }
 
 void cached_interp_CVT_W_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x24); PC++;
 }
 
 void cached_interp_CVT_W_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x24); PC++;
 }
 
 void cached_interp_CVT_L_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x25); PC++;
 }
 
 void cached_interp_CVT_L_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x25); PC++;
 }
 
 void cached_interp_CVT_S_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x20); PC++;
 }
 
 void cached_interp_CVT_S_W(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x20); PC++;
 }
 
 void cached_interp_CVT_S_L(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    r4300.stop = 1; PC++; printf("CVT_S_L not implemented\n");
 }
 
 void cached_interp_TRUNC_W_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x30); PC++;
 }
 
 void cached_interp_TRUNC_W_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x30); PC++;
 }
 
 void cached_interp_TRUNC_L_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x31); PC++;
 }
 
 void cached_interp_TRUNC_L_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x31); PC++;
 }
 
 void cached_interp_CEIL_W_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x28); PC++;
 }
 
 void cached_interp_CEIL_W_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x28); PC++;
 }
 
 void cached_interp_CEIL_L_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x29); PC++;
 }
 
 void cached_interp_CEIL_L_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x29); PC++;
 }
 
 void cached_interp_FLOOR_W_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x34); PC++;
 }
 
 void cached_interp_FLOOR_W_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x34); PC++;
 }
 
 void cached_interp_FLOOR_L_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x35); PC++;
 }
 
 void cached_interp_FLOOR_L_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x35); PC++;
 }
 
 void cached_interp_ROUND_W_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x22); PC++;
 }
 
 void cached_interp_ROUND_W_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x22); PC++;
 }
 
 void cached_interp_ROUND_L_S(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_s(0x23); PC++;
 }
 
 void cached_interp_ROUND_L_D(void)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    cached_fpu_op_d(0x23); PC++;
 }
 
 void cached_interp_CMP_COND_S(u32 cond)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    float a = *r4300.fpr_single[PC->f.cf.fs];
    float b = *r4300.fpr_single[PC->f.cf.ft];
    int c = 0;
@@ -1867,7 +1945,7 @@ void cached_interp_CMP_COND_S(u32 cond)
 
 void cached_interp_CMP_COND_D(u32 cond)
 {
-   if (check_cop1_unusable()) { PC++; return; }
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
    double a = *r4300.fpr_double[PC->f.cf.fs];
    double b = *r4300.fpr_double[PC->f.cf.ft];
    int c = 0;

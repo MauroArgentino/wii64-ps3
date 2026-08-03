@@ -888,11 +888,8 @@ static void ERET()
    update_count();
    if (Status & 0x4)
      {
-	printf("erreur dans ERET\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
+	Status &= 0xFFFFFFFB;
+	r4300.pc = (ErrorEPC == 0xFFFFFFFF) ? EPC : ErrorEPC;
      }
    else
      {
@@ -2138,6 +2135,10 @@ static void BNE()
    short local_immediate = iimmediate;
    local_rs = irs;
    local_rt = irt;
+#ifdef BYPASS_CIC_CHECKSUM
+   if (r4300.pc == 0x800001ac || r4300.pc == 0x800001b8)
+      local_rs = local_rt;
+#endif
    if ((r4300.pc + (local_immediate+1)*4) == r4300.pc)
      if (local_rs != local_rt)
        {

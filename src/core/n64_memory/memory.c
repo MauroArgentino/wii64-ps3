@@ -41,6 +41,7 @@
 #include "../r4300/macros.h"
 #include "../r4300/interrupt.h"
 #include "../r4300/Invalid_Code.h"
+#include "../r4300/wii64_cached_interp.h"
 #include "pif.h"
 #include "flashram.h"
 #include "../../main/plugin.h"
@@ -985,6 +986,11 @@ void write_nothingd()
 
 void read_nomem()
 {
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      *rdword = 0; // kseg0/kseg1 are direct-mapped: never TLB-fault, open bus
+      return;
+   }
    address = virtual_to_physical_address(address,0);
    if (address == 0x00000000) return;
    read_word_in_memory();
@@ -992,6 +998,11 @@ void read_nomem()
 
 void read_nomemb()
 {
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      *rdword = 0; // kseg0/kseg1 are direct-mapped: never TLB-fault, open bus
+      return;
+   }
    address = virtual_to_physical_address(address,0);
    if (address == 0x00000000) return;
    read_byte_in_memory();
@@ -999,6 +1010,11 @@ void read_nomemb()
 
 void read_nomemh()
 {
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      *rdword = 0; // kseg0/kseg1 are direct-mapped: never TLB-fault, open bus
+      return;
+   }
    address = virtual_to_physical_address(address,0);
    if (address == 0x00000000) return;
    read_hword_in_memory();
@@ -1006,6 +1022,11 @@ void read_nomemh()
 
 void read_nomemd()
 {
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      *rdword = 0; // kseg0/kseg1 are direct-mapped: never TLB-fault, open bus
+      return;
+   }
    address = virtual_to_physical_address(address,0);
    if (address == 0x00000000) return;
    read_dword_in_memory();
@@ -1016,6 +1037,10 @@ void write_nomem()
 /*   if (!interpcore && !invalid_code_get(address>>12))
      //if (blocks[address>>12]->code_addr[(address&0xFFF)/4])
        invalid_code_set(address>>12, 1);*/
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      return; // kseg0/kseg1 are direct-mapped: never TLB-fault, write discarded
+   }
    address = virtual_to_physical_address(address,1);
    if (address == 0x00000000) return;
    write_word_in_memory();
@@ -1026,6 +1051,10 @@ void write_nomemb()
 /*   if (!interpcore && !invalid_code_get(address>>12))
      //if (blocks[address>>12]->code_addr[(address&0xFFF)/4])
        invalid_code_set(address>>12, 1);*/
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      return; // kseg0/kseg1 are direct-mapped: never TLB-fault, write discarded
+   }
    address = virtual_to_physical_address(address,1);
    if (address == 0x00000000) return;
    write_byte_in_memory();
@@ -1036,6 +1065,10 @@ void write_nomemh()
 /*   if (!interpcore && !invalid_code_get(address>>12))
      //if (blocks[address>>12]->code_addr[(address&0xFFF)/4])
        invalid_code_set(address>>12, 1);*/
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      return; // kseg0/kseg1 are direct-mapped: never TLB-fault, write discarded
+   }
    address = virtual_to_physical_address(address,1);
    if (address == 0x00000000) return;
    write_hword_in_memory();
@@ -1046,6 +1079,10 @@ void write_nomemd()
 /*   if (!interpcore && !invalid_code_get(address>>12))
      //if (blocks[address>>12]->code_addr[(address&0xFFF)/4])
        invalid_code_set(address>>12, 1);*/
+   if (address >= 0x80000000 && address < 0xC0000000)
+   {
+      return; // kseg0/kseg1 are direct-mapped: never TLB-fault, write discarded
+   }
    address = virtual_to_physical_address(address,1);
    if (address == 0x00000000) return;
    write_dword_in_memory();
@@ -1066,21 +1103,25 @@ void write_nomemd()
 
 void read_rdram()
 {
+   if (!rdramb) { *rdword = 0; return; }
    *rdword = *((u32 *)(rdramb + (address & MEMMASK)));
 }
 
 void read_rdramb()
 {
+   if (!rdramb) { *rdword = 0; return; }
    *rdword = *(rdramb + ((address & MEMMASK)^S8));
 }
 
 void read_rdramh()
 {
+   if (!rdramb) { *rdword = 0; return; }
    *rdword = *((unsigned short *)(rdramb + ((address & MEMMASK)^S16)));
 }
 
 void read_rdramd()
 {
+   if (!rdramb) { *rdword = 0; return; }
    *rdword = ((unsigned long long int)(*(u32 *)(rdramb + (address & MEMMASK))) << 32) |
      ((*(u32 *)(rdramb + (address & MEMMASK) + 4)));
 }
@@ -1173,29 +1214,49 @@ void read_rdramFBd()
    read_rdramd();
 }
 
+static void invalidate_code_rdram(u32 size)
+{
+   if (!ci.invalid_code) return;
+   if (!ci.invalid_code[address >> 12])
+      invalidate_cached_code(address, size);
+   if (address >= 0x80000000 && address < 0xc0000000)
+   {
+      u32 alt = address ^ 0x20000000;
+      if (!ci.invalid_code[alt >> 12])
+         invalidate_cached_code(alt, size);
+   }
+}
+
 void write_rdram()
 {
    if (!rdramb) { trash = word; return; }
    *((u32 *)(rdramb + (address & MEMMASK))) = word;
+   invalidate_code_rdram(4);
 }
 
 void write_rdramb()
 {
    if (!rdramb) { trash = byte; return; }
    *((rdramb + ((address & MEMMASK)^S8))) = byte;
+   invalidate_code_rdram(1);
 }
 
 void write_rdramh()
 {
    if (!rdramb) { trash = hword; return; }
    *(unsigned short *)((rdramb + ((address & MEMMASK)^S16))) = hword;
+   invalidate_code_rdram(2);
 }
 
 void write_rdramd()
 {
    if (!rdramb) { trash = (u32)(dword >> 32); trash = (u32)(dword & 0xFFFFFFFF); return; }
-   *((u32 *)(rdramb + (address & MEMMASK))) = dword >> 32;
-   *((u32 *)(rdramb + (address & MEMMASK) + 4 )) = dword & 0xFFFFFFFF;
+   u32 wlow = (u32)(dword & 0xFFFFFFFF);
+   u32 whigh = (u32)(dword >> 32);
+   u32 a = address & MEMMASK;
+   *((u32 *)(rdramb + a)) = whigh;
+   *((u32 *)(rdramb + a + 4)) = wlow;
+   invalidate_code_rdram(8);
 }
 
 void write_rdramFB()
@@ -2706,6 +2767,7 @@ void write_pi()
 	break;
       case 0x10:
 	if (word & 2) MI_register.mi_intr_reg &= 0xFFFFFFEF;
+	pi_register.read_pi_status_reg &= ~(word & 0x3);
 	check_interrupt();
 	return;
 	break;
@@ -2750,7 +2812,9 @@ void write_pib()
       case 0x11:
       case 0x12:
       case 0x13:
-	if (word) MI_register.mi_intr_reg &= 0xFFFFFFEF;
+	if (byte) MI_register.mi_intr_reg &= 0xFFFFFFEF;
+	pi_register.read_pi_status_reg &=
+	  ~(((u32)byte) << (24 - ((*address_low & 3) * 8)));
 	check_interrupt();
 	return;
 	break;

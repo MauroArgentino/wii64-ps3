@@ -37,6 +37,7 @@
 #include "../r4300/r4300.h"
 #include "../r4300/interrupt.h"
 #include "../r4300/macros.h"
+#include "../r4300/wii64_cached_interp.h"
 #include "../../ui/fileBrowser/fileBrowser.h"
 #include "../r4300/Invalid_Code.h"
 #include "../../main/ROM-Cache.h"
@@ -233,6 +234,14 @@ void dma_pi_write()
      	       longueur);*/
 	ROMCache_read((u8*)((char*)rdram + ((u32)(pi_register.pi_dram_addr_reg)^S8)),
 	              (((pi_register.pi_cart_addr_reg-0x10000000)&0x3FFFFFF))^S8, longueur);
+ 	if (ci.invalid_code)
+ 	  {
+ 	     u32 dst = ((u32)(pi_register.pi_dram_addr_reg) ^ S8) & 0xFFFFFF;
+ 	     if (!ci.invalid_code[(dst + 0x80000000) >> 12])
+ 	        invalidate_cached_code(dst + 0x80000000, longueur);
+ 	     if (!ci.invalid_code[(dst + 0xa0000000) >> 12])
+ 	        invalidate_cached_code(dst + 0xa0000000, longueur);
+ 	  }
  	}
 
    if ((debug_count+Count) < 0x100000)

@@ -67,8 +67,7 @@ void XTLB_refill_exception(unsigned long long int addresse)
 void TLB_refill_exception(u32 address, int w)
 {
   int usual_handler = 0, i = 0;
-  
-  if (!dynacore && w != 2) {
+  if (!dynacore && w != 2 && interpcore != 2) {
     update_count();
   }
   Cause = (w == 1) ? (3 << 2):(2 << 2);
@@ -122,8 +121,8 @@ void TLB_refill_exception(u32 address, int w)
     Cause &= 0x7FFFFFFF;
   }
   
-  if(w != 2) {
-    EPC-=4;  //wii64: wtf is w != 2 ?
+  if(w != 2 && interpcore != 2) {
+    EPC-=4;  // pure interp pre-advances r4300.pc by 4 before the read; cached interp sets r4300.pc = faulting instruction
   }
    
   r4300.last_pc = r4300.pc;
@@ -159,7 +158,7 @@ void coprocessor_unusable_exception()
 
 void exception_general()
 {
-  update_count();
+  if (interpcore != 2) update_count();
   Status |= 2;
    
   EPC = r4300.pc;

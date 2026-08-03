@@ -20,12 +20,15 @@ struct cached_interp
 };
 
 extern struct cached_interp ci;
+extern u32 *tlb_LUT_r;
 
+u32 read_inst(u32 addr);
 void init_cached_blocks(void);
 void free_cached_blocks(void);
 void cached_interp_init_block(u32 address);
 void cached_interp_recompile_block(u32 address);
 void cached_interpreter_jump_to(u32 address);
+void cached_interp_take_exception(void);
 void run_cached_interpreter(void);
 void invalidate_cached_code(u32 address, u32 size);
 

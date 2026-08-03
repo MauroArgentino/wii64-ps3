@@ -28,15 +28,17 @@
 
 void Func_ChoosePureInterp();
 void Func_ChooseDynarec();
+void Func_ChooseCachedInterp();
 void Func_ReturnFromSelectCPUFrame();
 
-#define NUM_FRAME_BUTTONS 2
+#define NUM_FRAME_BUTTONS 3
 #define FRAME_BUTTONS selectCPUFrameButtons
 #define FRAME_STRINGS selectCPUFrameStrings
 
-static char FRAME_STRINGS[2][19] =
+static char FRAME_STRINGS[3][19] =
 	{ "Pure Interpreter",
-	  "Dynamic Recompiler"};
+	  "Dynamic Recompiler",
+	  "Cached Interpreter"};
 
 struct ButtonInfo
 {
@@ -54,9 +56,10 @@ struct ButtonInfo
 	ButtonFunc		clickedFunc;
 	ButtonFunc		returnFunc;
 } FRAME_BUTTONS[NUM_FRAME_BUTTONS] =
-{ //	button	buttonStyle	buttonString		x		y		width	height	Up	Dwn	Lft	Rt	clickFunc				returnFunc
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[0],	150.0,	150.0,	340.0,	56.0,	 1,	 1,	-1,	-1,	Func_ChoosePureInterp,	Func_ReturnFromSelectCPUFrame }, // Pure Interpreter
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[1],	150.0,	250.0,	340.0,	56.0,	 0,	 0,	-1,	-1,	Func_ChooseDynarec,		Func_ReturnFromSelectCPUFrame }, // Dynarec
+{ //	button	buttonStyle	buttonString		x		y		width	height	Up	Dwn	Lft	Rt	clickFunc					returnFunc
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[0],	150.0,	100.0,	340.0,	56.0,	 2,	 1,	-1,	-1,	Func_ChoosePureInterp,		Func_ReturnFromSelectCPUFrame }, // Pure Interpreter
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[1],	150.0,	200.0,	340.0,	56.0,	 0,	 2,	-1,	-1,	Func_ChooseDynarec,			Func_ReturnFromSelectCPUFrame }, // Dynarec
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[2],	150.0,	300.0,	340.0,	56.0,	 1,	 0,	-1,	-1,	Func_ChooseCachedInterp,	Func_ReturnFromSelectCPUFrame }, // Cached Interpreter
 };
 
 SelectCPUFrame::SelectCPUFrame()
@@ -121,6 +124,16 @@ void Func_ChooseDynarec()
 	dynacore = 1;
 	if(hasLoadedROM && needInit) cpu_init();
 	menu::MessageBox::getInstance().setMessage("Running Dynarec Mode");
+	pMenuContext->setActiveFrame(MenuContext::FRAME_MAIN);
+}
+
+void Func_ChooseCachedInterp()
+{
+	int needInit = 0;
+	if(hasLoadedROM && dynacore != 3){ cpu_deinit(); needInit = 1; }
+	dynacore = 3;
+	if(hasLoadedROM && needInit) cpu_init();
+	menu::MessageBox::getInstance().setMessage("Running Cached Interpreter Mode");
 	pMenuContext->setActiveFrame(MenuContext::FRAME_MAIN);
 }
 

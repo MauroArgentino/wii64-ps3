@@ -1,6 +1,6 @@
 export PS3SDK=c:/PSDK3v2
 export GCC_COLORS='locus=01;35:error=01;31:warning=01;33'
-export PATH := $(PS3SDK)/mingw/msys/1.0/bin:$(PS3SDK)/mingw/bin:$(PS3SDK)/ps3dev/bin:$(PS3SDK)/ps3dev/ppu/bin:$(PS3SDK)/ps3dev/spu/bin:$(PATH)
+export PATH := /c/PSDK3v2/mingw/msys/1.0/bin:/c/PSDK3v2/mingw/bin:/c/PSDK3v2/ps3dev/bin:/c/PSDK3v2/ps3dev/ppu/bin:/c/PSDK3v2/ps3dev/spu/bin:$(PATH)
 #export PSL1GHT=J:/PS3/PSDK3v2/psl1ght
 #export PS3DEV=j:/PS3/PSDK3v2/ps3dev
 
@@ -23,6 +23,7 @@ include $(PSL1GHT)/ppu_rules
 #---------------------------------------------------------------------------------
 #TARGET		:=	$(notdir $(CURDIR))
 TARGET		:=	ps364_glN64
+VERSION		?=	1.0.5
 ifdef DEBUG
 TARGET		:=	ps364_debug
 BUILD		:=	build_debug
@@ -46,12 +47,14 @@ CFLAGS		= -O0 -g3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ \
 			-DDEBUG_POLYGONS -DSHOW_DEBUG -DDEBUG \
 			-include ../src/main/winlnxdefs.h \
-			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__
+			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__ \
+			-DBYPASS_CIC_CHECKSUM
 else
 CFLAGS		= -O3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ -DNDEBUG -D_GLIBCXX_DEBUG=0 -U_GLIBCXX_DEBUG \
 			-include ../src/main/winlnxdefs.h \
-			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__
+			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__ \
+			-DBYPASS_CIC_CHECKSUM
 endif
 	  
 CXXFLAGS	=	$(CFLAGS) -fno-rtti -fno-exceptions -fpermissive
@@ -107,8 +110,8 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 #---------------------------------------------------------------------------------
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
-sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
+sFILES	:=	$(filter %.s,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s))))
+SFILES	:=	$(filter %.S,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S))))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 VCGFILES	:=	$(foreach dir,$(SHADERS),$(notdir $(wildcard $(dir)/*.vcg)))
 FCGFILES	:=	$(foreach dir,$(SHADERS),$(notdir $(wildcard $(dir)/*.fcg)))
@@ -152,10 +155,20 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 .PHONY: $(BUILD) clean
 
 #---------------------------------------------------------------------------------
+BUILD_FILE := $(CURDIR)/.build
+
 $(BUILD): spu_build
 	@[ -d $@ ] || mkdir -p $@
 	@cp -f $(SPU_EMBED_OBJ) $@/$(notdir $(SPU_EMBED_OBJ))
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@$(MAKE) --no-print-directory -C $(BUILD) -f ../Makefile
+	@if [ -f $(CURDIR)/$(TARGET).self ]; then \
+		build_num=$$(cat $(BUILD_FILE) 2>/dev/null || echo 0); \
+		build_num=$$((build_num + 1)); \
+		echo $$build_num > $(BUILD_FILE); \
+		versioned="$(TARGET)_ver_$(VERSION).$$(printf '%05d' $$build_num).self"; \
+		cp $(CURDIR)/$(TARGET).self $(CURDIR)/$$versioned; \
+		echo "=== Archived: $$versioned ==="; \
+	fi
 
 #---------------------------------------------------------------------------------
 spu_build:
@@ -172,11 +185,16 @@ spu_build:
 
 #---------------------------------------------------------------------------------
 clean:
-	@echo clean ...
-	@rm -fr $(BUILD) build build_debug ps364_glN64.elf ps364_glN64.self ps364_debug.elf ps364_debug.self *.pkg *.map
+	@echo "Cleaning build artifacts..."
+	@rm -fr $(BUILD) build build_debug *.map
 	@rm -f $(foreach dir,$(SOURCES),$(dir)/*.o) $(foreach dir,$(SOURCES),$(dir)/*.d)
 	@echo "Cleaning SPU artifacts..."
 	@rm -f $(SPU_DIR)/*.o $(SPU_DIR)/*.elf $(SPU_DIR)/*.bin $(SPU_EMBED_OBJ)
+
+cleanall: clean
+	@echo "Cleaning all releases..."
+	@rm -f ps364_glN64*.elf ps364_glN64*.self ps364_debug*.elf ps364_debug*.self *.pkg
+	@rm -f $(BUILD_FILE)
 
 #---------------------------------------------------------------------------------
 run:
@@ -223,6 +241,11 @@ all: rel dbg
 else
 
 export BUILDDIR	:=	$(CURDIR)
+
+export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/../$(dir)) \
+					$(foreach dir,$(DATA),$(CURDIR)/../$(dir)) \
+					$(foreach dir,$(SHADERS),$(CURDIR)/../$(dir)) \
+					$(CURDIR)/../src/platform/ps3
 
 DEPENDS	:=	$(OFILES:.o=.d)
 
