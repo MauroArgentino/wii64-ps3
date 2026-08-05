@@ -723,6 +723,15 @@ static void update_MI_intr_mask_reg()
 
 void update_SP()
 {
+   {
+     static int spWrCnt = 0;
+     if (spWrCnt < 25) {
+       spWrCnt++;
+       printf("[SPW#%d] SP_STATUS=%08X pc=%08X Count=%08X sp_st=%08X\n",
+         spWrCnt, sp_register.w_sp_status_reg,
+         (u32)r4300.pc, (unsigned int)r4300.reg_cop0[9], sp_register.sp_status_reg);
+     }
+   }
    if (sp_register.w_sp_status_reg & 0x1)
      sp_register.halt = 0;
    if (sp_register.w_sp_status_reg & 0x2)
@@ -1230,6 +1239,83 @@ static void invalidate_code_rdram(u32 size)
 void write_rdram()
 {
    if (!rdramb) { trash = word; return; }
+   {
+      /* BUILD 00147: scheduler struct write watcher. Prints ONLY the first
+         few stores of a GARBAGE value (bit31 clear = not a 0x8000xxxx RDRAM
+         pointer) to the scheduler fields, capturing the corrupting store.
+         Valid-thread transitions are suppressed to avoid log flooding. */
+      static int qbadCnt = 0;
+      static u32 lastA8 = 0, lastB0 = 0;
+      u32 qph = address & MEMMASK;
+      if (qph == 0x3359A8 || qph == 0x3359B0) {
+         u32 *last = (qph == 0x3359A8) ? &lastA8 : &lastB0;
+         if (word != *last && (word & 0x80000000) == 0 && qbadCnt < 10) {
+            qbadCnt++;
+            printf("[QHIT] sw phys=%08X last=%08X NEWGARBAGE=%08X pc=%08X Count=%08X\n",
+               qph, *last, (unsigned int)word,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+         *last = word;
+      }
+      /* BUILD 00147: track the suspect corrupt values wherever they land */
+      if (word == 0x459A0 || word == 0x459A8 || word == 0x006C02EC) {
+         static int qvalCnt = 0;
+         if (qvalCnt < 10) {
+            qvalCnt++;
+            printf("[QVAL] sw phys=%08X val=%08X pc=%08X Count=%08X\n",
+               qph, (unsigned int)word,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      /* BUILD 00148: watch the whole scheduler region 0x335980-0x335C00 for
+         the FIRST suspicious low values (0x10000 < val < 0x80000000): the
+         corrupted thread ptr/EPC range. Captures the ORIGINAL corrupting
+         store, not just the +1 copies in the handler. */
+      if (qph >= 0x335980 && qph < 0x335C00) {
+         static int qregCnt = 0;
+         if (word > 0x10000 && (word & 0xC0000000) == 0 && qregCnt < 40) {
+            qregCnt++;
+            printf("[QREG] sw phys=%08X val=%08X pc=%08X Count=%08X\n",
+               qph, (unsigned int)word,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      /* BUILD 00158: full-history watch on the queue node NEXT field at
+         0x3359A0. It was 0 when the game popped it (crash). Log EVERY word
+         store to catch whoever zeroes it. */
+      if (qph == 0x3359A0) {
+         static int qa0Cnt = 0;
+         if (qa0Cnt < 30) {
+            qa0Cnt++;
+            printf("[QA0] sw phys=003359A0 val=%08X pc=%08X Count=%08X\n",
+               (unsigned int)word, (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      /* BUILD 00158: watch the 0x335B54 counter for NON-INCREMENT writers.
+         The only legit writer is the game's `sw t1,0x5b54(at)` at 0x8032787C
+         (pc shows 0x80327880 next). Any OTHER pc writing here is the
+         corrupting store we've been hunting. */
+      if (qph == 0x335B54 && r4300.pc != 0x80327880) {
+         static int qb54Cnt = 0;
+         if (qb54Cnt < 30) {
+            qb54Cnt++;
+            printf("[QB54] sw phys=00335B54 val=%08X pc=%08X Count=%08X\n",
+               (unsigned int)word, (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      /* BUILD 00155: every store (any value) to the idle thread's saved
+         Status/EPC fields (0x335AB8/0x335ABC) - ground truth for what sets
+         the jump target of the crash thread. */
+      if (qph == 0x335AB8 || qph == 0x335ABC) {
+         static int qepcCnt = 0;
+         if (qepcCnt < 20) {
+            qepcCnt++;
+            printf("[QEPC] sw phys=%08X val=%08X pc=%08X Count=%08X\n",
+               qph, (unsigned int)word,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+   }
    *((u32 *)(rdramb + (address & MEMMASK))) = word;
    invalidate_code_rdram(4);
 }
@@ -1237,6 +1323,28 @@ void write_rdram()
 void write_rdramb()
 {
    if (!rdramb) { trash = byte; return; }
+   {
+      /* BUILD 00149: byte-store watcher for the scheduler region. Word/SD
+         stores are exonerated; byte/halfword stores and DMA are the remaining
+         corruption candidates for [0x803359B0]. */
+      static int qbyteCnt = 0;
+      u32 qph = address & MEMMASK;
+      if (qph == 0x3359A0 || qph == 0x335B54) {
+         static int qba0Cnt = 0;
+         if (qba0Cnt < 20) {
+            qba0Cnt++;
+            printf("[QBA0] sb phys=%08X val=%02X pc=%08X Count=%08X\n",
+               qph, (unsigned int)(byte & 0xFF),
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      if (qph >= 0x335980 && qph < 0x335C00 && qbyteCnt < 40) {
+         qbyteCnt++;
+         printf("[QB] sb phys=%08X val=%02X pc=%08X Count=%08X\n",
+            qph, (unsigned int)(byte & 0xFF),
+            (unsigned int)r4300.pc, (unsigned int)Count);
+      }
+   }
    *((rdramb + ((address & MEMMASK)^S8))) = byte;
    invalidate_code_rdram(1);
 }
@@ -1244,6 +1352,26 @@ void write_rdramb()
 void write_rdramh()
 {
    if (!rdramb) { trash = hword; return; }
+   {
+      /* BUILD 00149: halfword-store watcher for the scheduler region. */
+      static int qhalfCnt = 0;
+      u32 qph = address & MEMMASK;
+      if (qph == 0x3359A0 || qph == 0x335B54) {
+         static int qha0Cnt = 0;
+         if (qha0Cnt < 20) {
+            qha0Cnt++;
+            printf("[QHA0] sh phys=%08X val=%04X pc=%08X Count=%08X\n",
+               qph, (unsigned int)(hword & 0xFFFF),
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      if (qph >= 0x335980 && qph < 0x335C00 && qhalfCnt < 40) {
+         qhalfCnt++;
+         printf("[QH] sh phys=%08X val=%04X pc=%08X Count=%08X\n",
+            qph, (unsigned int)(hword & 0xFFFF),
+            (unsigned int)r4300.pc, (unsigned int)Count);
+      }
+   }
    *(unsigned short *)((rdramb + ((address & MEMMASK)^S16))) = hword;
    invalidate_code_rdram(2);
 }
@@ -1251,6 +1379,57 @@ void write_rdramh()
 void write_rdramd()
 {
    if (!rdramb) { trash = (u32)(dword >> 32); trash = (u32)(dword & 0xFFFFFFFF); return; }
+   {
+      /* BUILD 00147: scheduler struct write watcher for 64-bit stores.
+         Logs only garbage (bit31 clear) low word writes to the fields. */
+      static int qwatchdCnt = 0;
+      static u32 lastdA0 = 0, lastdA8 = 0, lastdB0 = 0;
+      u32 qph = address & MEMMASK;
+      u32 wlow = (u32)(dword & 0xFFFFFFFF);
+      if ((qph == 0x3359A0 || qph == 0x335B54)) {
+         static int qda0Cnt = 0;
+         if (qda0Cnt < 20) {
+            qda0Cnt++;
+            printf("[QDA0] sd phys=%08X val=%08X%08X pc=%08X Count=%08X\n",
+               qph, (unsigned int)(u32)(dword >> 32), wlow,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      if ((qph == 0x3359A0 || qph == 0x3359A8 || qph == 0x3359B0) && qwatchdCnt < 10) {
+         u32 *last = (qph == 0x3359A0) ? &lastdA0 : (qph == 0x3359A8) ? &lastdA8 : &lastdB0;
+         if (wlow != *last && (wlow & 0x80000000) == 0) {
+            qwatchdCnt++;
+            printf("[QDWATCH] sd phys=%08X last=%08X NEWGARBAGE=%08X%08X pc=%08X Count=%08X\n",
+               qph, *last,
+               (unsigned int)(u32)(dword >> 32), wlow,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+         *last = wlow;
+      }
+      /* BUILD 00157: 64-bit stores ANYWHERE in the scheduler region. A SD to
+         0x335AB8 writes the thread's saved Status+EPC fields in ONE op, which
+         the word-watchers (QEPC/QREG) cannot see. This is the likely writer
+         of EPC=0x006C02EC in the idle thread. */
+      if (qph >= 0x335980 && qph < 0x335C00) {
+         static int qdsdCnt = 0;
+         if (qdsdCnt < 40) {
+            qdsdCnt++;
+            printf("[QDSD] sd phys=%08X val=%08X%08X pc=%08X Count=%08X\n",
+               qph, (unsigned int)(u32)(dword >> 32), wlow,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+      /* BUILD 00157: 64-bit store of the suspect audio ROM offsets (anywhere) */
+      if (wlow == 0x459A0 || wlow == 0x459A8 || wlow == 0x006C02EC) {
+         static int qdvalCnt = 0;
+         if (qdvalCnt < 20) {
+            qdvalCnt++;
+            printf("[QDVAL] sd phys=%08X val=%08X%08X pc=%08X Count=%08X\n",
+               qph, (unsigned int)(u32)(dword >> 32), wlow,
+               (unsigned int)r4300.pc, (unsigned int)Count);
+         }
+      }
+   }
    u32 wlow = (u32)(dword & 0xFFFFFFFF);
    u32 whigh = (u32)(dword >> 32);
    u32 a = address & MEMMASK;
@@ -2089,6 +2268,7 @@ void read_vid()
 
 void write_vi()
 {
+   static int viOrigLog = 0;
    switch(*address_low)
      {
       case 0x0:
@@ -2099,6 +2279,14 @@ void write_vi()
 	  }
 	return;
 	break;
+      case 0x4:  // VI_ORIGIN
+        if (viOrigLog < 20) {
+          viOrigLog++;
+          printf("[VI_ORIG#%d] write VI_ORIGIN=%08X (old=%08X) pc=%08X\n",
+            viOrigLog, word, vi_register.vi_origin, r4300.pc);
+        }
+        *readvi[0x4] = word;
+        return;
       case 0x8:
 	if (vi_register.vi_width != word)
 	  {
@@ -2109,6 +2297,14 @@ void write_vi()
 	break;
       case 0x10:
 	MI_register.mi_intr_reg &= 0xFFFFFFF7;
+	{
+	  static int viClearCnt = 0;
+	  if (viClearCnt < 30) {
+	    viClearCnt++;
+	    printf("[VICLR#%d] write VI_CURRENT mi_intr=%08X pc=%08X Count=%08X\n",
+	      viClearCnt, MI_register.mi_intr_reg, r4300.pc, (unsigned int)Count);
+	  }
+	}
 	check_interrupt();
 	return;
 	break;

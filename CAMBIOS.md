@@ -569,3 +569,38 @@ Se agregó variable `drain_level` para capturar el tamaño del buffer antes de q
 
 El test de sine fue útil para confirmar que el artefacto venía del puerto de audio
 RPCS3, no de nuestra pipeline. Ahora se desactiva para probar con audio real del N64.
+
+---
+
+## Fix 27 — Interrupciones de dispositivos con modelo de pulso (interrupt.c / interrupt.h)
+
+**Archivo:** `src/core/r4300/interrupt.c`, `src/core/r4300/interrupt.h`
+**Cambio (build 00144):** Los manejos de interrupción tomados (VI, SI, PI, AI, SP, DP)
+ya NO auto-desactivan el bit de MI antes de `exception_general()`. El bit queda
+activo (y por tanto `Cause.IPx` se mantiene actualizado por `update_cause()`) hasta
+que un evento de "fin de pulso" lo desactiva.
+
+**Problema (build 00143):** Con SM64, la auto-desactivación previa a la excepción
+hacía que el handler del juego leyera `Cause=0` (cualquier `check_interrupt()` en un
+write MMIO durante el prologo del handler, al no encontrar bit MI pendiente, hacía
+`Cause &= 0xFFFF83FF`). SM64 despacha por `Cause`: `Cause=0` → loop en el dispatcher
+(0x803276xx) → restaura contexto de thread corrupto (puntero de thread = 0x000459C0
+basura) → TLB store-miss loop → pantalla negra eterna.
+
+**Solución:**
+- Nuevos tipos de evento `VI_PULSE_INT` (0x1000), `SI_PULSE_INT`, `PI_PULSE_INT`,
+  `AI_PULSE_INT`, `SP_PULSE_INT`, `DP_PULSE_INT` en `interrupt.h`.
+- `INTERRUPT_PULSE_LEN = 200` ciclos: duración del pulso tras la excepción.
+- En cada caso tomado se programa `add_interrupt_event_count(..., Count + INTERRUPT_PULSE_LEN)`
+  y el caso `*_PULSE_INT` hace `MI_register.mi_intr_reg &= ~bit` + `remove_interrupt_event()`
+  y `return` (sin caer en `exception_general()`).
+- Los clears de dispositivo que hace el juego al hacer ACK (escritura a registros
+  VI/SI/PI, que ya existían en `memory.c`) siguen funcionando y cortan el pulso antes.
+
+**Efecto:** el handler del juego ve `Cause.IPx` correcto en la entrada y despacha al
+handler correcto; tras el ERET la línea ya se ha desactivado y no se re-dispara el
+CHECK_INT storm. Los casos en que IE estaba deshabilitado (`chk_status(1)` falla)
+siguen auto-desactivando el bit inmediatamente (comportamiento de pulso real: la
+interrupción se pierde si no se toma).
+
+---

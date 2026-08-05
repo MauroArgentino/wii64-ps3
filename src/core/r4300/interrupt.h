@@ -58,6 +58,20 @@ void load_eventqueue_infos(char *buf);
 #define AI_INT      0x040
 #define SP_INT      0x080
 #define DP_INT      0x100
+/* BUILD 00144: delayed "pulse end" events. A taken device interrupt keeps its
+ * MI bit (and Cause.IPx) set so the game's exception handler can identify the
+ * source, then auto-deasserts shortly after (the real RCP lines are pulses).
+ * These events perform the deassert so IE-reenable does not re-fire a storm. */
+#define VI_PULSE_INT  0x1000
+#define SI_PULSE_INT  0x2000
+#define PI_PULSE_INT  0x4000
+#define AI_PULSE_INT  0x8000
+#define SP_PULSE_INT  0x10000
+#define DP_PULSE_INT  0x20000
+
+/* BUILD 00144: how long (in cycles) a taken device interrupt stays asserted
+ * after its exception is raised, before the pulse-end event deasserts it. */
+#define INTERRUPT_PULSE_LEN 200
 
 typedef struct _interrupt_queue
 {

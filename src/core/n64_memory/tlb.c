@@ -198,11 +198,18 @@ void tlb_map(int index)
    unsigned int i;
    tlb *e = &tlb_e[index];
 
+   /* BUILD 00134: accept the RDRAM KSEG0 alias as a physical target.
+    * The N64 RCP decodes 0x80000000-0x807FFFFF as RDRAM (alias of physical
+    * 0x00000000), and real games map it via the TLB (SM64 maps 0xC0000000 ->
+    * pfn 0x80000). The old guard `phys < 0x20000000` silently dropped such
+    * entries, turning valid KSEG2 accesses into TLBS exceptions. */
+   #define PHYS_OK(p) ((p) < 0x20000000 || ((p) >= 0x80000000 && (p) < 0x80800000))
+
    if (e->v_even)
      {
         if (e->start_even < e->end_even &&
             !(e->start_even >= 0x80000000 && e->end_even < 0xC0000000) &&
-            e->phys_even < 0x20000000)
+            PHYS_OK(e->phys_even))
           {
              for (i = e->start_even; i < e->end_even; i += 0x1000)
                 tlb_LUT_r[i>>12] = 0x80000000 |
@@ -217,7 +224,7 @@ void tlb_map(int index)
      {
         if (e->start_odd < e->end_odd &&
             !(e->start_odd >= 0x80000000 && e->end_odd < 0xC0000000) &&
-            e->phys_odd < 0x20000000)
+            PHYS_OK(e->phys_odd))
           {
              for (i = e->start_odd; i < e->end_odd; i += 0x1000)
                 tlb_LUT_r[i>>12] = 0x80000000 |
@@ -228,4 +235,5 @@ void tlb_map(int index)
                       (e->phys_odd + (i - e->start_odd + 0xFFF));
           }
      }
+   #undef PHYS_OK
 }

@@ -182,9 +182,26 @@ int check_cop1_unusable()
 
 void update_count()
 {
+	static u32 last_count = 0;
 	//sprintf(txtbuffer, "trace: addr = 0x%08x\n", r4300.pc);
+	/* BUILD 00158: catch the huge-count-delta source. If last_pc got out of
+	   sync with pc (e.g. a backward jump / exception that did not re-sync
+	   last_pc), (pc-last_pc)/2 wraps to a ~2^31 delta and Count explodes,
+	   destroying the game's Count-compare timer and breaking the scheduler. */
+	{
+		u32 d = (r4300.pc - r4300.last_pc) / 2;
+		static int bigCnt = 0;
+		if (d > 0x4000000 && bigCnt < 30) {
+			bigCnt++;
+			printf("[BIGCOUNT] delta=%08X pc=%08X last_pc=%08X Count=%08X\n",
+				d, r4300.pc, r4300.last_pc, (unsigned int)Count);
+		}
+		if (last_count > 0xFFF00000 && Count < 0x00100000)
+			printf("[COUNTWRAP] Count wrapped: %08X -> %08X (pc=%08X last=%08X delta=%08X)\n", last_count, Count, r4300.pc, r4300.last_pc, d);
+	}
 	Count = Count + (r4300.pc - r4300.last_pc) / 2;
 	r4300.last_pc = r4300.pc;
+	last_count = Count;
 }
 
 void init_blocks()

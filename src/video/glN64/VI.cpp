@@ -108,7 +108,13 @@ void VI_UpdateScreen()
 	GameHacks_ApplyPerFrame();
 
 	if (!OGL.frameReady)
+	{
+		static int dbgSkipped = 0;
+		extern timers Timers;
+		if (dbgSkipped < 400) printf("[VIDBG] VI#%d early-return frameReady=0 vis=%.1f fps=%.1f VI_ORIGIN=%08X\n", ++dbgSkipped, Timers.vis, Timers.fps, *REG.VI_ORIGIN);
+		else dbgSkipped++;
 		return;
+	}
 
 #ifdef DEBUG_POLYGONS
 	debug_pause_poll();
@@ -160,6 +166,10 @@ void VI_UpdateScreen()
 	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
 	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
 	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
+	static int dbgFrames = 0;
+	extern timers Timers;
+	if (dbgFrames < 400) printf("[VIDBG] frame#%d: vis=%.1f fps=%.1f VI_ORIGIN=%08X VI_STATUS=%08X\n", ++dbgFrames, Timers.vis, Timers.fps, *REG.VI_ORIGIN, *REG.VI_STATUS);
+	else dbgFrames++;
 	flip();
 	OGL.frameReady = 0;
 	gSP.changed &= ~CHANGED_COLORBUFFER;

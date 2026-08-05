@@ -184,9 +184,10 @@ char menuActive;
        char padNeedScan;
        char wpadNeedScan;
        char shutdownMenu = 0;
-	   char nativeSaveDevice;
-	   char saveStateDevice;
-       char autoSave;
+ 	   char nativeSaveDevice;
+ 	   char saveStateDevice;
+        char autoSave;
+        char autoStart;
        char screenMode = 0;
 	   char padAutoAssign;
 	   char padType[4];
@@ -213,6 +214,7 @@ static struct {
   { "NativeDevice", &nativeSaveDevice, NATIVESAVEDEVICE_SD, NATIVESAVEDEVICE_CARDB },
   { "StatesDevice", &saveStateDevice, SAVESTATEDEVICE_SD, SAVESTATEDEVICE_USB },
   { "AutoSave", &autoSave, AUTOSAVE_DISABLE, AUTOSAVE_ENABLE },
+  { "AutoStart", &autoStart, 0, 1 },
   { "LimitVIs", &Timers.limitVIs, LIMITVIS_NONE, LIMITVIS_WAIT_FOR_FRAME },
   { "Pak1", &pakMode[0], PAKMODE_MEMPAK, PAKMODE_RUMBLEPAK },
   { "Pak2", &pakMode[1], PAKMODE_MEMPAK, PAKMODE_RUMBLEPAK },
@@ -236,6 +238,37 @@ void (*fBRead)(DWORD addr) = NULL;
 void (*fBWrite)(DWORD addr, DWORD size) = NULL;
 void (*fBGetFrameBufferInfo)(void *p) = NULL;
 int loadROM(fileBrowser_file* rom);
+
+// TEMPORAL: autostart de prueba (SM64 + core del settings.cfg). No commitear.
+static void autostart_test(void)
+{
+	fileBrowser_file* dir = NULL;
+	int n, i;
+
+	romFile_readFile = fileBrowser_ps3ROM_readFile;
+	romFile_seekFile = fileBrowser_ps3_seekFile;
+	romFile_readDir  = fileBrowser_ps3_readDir;
+	romFile_init     = fileBrowser_ps3_init;
+	romFile_deinit   = fileBrowser_ps3ROM_deinit;
+	romFile_topLevel = &topLevel_ps3_Default;
+	if (romFile_deinit) romFile_deinit(romFile_topLevel);
+	if (romFile_init)   romFile_init(romFile_topLevel);
+
+	n = romFile_readDir(romFile_topLevel, &dir);
+	printf("[AUTOSTART] dynacore=%d, rom dir entries=%d\n", dynacore, n);
+	for (i = 0; i < n; i++) {
+		if (dir[i].attr == 0 && strstr(dir[i].name, "Super Mario 64")) {
+			printf("[AUTOSTART] loading: %s (size=0x%x)\n", dir[i].name, dir[i].size);
+			if (!loadROM(&dir[i])) {
+				menuActive = 0;
+				printf("[AUTOSTART] ROM loaded OK, menuActive=0 -> go()\n");
+			} else {
+				printf("[AUTOSTART] loadROM FAILED\n");
+			}
+			break;
+		}
+	}
+}
 
 int main(int argc, char* argv[]){
 
@@ -287,6 +320,7 @@ int main(int argc, char* argv[]){
 	Timers.limitVIs  = 1;
 	saveEnabled      = 0; // Don't save game
 	autoSave         = 1;
+	autoStart        = 0;
 	dynacore         = 1;
 	screenMode		 = 0;
 	padType[0]		 = PADTYPE_NONE;
@@ -332,6 +366,11 @@ int main(int argc, char* argv[]){
 	int i;
 	for(i=1; i<argc; ++i){
 		handleConfigPair(argv[i]);
+	}
+
+	// TEMPORAL: autostart de prueba activado por "AutoStart = 1" en settings.cfg
+	if (autoStart) {
+		autostart_test();
 	}
 
 	running = 1;

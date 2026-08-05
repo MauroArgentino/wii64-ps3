@@ -189,3 +189,33 @@ Also fixed: `TLBWR()` dead code had `i>>2` where `i>>12` was intended (`#ifdef U
 All 12 trap opcodes (TEQ, TGE, TGEU, TLT, TLTU, TNE, TGEI, TGEIU, TLTI, TLTIU, TEQI, TNEI) called `r4300.stop = 1` on trap condition instead of raising a proper exception. **Fix:** each now sets `Cause = (13 << 2)` and calls `exception_general()` + `cached_interpreter_jump_to(r4300.pc)` + `return` (skipping PC++).
 
 Also fixed SYSCALL and BREAK in the cached interpreter: they now set `Cause = (8 << 2)` and `Cause = (9 << 2)` respectively before calling `exception_general()`, matching the pure interpreter's behavior.
+
+## Headless ROM testing on RPCS3 (no GUI) — proven 2026-08-03
+
+Launch the installed homebrew directly from the command line so no manual GUI interaction is needed:
+
+```powershell
+$rpcs3 = 'C:\Users\tupri\Downloads\rpcs3-v0.0.41-19607-7a90d09c_win64_msvc\rpcs3.exe'
+$eboot = 'C:\Users\tupri\Downloads\rpcs3-v0.0.41-19607-7a90d09c_win64_msvc\dev_hdd0\game\WII64PS3N\USRDIR\EBOOT.BIN'
+Start-Process -FilePath $rpcs3 -ArgumentList '--no-gui', "`"$eboot`""
+```
+
+- `--no-gui` keeps a visible window (for screen capture); `--headless` also works.
+- Homebrew install root: `dev_hdd0\game\WII64PS3N\` (USRDIR/EBOOT.BIN is the built `.self`).
+- ROM dir (dev_usb000): `dev_usb000\wii64\roms\` — SM64 test ROM: `Super Mario 64 (ESP) [!].z64`.
+- Guest config: `dev_usb000\wii64\settings.cfg` — set `Core = 3` for cached interpreter (DYNACORE_CACHED_INTERP), `AutoStart = 1` to auto-load.
+- Guest stdout goes to `log\TTY.log` — **file-locked while RPCS3 runs**, so `Stop-Process -Name rpcs3 -Force` first, then read it. Emulator log: `log\RPCS3.log` (same lock behavior).
+- Game boots to black screen even when emulation is healthy; the RPCS3 window title shows `FPS: <n> | Vulkan | ...` as a liveness probe, and sustained multi-core CPU (e.g. ~200%) while no "Access violation"/"frozen" appears in RPCS3.log means the CPU core is running (a video/glN64 display problem, not a core crash).
+
+**SM64 + cached interpreter result (2026-08-03):** TTY shows `[GO] Starting cached interpreter` and emulation keeps running at ~200% CPU with no `stop`, no NI warnings, and no access violation for minutes — i.e. the cached interpreter boots SM64 on the CPU side. Output stays black → remaining issue is the glN64/RSX video path, not the interpreter.
+
+### Temporary autostart (do NOT commit)
+
+`src/main/main.cpp` carries a marked `// TEMPORAL: autostart de prueba (SM64 + core del settings.cfg). No commitear.` block:
+- `autoStart` config option (`AutoStart = 1` in settings.cfg) triggers `autostart_test()` right after config parse, before the menu loop.
+- `autostart_test()` must assign ALL `romFile_*` function pointers it uses before calling them — they are NULL-initialized globals in `fileBrowser.c` and were the cause of an "Access violation reading location 0x0" crash (missing `romFile_readDir = fileBrowser_ps3_readDir;`).
+- `loadROM()` sets `hasLoadedROM = TRUE` *before* `rom_read()`, so the LoadingBar (drawn mid-load) hits the "ROM loaded" branch of the menu with `ROM_HEADER` still NULL.
+
+### InputStatusBar NULL guard (real fix, keep)
+
+`InputStatusBar::drawComponent()` (`src/ui/libgui/InputStatusBar.cpp:119`) dereferenced `ROM_HEADER->Country_code` while the ROM was still being loaded (ROM_HEADER only set inside `rom_read()` after `ROMCache_load()` returns). During `LoadingBar::showBar` → `Gui::draw` → MainFrame draw, this crashed with a NULL read (`Access violation reading location 0x3f`). **Fix:** guard with `if (ROM_HEADER)`. This is a genuine bug fix independent of the temporary autostart.

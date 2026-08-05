@@ -8,6 +8,7 @@
 #include "../n64_memory/memory.h"
 #include "macros.h"
 #include "interrupt.h"
+#include "../../main/ROM-Cache.h"
 
 extern u32 op;
 extern tlb tlb_e[32];
@@ -96,6 +97,7 @@ void cached_interp_CVT_D_S(void); void cached_interp_CVT_D_W(void);
 void cached_interp_CVT_W_S(void); void cached_interp_CVT_W_D(void);
 void cached_interp_CVT_L_S(void); void cached_interp_CVT_L_D(void);
 void cached_interp_CVT_S_D(void); void cached_interp_CVT_S_W(void); void cached_interp_CVT_S_L(void);
+void cached_interp_CVT_D_L(void);
 void cached_interp_TRUNC_W_S(void); void cached_interp_TRUNC_W_D(void);
 void cached_interp_TRUNC_L_S(void); void cached_interp_TRUNC_L_D(void);
 void cached_interp_CEIL_W_S(void); void cached_interp_CEIL_W_D(void);
@@ -512,12 +514,18 @@ static void r4300_decode(precomp_instr* inst, u32 iw, u32 next_iw, struct precom
                   case 0x05: inst->ops = (fmt == 16) ? cached_interp_ABS_S : cached_interp_ABS_D; break;
                   case 0x06: inst->ops = (fmt == 16) ? cached_interp_MOV_S : cached_interp_MOV_D; break;
                   case 0x07: inst->ops = (fmt == 16) ? cached_interp_NEG_S : cached_interp_NEG_D; break;
-                  case 0x21: inst->ops = (fmt == 16) ? cached_interp_CVT_D_S : cached_interp_CVT_D_W; break;
+                  case 0x21:
+                     inst->ops = (fmt == 16) ? cached_interp_CVT_D_S :
+                                 (fmt == 20) ? cached_interp_CVT_D_W :
+                                 (fmt == 21) ? cached_interp_CVT_D_L : cached_interp_NI;
+                     break;
                   case 0x24: inst->ops = (fmt == 16) ? cached_interp_CVT_W_S : cached_interp_CVT_W_D; break;
                   case 0x25: inst->ops = (fmt == 16) ? cached_interp_CVT_L_S : cached_interp_CVT_L_D; break;
-                  case 0x20: inst->ops = (fmt == 17) ? cached_interp_CVT_S_D : cached_interp_NI; break;
-                  case 0x32: inst->ops = (fmt == 16) ? cached_interp_CVT_S_W : cached_interp_NI; break;
-                  case 0x33: inst->ops = (fmt == 16) ? cached_interp_CVT_S_L : cached_interp_NI; break;
+                  case 0x20:
+                     inst->ops = (fmt == 17) ? cached_interp_CVT_S_D :
+                                 (fmt == 20) ? cached_interp_CVT_S_W :
+                                 (fmt == 21) ? cached_interp_CVT_S_L : cached_interp_NI;
+                     break;
                   case 0x30: inst->ops = (fmt == 16) ? cached_interp_TRUNC_W_S : cached_interp_TRUNC_W_D; break;
                   case 0x31: inst->ops = (fmt == 16) ? cached_interp_TRUNC_L_S : cached_interp_TRUNC_L_D; break;
                   case 0x28: inst->ops = (fmt == 16) ? cached_interp_CEIL_W_S : cached_interp_CEIL_W_D; break;
@@ -833,6 +841,607 @@ void run_cached_interpreter(void)
          break;
       }
       r4300.pc = PC->addr;
+      r4300.last_pc = r4300.pc;
+      {
+        static int dbgTraceOn = 0; static int dbgTraceCnt = 0;
+        static int decompRaw = 0, decompRepeat = 0, decompTotalBytes = 0;
+        static int tokLogDone = 0;
+        static int reloadLogCnt = 0;
+        static int firstEntryCnt = 0;
+        if (r4300.pc == 0x8027F500 && firstEntryCnt < 10) {
+          firstEntryCnt++;
+          u32 fa0=(u32)r4300.gpr[4], fa1=(u32)r4300.gpr[5], fa2=(u32)r4300.gpr[6];
+          u32 fa3=(u32)r4300.gpr[7], ft0=(u32)r4300.gpr[8], ft8=(u32)r4300.gpr[24];
+          u32 ft9=(u32)r4300.gpr[25];
+          printf("[FIRST#%d] a0=%08X a1=%08X a2=%08X a3=%08X t0=%08X t8=%08X t9=%08X\n",
+            firstEntryCnt, fa0, fa1, fa2, fa3, ft0, ft8, ft9);
+          printf("[FIRST#%d] output range: %08X to %08X (%d bytes)\n",
+            firstEntryCnt, fa1, ft8, (int)(ft8 - fa1));
+          printf("[FIRST#%d] bitfield@%08X: ", firstEntryCnt, fa0);
+          { int i; for (i=0; i<4; i++) {
+            u32 addr=fa0+i*4;
+            u32 v=(rdramb[(addr&0xFFFFFF)]<<24)|(rdramb[(addr&0xFFFFFF)+1]<<16)|(rdramb[(addr&0xFFFFFF)+2]<<8)|rdramb[(addr&0xFFFFFF)+3];
+            printf("%08X ", v);
+          } printf("\n"); }
+          printf("[FIRST#%d] tokens@%08X: ", firstEntryCnt, fa3);
+          { int i; for (i=0; i<16; i++) {
+            u32 addr=fa3+i*2;
+            printf("%04X ", (rdramb[(addr&0xFFFFFF)]<<8)|rdramb[(addr&0xFFFFFF)+1]);
+          } printf("\n"); }
+        }
+        if (r4300.pc >= 0x8027F500 && r4300.pc <= 0x8027F57F) {
+          if (r4300.pc == 0x8027F528) { decompRaw++; decompTotalBytes++; }
+          if (r4300.pc == 0x8027F55C) { decompRepeat++; decompTotalBytes++; }
+          if (r4300.pc == 0x8027F508 && (u32)r4300.gpr[5] > (u32)r4300.gpr[24] - 0x40 && reloadLogCnt < 20) {
+            u32 a0val = (u32)r4300.gpr[4];
+            u32 rWord = (rdramb[(a0val&0xFFFFFF)]<<24)|(rdramb[(a0val&0xFFFFFF)+1]<<16)|(rdramb[(a0val&0xFFFFFF)+2]<<8)|rdramb[(a0val&0xFFFFFF)+3];
+            printf("[RELOAD] PRE-lw: a0=%08X word@mem=%08X a2=%d a1=%08X t0=%08X\n", a0val, rWord, (u32)r4300.gpr[6]&0xFF, (u32)r4300.gpr[5], (u32)r4300.gpr[8]);
+          }
+          if (r4300.pc == 0x8027F50C && (u32)r4300.gpr[5] > (u32)r4300.gpr[24] - 0x40 && reloadLogCnt < 20) {
+            reloadLogCnt++;
+            printf("[RELOAD] POST-lw: t0=%08X a0=%08X a2=%d a1=%08X\n", (u32)r4300.gpr[8], (u32)r4300.gpr[4], (u32)r4300.gpr[6]&0xFF, (u32)r4300.gpr[5]);
+          }
+          if (!dbgTraceOn && (u32)r4300.gpr[5] > (u32)r4300.gpr[24] - 0x40) { dbgTraceOn = 1; printf("[TRACE] near end a1=%08X t8=%08X a3=%08X t9=%08X a0=%08X a2=%08X t0=%08X\n", (u32)r4300.gpr[5], (u32)r4300.gpr[24], (u32)r4300.gpr[7], (u32)r4300.gpr[25], (u32)r4300.gpr[4], (u32)r4300.gpr[6], (u32)r4300.gpr[8]); }
+          if (dbgTraceOn && dbgTraceCnt < 1500) { dbgTraceCnt++; printf("[TR] pc=%08X t0=%08X a2=%02X a1=%08X a3=%08X t9=%08X t1=%08X t2=%08X t3=%08X\n", r4300.pc, (u32)r4300.gpr[8], (u32)r4300.gpr[6]&0xFF, (u32)r4300.gpr[5], (u32)r4300.gpr[7], (u32)r4300.gpr[25], (u32)r4300.gpr[9], (u32)r4300.gpr[10], (u32)r4300.gpr[11]); }
+          if (r4300.pc == 0x8027F574 && (u32)r4300.gpr[5] > (u32)r4300.gpr[24] - 0x40) {
+            printf("[BYTECOUNT] raw=%d repeat=%d total=%d a1=%08X t8=%08X delta=%d\n", decompRaw, decompRepeat, decompTotalBytes, (u32)r4300.gpr[5], (u32)r4300.gpr[24], (u32)r4300.gpr[5] - (0x80064F80));
+          }
+          if (!tokLogDone && r4300.pc == 0x8027F500 && (u32)r4300.gpr[5] > (u32)r4300.gpr[24] - 0x40 && (u32)r4300.gpr[5] < (u32)r4300.gpr[24]) {
+            tokLogDone = 1;
+            u32 a3start = (u32)r4300.gpr[7];
+            u32 a0val = (u32)r4300.gpr[4];
+            int i;
+            printf("[TOKDUMP] a1=%08X t8=%08X a3=%08X a0=%08X t0=%08X a2=%d\n", (u32)r4300.gpr[5], (u32)r4300.gpr[24], a3start, a0val, (u32)r4300.gpr[8], (u32)r4300.gpr[6]&0xFF);
+            printf("[TOKDUMP] bitfield word at a0:\n");
+            for (i = 0; i < 4; i++) {
+              u32 addr = a0val + i*4;
+              u32 val = (rdramb[(addr&0xFFFFFF)]<<24)|(rdramb[(addr&0xFFFFFF)+1]<<16)|(rdramb[(addr&0xFFFFFF)+2]<<8)|rdramb[(addr&0xFFFFFF)+3];
+              printf("[TOKDUMP]   %08X: %08X\n", addr, val);
+            }
+            printf("[TOKDUMP] token stream at a3 (32 halfwords):\n");
+            for (i = 0; i < 32; i++) {
+              u32 addr = a3start + i*2;
+              u16 tok = (rdramb[(addr&0xFFFFFF)]<<8)|rdramb[(addr&0xFFFFFF)+1];
+              printf("[TOKDUMP]   %08X: %04X (cnt=%d dist=%d)\n", addr, tok, (tok>>12)+3, tok&0xFFF);
+            }
+          }
+        }
+        if (r4300.pc == 0x8027F574 && (u32)r4300.gpr[5] > (u32)r4300.gpr[24]) {
+          printf("[OVERSHOOT] a1=%08X t8=%08X raw=%d repeat=%d total=%d\n", (u32)r4300.gpr[5], (u32)r4300.gpr[24], decompRaw, decompRepeat, decompTotalBytes);
+        }
+        static int dbgInsns = 0; static int dbgDumpDone = 0;
+        if (dbgInsns < 20000000 && (dbgInsns++ % 100000) == 0) {
+          if ((r4300.pc >= 0x8027F500 && r4300.pc <= 0x8027F580) || (r4300.pc >= 0x80327650 && r4300.pc <= 0x80327700)) {
+            u32 ctxEp = 0x803673CC & 0xFFFFFF;
+            u32 savedEpc = (rdramb[ctxEp]<<24)|(rdramb[ctxEp+1]<<16)|(rdramb[ctxEp+2]<<8)|rdramb[ctxEp+3];
+            printf("[CIP] pc=%08X instr=%08X a1=%08X t8=%08X a3=%08X t1=%08X t0=%08X EPCret=%08X Count=%08X next=%08X\n", r4300.pc, read_inst(r4300.pc), (u32)r4300.gpr[5], (u32)r4300.gpr[24], (u32)r4300.gpr[7], (u32)r4300.gpr[9], (u32)r4300.gpr[8], savedEpc, (unsigned int)Count, r4300.next_interrupt);
+          }
+          if (!dbgDumpDone && r4300.pc >= 0x8027F500 && r4300.pc <= 0x8027F580 && (u32)r4300.gpr[5] > (u32)r4300.gpr[24]) {
+            dbgDumpDone = 1; int i;
+            printf("[DUMP] a1=%08X t8=%08X src=%08X\n", (u32)r4300.gpr[5], (u32)r4300.gpr[24], (u32)r4300.gpr[7]);
+            u8* bp = (u8*)(&rdramb[((r4300.gpr[7] & 0xFFFFFF) - 0x40)]);
+            for (i = 0; i < 96; i++) printf("%02X%s", bp[i], ((i+1)%16==0)?"\n":" ");
+            printf("[DUMP] tokenbuf start 0x801B6870:\n"); bp = (u8*)(&rdramb[0x1B6870]);
+            for (i = 0; i < 64; i++) printf("%02X%s", bp[i], ((i+1)%16==0)?"\n":" ");
+            printf("[DUMP] code 0x8027F4F0:\n"); { u8* cp = (u8*)(&rdramb[0x27F4F0 & 0xFFFFFF]); int j;
+              for (j = 0; j < 48; j++) printf("%08X%s", ((cp[j*4]<<24)|(cp[j*4+1]<<16)|(cp[j*4+2]<<8)|cp[j*4+3]), ((j+1)%4==0)?"\n":" "); }
+            printf("[DUMP] tokens@0x801DD000 (near end a3):\n"); { u8* bp2 = (u8*)(&rdramb[0x1DD000]); int j; for (j = 0; j < 64; j++) printf("%02X%s", bp2[j], ((j+1)%16==0)?"\n":" "); }
+            printf("[DUMP] tokens@0x801BDD00 (mid stream):\n"); { u8* bp3 = (u8*)(&rdramb[0x1BDD00]); int j; for (j = 0; j < 32; j++) printf("%02X%s", bp3[j], ((j+1)%16==0)?"\n":" "); }
+          }
+        }
+        /* Coarse PC sampler: log every 200000 insns, max 80 samples (BUILD 00138, moved outside dbgInsns block) */
+        {
+          static int pcSamplerInsns = 0;
+          static int pcSamplerCnt = 0;
+          if (pcSamplerInsns++ % 200000 == 0 && pcSamplerCnt < 80) {
+            pcSamplerCnt++;
+            printf("[PCS] pc=%08X instr=%08X sp=%08X a0=%08X a1=%08X ra=%08X Count=%08X\n",
+              r4300.pc, read_inst(r4300.pc), (u32)r4300.gpr[29], (u32)r4300.gpr[4], (u32)r4300.gpr[5],
+              (u32)r4300.gpr[31], (unsigned int)Count);
+          }
+        }
+      }
+      /* === BUILD 00140: relocate __osIntOffTable/__osIntTable from VMA 0x80339980
+         (rom 0xF4980, where the 1MB cart DMA put them) to 0x80349980, the address
+         the exception handler dispatch reads (lui at,0x8034 + lbu 0x9980 / lw 0x99A0).
+         The ESP translation's data segment sits 0x10000 below its text expectations. === */
+      {
+        static int intTableRelocated = 0;
+        if (!intTableRelocated && rdramb && r4300.pc >= 0x80327640 && r4300.pc <= 0x80327EC0) {
+          intTableRelocated = 1;
+          ROMCache_read(&rdramb[0x349980], 0xF4980, 0x44);
+          printf("[INTFIX] __osIntOffTable/__osIntTable: rom 0xF4980 -> RDRAM 0x80349980 (0x44 bytes)\n");
+          printf("[INTFIX] intTable targets: %08X %08X %08X %08X %08X %08X %08X %08X %08X\n",
+            ((u32)rdramb[0x3499A0]<<24)|(rdramb[0x3499A1]<<16)|(rdramb[0x3499A2]<<8)|rdramb[0x3499A3],
+            ((u32)rdramb[0x3499A4]<<24)|(rdramb[0x3499A5]<<16)|(rdramb[0x3499A6]<<8)|rdramb[0x3499A7],
+            ((u32)rdramb[0x3499A8]<<24)|(rdramb[0x3499A9]<<16)|(rdramb[0x3499AA]<<8)|rdramb[0x3499AB],
+            ((u32)rdramb[0x3499AC]<<24)|(rdramb[0x3499AD]<<16)|(rdramb[0x3499AE]<<8)|rdramb[0x3499AF],
+            ((u32)rdramb[0x3499B0]<<24)|(rdramb[0x3499B1]<<16)|(rdramb[0x3499B2]<<8)|rdramb[0x3499B3],
+            ((u32)rdramb[0x3499B4]<<24)|(rdramb[0x3499B5]<<16)|(rdramb[0x3499B6]<<8)|rdramb[0x3499B7],
+            ((u32)rdramb[0x3499B8]<<24)|(rdramb[0x3499B9]<<16)|(rdramb[0x3499BA]<<8)|rdramb[0x3499BB],
+            ((u32)rdramb[0x3499BC]<<24)|(rdramb[0x3499BD]<<16)|(rdramb[0x3499BE]<<8)|rdramb[0x3499BF],
+            ((u32)rdramb[0x3499C0]<<24)|(rdramb[0x3499C1]<<16)|(rdramb[0x3499C2]<<8)|rdramb[0x3499C3]);
+        }
+      }
+      /* === BUILD 00129: SP corruption detector + interrupt trace + vector dump === */
+      {
+        static int bgeuHackApplied = 0;
+        static int codeHexDumpDone = 0;
+
+        /* --- Dump exception vector at 0x80000180 and delay slot at 0x80246DDC --- */
+        static int vectorDumpDone = 0;
+        if (!vectorDumpDone && r4300.pc >= 0x80246000 && r4300.pc <= 0x80247000) {
+          vectorDumpDone = 1;
+          int i;
+          printf("[VECTORDUMP] Exception vector at 0x80000180 (8 words):\n");
+          for (i = 0; i < 8; i++) {
+            u32 addr = 0x80000180 + i * 4;
+            u32 insn = read_inst(addr);
+            printf("[VECTORDUMP]   %08X: %08X\n", addr, insn);
+          }
+          printf("[VECTORDUMP] Main region 0x80246000-0x80247000 (1024 words):\n");
+          for (i = 0; i < 1024; i++) {
+            u32 addr = 0x80246000 + i * 4;
+            u32 insn = read_inst(addr);
+            printf("[VECTORDUMP]   %08X: %08X\n", addr, insn);
+          }
+          /* Also dump what's at 0x80327640-0x80327A40 (handler area, BUILD 00132: extended) */
+          printf("[VECTORDUMP] Handler area 0x80327640-0x80327A40 (256 words):\n");
+          for (i = 0; i < 256; i++) {
+            u32 addr = 0x80327640 + i * 4;
+            u32 insn = read_inst(addr);
+            printf("[VECTORDUMP]   %08X: %08X\n", addr, insn);
+          }
+          /* Dump the OSTask struct in SP DMEM 0xFC0 (BUILD 00135: RSP task probe) */
+          printf("[VECTORDUMP] OSTask @ SP_DMEM 0xFC0 (32 words):\n");
+          for (i = 0; i < 32; i++) {
+            u32 addr = 0xFC0 + i * 4;
+            u32 val = SP_DMEM[addr / 4];
+            printf("[VECTORDUMP]   %08X: %08X\n", addr, val);
+          }
+        }
+
+        /* === BUILD 00136: identify 0x803236F0 (idle pre-spin call) + main entry === */
+        {
+          static int libDumpDone = 0;
+          if (!libDumpDone && r4300.pc >= 0x80246000 && r4300.pc <= 0x80247000) {
+            libDumpDone = 1;
+            int i;
+            printf("[VECTORDUMP] libultra 0x80323500-0x80323800 (192 words):\n");
+            for (i = 0; i < 192; i++) {
+              u32 addr = 0x80323500 + i * 4;
+              u32 insn = read_inst(addr);
+              printf("[VECTORDUMP]   %08X: %08X\n", addr, insn);
+            }
+            /* BUILD 00138/00146: dump the exception dispatch tables. CORRECTION (00146):
+               the handler reads them at 0x80339980/0x803399A0 (lui at,0x8034 + 0xFFFF9980/99A0),
+               NOT 0x80349980 where INTFIX (00140) wrote. */
+            printf("[VECTORDUMP] __osIntOffTable @ 0x80339980 (32 bytes):\n");
+            for (i = 0; i < 32; i++) {
+              u32 addr = 0x80339980 + i;
+              u8 b = rdramb[addr & 0xFFFFFF];
+              printf("[VECTORDUMP]   %08X: %02X\n", addr, b);
+            }
+            printf("[VECTORDUMP] __osIntTable @ 0x803399A0 (18 words):\n");
+            for (i = 0; i < 18; i++) {
+              u32 addr = 0x803399A0 + i * 4;
+              u32 v = (rdramb[(addr)&0xFFFFFF]<<24)|(rdramb[(addr+1)&0xFFFFFF]<<16)|(rdramb[(addr+2)&0xFFFFFF]<<8)|rdramb[(addr+3)&0xFFFFFF];
+              printf("[VECTORDUMP]   %08X: %08X\n", addr, v);
+            }
+            {
+              u8 off10 = rdramb[(0x80339980+0x10) & 0xFFFFFF];
+              u32 addr = 0x803399A0 + off10;
+              u32 tgt = (rdramb[(addr)&0xFFFFFF]<<24)|(rdramb[(addr+1)&0xFFFFFF]<<16)|(rdramb[(addr+2)&0xFFFFFF]<<8)|rdramb[(addr+3)&0xFFFFFF];
+              printf("[VECTORDUMP] index0x10: off=%02X target=%08X (resume-check=80327B18, resched=80327D68, suspend=80327B68)\n", off10, tgt);
+            }
+            printf("[VECTORDUMP] INTFIX copy @ 0x80349980 (17 words):\n");
+            for (i = 0; i < 17; i++) {
+              u32 addr = 0x80349980 + i * 4;
+              u32 v = (rdramb[(addr)&0xFFFFFF]<<24)|(rdramb[(addr+1)&0xFFFFFF]<<16)|(rdramb[(addr+2)&0xFFFFFF]<<8)|rdramb[(addr+3)&0xFFFFFF];
+              printf("[VECTORDUMP]   %08X: %08X\n", addr, v);
+            }
+            printf("[VECTORDUMP] handler dispatch 0x803278A0-0x80327A40 (96 words):\n");
+            for (i = 0; i < 96; i++) {
+              u32 addr = 0x803278A0 + i * 4;
+              u32 insn = read_inst(addr);
+              printf("[VECTORDUMP]   %08X: %08X\n", addr, insn);
+            }
+            printf("[VECTORDUMP] handler redispatch 0x80327A40-0x80327EC0 (160 words):\n");
+            for (i = 0; i < 160; i++) {
+              u32 addr = 0x80327A40 + i * 4;
+              u32 insn = read_inst(addr);
+              printf("[VECTORDUMP]   %08X: %08X\n", addr, insn);
+            }
+            printf("[VECTORDUMP] flag area 0x80335A30-0x80335B60 (76 words):\n");
+            for (i = 0; i < 76; i++) {
+              u32 addr = 0x80335A30 + i * 4;
+              u32 v = (rdramb[(addr)&0xFFFFFF]<<24)|(rdramb[(addr+1)&0xFFFFFF]<<16)|(rdramb[(addr+2)&0xFFFFFF]<<8)|rdramb[(addr+3)&0xFFFFFF];
+              printf("[VECTORDUMP]   %08X: %08X\n", addr, v);
+            }
+          }
+
+          /* Dynamic trace of 0x803236F0: log first 120 instructions once entered */
+          {
+            static int idleFnTrace = 0;
+            static int idleFnLog = 0;
+            if (idleFnTrace == 0 && r4300.pc == 0x803236F0) {
+              idleFnTrace = 1;
+              printf("[IDLEFN] entered 0x803236F0 a0=%08X a1=%08X a2=%08X a3=%08X ra=%08X sp=%08X Count=%08X\n",
+                (u32)r4300.gpr[4], (u32)r4300.gpr[5], (u32)r4300.gpr[6], (u32)r4300.gpr[7],
+                (u32)r4300.gpr[31], (u32)r4300.gpr[29], (unsigned int)Count);
+            }
+            if (idleFnTrace == 1 && idleFnLog < 120) {
+              idleFnLog++;
+              printf("[IDLEFN] pc=%08X instr=%08X a0=%08X a1=%08X t0=%08X t1=%08X t2=%08X t3=%08X ra=%08X sp=%08X Count=%08X\n",
+                r4300.pc, read_inst(r4300.pc),
+                (u32)r4300.gpr[4], (u32)r4300.gpr[5],
+                (u32)r4300.gpr[8], (u32)r4300.gpr[9], (u32)r4300.gpr[10], (u32)r4300.gpr[11],
+                (u32)r4300.gpr[31], (u32)r4300.gpr[29], (unsigned int)Count);
+            }
+            if (idleFnLog >= 120) idleFnTrace = 2;
+          }
+
+          /* Log when main thread entry (0x802469B8) first executes */
+          {
+            static int mainEntryLogged = 0;
+            if (!mainEntryLogged && r4300.pc == 0x802469B8) {
+              mainEntryLogged = 1;
+              printf("[MAINTHREAD] main thread entered! sp=%08X ra=%08X a0=%08X a1=%08X t0=%08X Count=%08X\n",
+                (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[4], (u32)r4300.gpr[5],
+                (u32)r4300.gpr[8], (unsigned int)Count);
+            }
+          }
+
+          /* Log osStartThread (0x80322DF0) entry with its thread pointer */
+          {
+            static int startThreadCnt = 0;
+            if (startThreadCnt < 8 && r4300.pc == 0x80322DF0) {
+              startThreadCnt++;
+              printf("[STHREAD#%d] osStartThread tcb=%08X a1=%08X Count=%08X\n",
+                startThreadCnt, (u32)r4300.gpr[4], (u32)r4300.gpr[5], (unsigned int)Count);
+            }
+          }
+
+          /* Log real osCreateThread (0x803226B0) entry with its args */
+          {
+            static int createThreadCnt = 0;
+            if (createThreadCnt < 8 && r4300.pc == 0x803226B0) {
+              createThreadCnt++;
+              u32 spb = ((u32)r4300.gpr[29]) & 0xFFFFFF;
+              u32 stacktop = (rdramb[spb+16]<<24)|(rdramb[spb+17]<<16)|(rdramb[spb+18]<<8)|rdramb[spb+19];
+              u32 pri      = (rdramb[spb+20]<<24)|(rdramb[spb+21]<<16)|(rdramb[spb+22]<<8)|rdramb[spb+23];
+              printf("[CTHREAD#%d] osCreateThread tcb=%08X id=%08X entry=%08X arg=%08X stacktop=%08X pri=%08X Count=%08X\n",
+                createThreadCnt,
+                (u32)r4300.gpr[4], (u32)r4300.gpr[5], (u32)r4300.gpr[6], (u32)r4300.gpr[7],
+                stacktop, pri, (unsigned int)Count);
+            }
+          }
+
+          /* BUILD 00138: exception dispatch trace at handler JR t2 (0x803278DC) */
+          {
+            static int dispCnt = 0;
+            if (dispCnt < 40 && r4300.pc == 0x803278DC) {
+              dispCnt++;
+              u32 qhead = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              u32 runth = (rdramb[0x3359B0]<<24)|(rdramb[0x3359B1]<<16)|(rdramb[0x3359B2]<<8)|rdramb[0x3359B3];
+              printf("[DISP#%d] s0=%08X t1=%08X t2(target)=%08X Status=%08X Cause=%08X mi_intr=%08X mi_mask=%08X qhead=%08X run=%08X Count=%08X\n",
+                dispCnt,
+                (u32)r4300.gpr[16], (u32)r4300.gpr[9], (u32)r4300.gpr[10],
+                (u32)Status, (u32)Cause,
+                MI_register.mi_intr_reg, MI_register.mi_intr_mask_reg,
+                qhead, runth, (unsigned int)Count);
+            }
+          }
+
+          /* BUILD 00145: scheduler state at exception vector entry (0x80327650) */
+          {
+            static int excCnt = 0;
+            if (excCnt < 100 && r4300.pc == 0x80327650) {
+              excCnt++;
+              u32 qhead = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              u32 runth = (rdramb[0x3359B0]<<24)|(rdramb[0x3359B1]<<16)|(rdramb[0x3359B2]<<8)|rdramb[0x3359B3];
+              u32 tssp  = (rdramb[0x372F0]<<24)|(rdramb[0x372F1]<<16)|(rdramb[0x372F2]<<8)|rdramb[0x372F3];
+              printf("[EXC#%d] entry Status=%08X Cause=%08X EPC=%08X run=%08X qhead=%08X tsSP=%08X mi_intr=%08X Count=%08X\n",
+                excCnt,
+                (u32)Status, (u32)Cause, (u32)EPC,
+                runth, qhead, tssp,
+                MI_register.mi_intr_reg, (unsigned int)Count);
+              /* BUILD 00146: one-time dump of the REAL int tables at first exception */
+              if (excCnt == 1) {
+                int ti;
+                u8 off10;
+                u32 addr, tgt;
+                printf("[EXCTABLE] __osIntOffTable @ 0x80339980 (0x20 bytes):\n");
+                for (ti = 0; ti < 0x20; ti++)
+                  printf("[EXCTABLE]   %08X: %02X\n", 0x80339980 + ti, rdramb[(0x80339980+ti) & 0xFFFFFF]);
+                printf("[EXCTABLE] __osIntTable @ 0x803399A0 (0x1C words):\n");
+                for (ti = 0; ti < 0x1C; ti++) {
+                  addr = 0x803399A0 + ti * 4;
+                  tgt = (rdramb[(addr)&0xFFFFFF]<<24)|(rdramb[(addr+1)&0xFFFFFF]<<16)|(rdramb[(addr+2)&0xFFFFFF]<<8)|rdramb[(addr+3)&0xFFFFFF];
+                  printf("[EXCTABLE]   %08X: %08X\n", addr, tgt);
+                }
+                off10 = rdramb[(0x80339980+0x10) & 0xFFFFFF];
+                addr = 0x803399A0 + off10;
+                tgt = (rdramb[(addr)&0xFFFFFF]<<24)|(rdramb[(addr+1)&0xFFFFFF]<<16)|(rdramb[(addr+2)&0xFFFFFF]<<8)|rdramb[(addr+3)&0xFFFFFF];
+                printf("[EXCTABLE] index0x10: off=%02X target=%08X\n", off10, tgt);
+              }
+            }
+          }
+
+          /* BUILD 00146: redispatch entry + pop/run-store trace */
+          {
+            static int redispCnt = 0;
+            if (redispCnt < 60 && r4300.pc == 0x80327B18) {
+              redispCnt++;
+              u32 k0v = (u32)r4300.gpr[26];
+              u32 pk0 = 0, pqh = 0;
+              if (k0v >= 0x80000000 && k0v < 0x80800000)
+                pk0 = (rdramb[(k0v&0xFFFFFF)+4]<<24)|(rdramb[(k0v&0xFFFFFF)+5]<<16)|(rdramb[(k0v&0xFFFFFF)+6]<<8)|rdramb[(k0v&0xFFFFFF)+7];
+              u32 qhead = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              if (qhead >= 0x80000000 && qhead < 0x80800000)
+                pqh = (rdramb[(qhead&0xFFFFFF)+4]<<24)|(rdramb[(qhead&0xFFFFFF)+5]<<16)|(rdramb[(qhead&0xFFFFFF)+6]<<8)|rdramb[(qhead&0xFFFFFF)+7];
+              printf("[REDISP#%d] B18 k0=%08X prioK0=%08X qhead=%08X prioQH=%08X Count=%08X\n",
+                redispCnt, k0v, pk0, qhead, pqh, (unsigned int)Count);
+            }
+            static int b68Cnt = 0;
+            if (b68Cnt < 20 && r4300.pc == 0x80327B68) {
+              b68Cnt++;
+              printf("[B68#%d] suspend path k0=%08X Count=%08X\n", b68Cnt, (u32)r4300.gpr[26], (unsigned int)Count);
+            }
+            static int runStoreCnt = 0;
+            if (runStoreCnt < 60 && r4300.pc == 0x80327D78) {
+              runStoreCnt++;
+              u32 nrun = (u32)r4300.gpr[2];
+              u32 qhead = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              printf("[RUN#%d] newrun=%08X%s qhead=%08X k0=%08X Count=%08X\n",
+                runStoreCnt, nrun, (nrun==0x803359A0)?" (SENTINEL!)":"", qhead,
+                (u32)r4300.gpr[26], (unsigned int)Count);
+            }
+          }
+
+          /* BUILD 00148: scheduler run-queue timeline. ENQ = the JAL insert in
+             __osEnqueueAndYield (0x80327D00); SKIP = its a0==0 skip check
+             (0x80327CF8, skips the enqueue); POP = the unguarded run-queue pop
+             (0x80327D58, run queue only); RESCH = reschedule entry (0x80327D68). */
+          {
+            static int enqCnt = 0;
+            if (enqCnt < 80 && r4300.pc == 0x80327D00) {
+              enqCnt++;
+              u32 qh = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              printf("[ENQ#%d] a0(queue)=%08X a1(thread)=%08X qhead=%08X sp=%08X ra=%08X Count=%08X\n",
+                enqCnt, (u32)r4300.gpr[4], (u32)r4300.gpr[5], qh,
+                (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
+            }
+            static int skipCnt = 0;
+            if (skipCnt < 40 && r4300.pc == 0x80327CF8) {
+              skipCnt++;
+              printf("[SKIP#%d] a0=%08X (skip enqueue if 0) sp=%08X ra=%08X Count=%08X\n",
+                skipCnt, (u32)r4300.gpr[4], (u32)r4300.gpr[29], (u32)r4300.gpr[31],
+                (unsigned int)Count);
+            }
+            static int popCnt = 0;
+            if (popCnt < 80 && r4300.pc == 0x80327D58 && (u32)r4300.gpr[4] == 0x803359A8) {
+              popCnt++;
+              u32 head = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              u32 headNext = 0;
+              if (head >= 0x80000000 && head < 0x80800000)
+                headNext = (rdramb[(head&0xFFFFFF)]<<24)|(rdramb[(head&0xFFFFFF)+1]<<16)|(rdramb[(head&0xFFFFFF)+2]<<8)|rdramb[(head&0xFFFFFF)+3];
+              printf("[POP#%d] popped=%08X%s next=%08X sp=%08X ra=%08X Count=%08X\n",
+                popCnt, head, (head==0x803359A0)?" (SENTINEL!)":"", headNext,
+                (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
+            }
+            static int reschCnt = 0;
+            if (reschCnt < 40 && r4300.pc == 0x80327D68) {
+              reschCnt++;
+              u32 qh = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              printf("[RESCH#%d] qhead=%08X%s k0=%08X sp=%08X ra=%08X Count=%08X\n",
+                reschCnt, qh, (qh==0x803359A0)?" (SENTINEL!)":"", (u32)r4300.gpr[26],
+                (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
+            }
+          }
+
+          /* BUILD 00145: log when non-flag path reads __osRunningThread (0x803276E8) */
+          {
+            static int nfpCnt = 0;
+            if (nfpCnt < 40 && r4300.pc == 0x803276E8) {
+              nfpCnt++;
+              u32 runth = (rdramb[0x3359B0]<<24)|(rdramb[0x3359B1]<<16)|(rdramb[0x3359B2]<<8)|rdramb[0x3359B3];
+              u32 qhead = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              printf("[NFP#%d] run=%08X qhead=%08X t0(tsbase)=%08X Status=%08X Cause=%08X EPC=%08X Count=%08X\n",
+                nfpCnt, runth, qhead, (u32)r4300.gpr[8],
+                (u32)Status, (u32)Cause, (u32)EPC, (unsigned int)Count);
+            }
+          }
+
+          /* BUILD 00139: handler flag-path trace at 0x80327808 (reads [0x80335A44]) */
+          {
+            static int flagCnt = 0;
+            if (flagCnt < 30 && r4300.pc == 0x80327808) {
+              flagCnt++;
+              u32 fl44 = (rdramb[0x335A44]<<24)|(rdramb[0x335A45]<<16)|(rdramb[0x335A46]<<8)|rdramb[0x335A47];
+              u32 fl48 = (rdramb[0x335A48]<<24)|(rdramb[0x335A49]<<16)|(rdramb[0x335A4A]<<8)|rdramb[0x335A4B];
+              printf("[FLAG#%d] fl44=%08X fl48=%08X t0(cause)=%08X k1(status)=%08X sp=%08X Count=%08X mi_intr=%08X\n",
+                flagCnt, fl44, fl48, (u32)r4300.gpr[8], (u32)r4300.gpr[27],
+                (u32)r4300.gpr[29], (unsigned int)Count, MI_register.mi_intr_reg);
+            }
+          }
+
+          /* BUILD 00149: settle fast-path vs generic. FASTVI = flag44 nonzero
+             (jump target 0x80327D88 mid-restore, no reschedule); FASTVI2 = flag48
+             nonzero (same target); GEN = both flags zero (table dispatch @0x803278DC). */
+          {
+            static int fastviCnt = 0;
+            if (fastviCnt < 10 && r4300.pc == 0x80327814) {
+              fastviCnt++;
+              u32 fl44 = (rdramb[0x335A44]<<24)|(rdramb[0x335A45]<<16)|(rdramb[0x335A46]<<8)|rdramb[0x335A47];
+              printf("[FASTVI#%d] flag44 path taken fl44=%08X t0=%08X k0=%08X Count=%08X mi_intr=%08X\n",
+                fastviCnt, fl44, (u32)r4300.gpr[8], (u32)r4300.gpr[26],
+                (unsigned int)Count, MI_register.mi_intr_reg);
+            }
+            static int fastvi2Cnt = 0;
+            if (fastvi2Cnt < 10 && r4300.pc == 0x80327844) {
+              fastvi2Cnt++;
+              u32 fl48 = (rdramb[0x335A48]<<24)|(rdramb[0x335A49]<<16)|(rdramb[0x335A4A]<<8)|rdramb[0x335A4B];
+              printf("[FASTVI2#%d] flag48 path taken fl48=%08X t0=%08X k0=%08X Count=%08X mi_intr=%08X\n",
+                fastvi2Cnt, fl48, (u32)r4300.gpr[8], (u32)r4300.gpr[26],
+                (unsigned int)Count, MI_register.mi_intr_reg);
+            }
+            static int genCnt = 0;
+            if (genCnt < 10 && r4300.pc == 0x80327880) {
+              genCnt++;
+              u32 qhead = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              printf("[GEN#%d] generic path (both flags 0) t0=%08X qhead=%08X Count=%08X mi_intr=%08X\n",
+                genCnt, (u32)r4300.gpr[8], qhead,
+                (unsigned int)Count, MI_register.mi_intr_reg);
+            }
+          }
+
+          /* BUILD 00149: confirm the exit-thunk -> __osCleanupThread path of the crash.
+             EXITTHUNK = 0x80327EA8 (only way to reach __osCleanupThread, no JAL callers);
+             CLEANUP = __osCleanupThread entry (ra = caller). */
+          {
+            static int exitThunkCnt = 0;
+            if (exitThunkCnt < 10 && r4300.pc == 0x80327EA8) {
+              exitThunkCnt++;
+              u32 runth = (rdramb[0x3359B0]<<24)|(rdramb[0x3359B1]<<16)|(rdramb[0x3359B2]<<8)|rdramb[0x3359B3];
+              printf("[EXITTHUNK#%d] at 0x80327EA8 run=%08X k0=%08X sp=%08X ra=%08X Count=%08X\n",
+                exitThunkCnt, runth, (u32)r4300.gpr[26],
+                (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
+            }
+            static int cleanupCnt = 0;
+            if (cleanupCnt < 10 && r4300.pc == 0x8032AE70) {
+              cleanupCnt++;
+              u32 runth = (rdramb[0x3359B0]<<24)|(rdramb[0x3359B1]<<16)|(rdramb[0x3359B2]<<8)|rdramb[0x3359B3];
+              printf("[CLEANUP#%d] __osCleanupThread a0=%08X run=%08X sp=%08X ra=%08X Count=%08X\n",
+                cleanupCnt, (u32)r4300.gpr[4], runth,
+                (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
+            }
+          }
+        }
+
+        /* --- SP corruption detector: log when gpr[29] transitions to 0 --- */
+        {
+          static u32 prev_sp = 0xDEADBEEF;
+          static int spCorruptCnt = 0;
+          u32 cur_sp = (u32)r4300.gpr[29];
+          if (prev_sp != 0 && cur_sp == 0 && spCorruptCnt < 20) {
+            spCorruptCnt++;
+            printf("[SP_CORRUPT#%d] SP went to 0! pc=%08X instr=%08X prev_sp=%08X\n",
+              spCorruptCnt, r4300.pc, read_inst(r4300.pc), prev_sp);
+            printf("[SP_CORRUPT#%d] All regs: a0=%08X a1=%08X v0=%08X v1=%08X\n",
+              spCorruptCnt,
+              (u32)r4300.gpr[4], (u32)r4300.gpr[5],
+              (u32)r4300.gpr[2], (u32)r4300.gpr[3]);
+            printf("[SP_CORRUPT#%d] t0-t7: %08X %08X %08X %08X %08X %08X %08X %08X\n",
+              spCorruptCnt,
+              (u32)r4300.gpr[8], (u32)r4300.gpr[9], (u32)r4300.gpr[10], (u32)r4300.gpr[11],
+              (u32)r4300.gpr[12], (u32)r4300.gpr[13], (u32)r4300.gpr[14], (u32)r4300.gpr[15]);
+            printf("[SP_CORRUPT#%d] s0-s7: %08X %08X %08X %08X %08X %08X %08X %08X\n",
+              spCorruptCnt,
+              (u32)r4300.gpr[16], (u32)r4300.gpr[17], (u32)r4300.gpr[18], (u32)r4300.gpr[19],
+              (u32)r4300.gpr[20], (u32)r4300.gpr[21], (u32)r4300.gpr[22], (u32)r4300.gpr[23]);
+            printf("[SP_CORRUPT#%d] t8-t9 k0-k1 ra: %08X %08X %08X %08X %08X\n",
+              spCorruptCnt,
+              (u32)r4300.gpr[24], (u32)r4300.gpr[25],
+              (u32)r4300.gpr[26], (u32)r4300.gpr[27],
+              (u32)r4300.gpr[31]);
+            printf("[SP_CORRUPT#%d] Status=%08X Cause=%08X EPC=%08X Count=%08X\n",
+              spCorruptCnt,
+              (u32)Status, (u32)Cause, (u32)EPC, (unsigned int)Count);
+            {
+              u32 qhead = (rdramb[0x3359A8]<<24)|(rdramb[0x3359A9]<<16)|(rdramb[0x3359AA]<<8)|rdramb[0x3359AB];
+              u32 runth = (rdramb[0x3359B0]<<24)|(rdramb[0x3359B1]<<16)|(rdramb[0x3359B2]<<8)|rdramb[0x3359B3];
+              u32 qhead2 = (rdramb[0x3359AC]<<24)|(rdramb[0x3359AD]<<16)|(rdramb[0x3359AE]<<8)|rdramb[0x3359AF];
+              printf("[SP_CORRUPT#%d] qhead=%08X qhead2=%08X run=%08X Count=%08X\n",
+                spCorruptCnt, qhead, qhead2, runth, (unsigned int)Count);
+              printf("[SP_CORRUPT#%d] TCB 0x803359A0 (k0) context dump:\n", spCorruptCnt);
+              {
+                int si;
+                u32 k0t = (u32)r4300.gpr[26];
+                if (k0t >= 0x80000000 && k0t < 0x80800000) {
+                  u8* cb = &rdramb[k0t & 0xFFFFFF];
+                  for (si = 0; si < 0x80; si += 16)
+                    printf("  %08X: %08X %08X %08X %08X\n", k0t + si,
+                      (cb[si]<<24)|(cb[si+1]<<16)|(cb[si+2]<<8)|cb[si+3],
+                      (cb[si+4]<<24)|(cb[si+5]<<16)|(cb[si+6]<<8)|cb[si+7],
+                      (cb[si+8]<<24)|(cb[si+9]<<16)|(cb[si+10]<<8)|cb[si+11],
+                      (cb[si+12]<<24)|(cb[si+13]<<16)|(cb[si+14]<<8)|cb[si+15]);
+                }
+              }
+            }
+            /* Dump 8 words from old_sp (the stack before corruption) */
+            if (prev_sp >= 0x80000000 && prev_sp < 0x80800000) {
+              int si;
+              u8* spBase = &rdramb[prev_sp & 0xFFFFFF];
+              printf("[SP_CORRUPT#%d] Stack dump @ prev_sp=%08X:\n", spCorruptCnt, prev_sp);
+              for (si = 0; si < 32; si += 4)
+                printf("  %08X: %08X %08X %08X %08X\n", prev_sp + si,
+                  (spBase[si]<<24)|(spBase[si+1]<<16)|(spBase[si+2]<<8)|spBase[si+3],
+                  (spBase[si+4]<<24)|(spBase[si+5]<<16)|(spBase[si+6]<<8)|spBase[si+7],
+                  (spBase[si+8]<<24)|(spBase[si+9]<<16)|(spBase[si+10]<<8)|spBase[si+11],
+                  (spBase[si+12]<<24)|(spBase[si+13]<<16)|(spBase[si+14]<<8)|spBase[si+15]);
+            }
+          }
+          prev_sp = cur_sp;
+        }
+
+        /* --- Track every SP register change (debug: only log large changes) --- */
+        {
+          static u32 lastLoggedSp = 0;
+          static int spChangeCnt = 0;
+          u32 curSp2 = (u32)r4300.gpr[29];
+          if (spChangeCnt < 500 && curSp2 != lastLoggedSp) {
+            u32 diff = (curSp2 > lastLoggedSp) ? (curSp2 - lastLoggedSp) : (lastLoggedSp - curSp2);
+            if (diff > 0x1000 || curSp2 == 0 || lastLoggedSp == 0) {
+              spChangeCnt++;
+              printf("[SP_CHG#%d] SP: %08X -> %08X pc=%08X instr=%08X Count=%08X\n",
+                spChangeCnt, lastLoggedSp, curSp2, r4300.pc, read_inst(r4300.pc), (unsigned int)Count);
+            }
+          }
+          lastLoggedSp = curSp2;
+        }
+
+        /* --- Post-hack trace: log every 200th instruction for first 200K after hack --- */
+        static int postHackCnt = 0;
+        static int postHackLogCnt = 0;
+        if (bgeuHackApplied && postHackCnt < 200000) {
+          postHackCnt++;
+          if ((postHackCnt % 200) == 0 && postHackLogCnt < 1000) {
+            postHackLogCnt++;
+            printf("[PH#%d] pc=%08X instr=%08X a0=%08X a1=%08X t0=%08X t8=%08X ra=%08X sp=%08X Count=%08X\n",
+              postHackLogCnt, r4300.pc, read_inst(r4300.pc),
+              (u32)r4300.gpr[4], (u32)r4300.gpr[5],
+              (u32)r4300.gpr[8], (u32)r4300.gpr[24],
+              (u32)r4300.gpr[31], (u32)r4300.gpr[29], (unsigned int)Count);
+          }
+          if (postHackCnt == 200000)
+            printf("[POSTHACK] trace complete (200K insns, %d logged)\n", postHackLogCnt);
+        }
+
+        /* One-time: dump raw instruction hex from RDRAM for disassembly verification */
+        if (!codeHexDumpDone && r4300.pc >= 0x8027F500 && r4300.pc <= 0x8027F580) {
+          codeHexDumpDone = 1;
+          int i;
+          printf("[CODEHEX] Decompressor code at 0x8027F4F0 (36 words):\n");
+          for (i = 0; i < 36; i++) {
+            u32 addr = 0x8027F4F0 + i * 4;
+            u8 *cp = &rdramb[addr & 0xFFFFFF];
+            u32 insn = (cp[0] << 24) | (cp[1] << 16) | (cp[2] << 8) | cp[3];
+            printf("[CODEHEX]   %08X: %08X\n", addr, insn);
+          }
+        }
+
+        /* Hack: at BNE a1,t8 (0x8027F574), if a1 overshot t8, force a1=t8 so loop exits */
+        if (!bgeuHackApplied && r4300.pc == 0x8027F574
+            && (u32)r4300.gpr[5] > (u32)r4300.gpr[24]) {
+          bgeuHackApplied = 1;
+          printf("[BGEU_HACK] Forcing a1=t8: a1=%08X -> %08X (was %08X)\n",
+            (u32)r4300.gpr[24], (u32)r4300.gpr[24],
+            (u32)r4300.gpr[5]);
+          r4300.gpr[5] = r4300.gpr[24]; /* force a1 = t8 */
+        }
+      }
+
       PC->ops();
       if (r4300.next_interrupt <= Count)
       {
