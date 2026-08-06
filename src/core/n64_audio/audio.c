@@ -58,7 +58,7 @@ static s64 audio_log_t0 = 0; // first timestamp for relative time
 // Uncomment to bypass N64 audio entirely and generate a pure 440Hz sine wave.
 // If this sounds clean → our audio pipeline is the problem.
 // If this also clicks → RPCS3 audio port has inherent crackling.
-// #define AUDIO_SINE_TEST  // DISABLED: want real game audio, not 440Hz test tone
+// // #define AUDIO_SINE_TEST
 
 // Use a dedicated audio thread so R4300 isn't blocked during block writes.
 // The thread drains ring buffer into PS3 blocks at the hardware rate,
@@ -263,29 +263,6 @@ static void audio_thread_entry(void *arg){
 #endif
 static int port_started = 0;
 
-#ifdef AUDIO_SINE_TEST
-#include <math.h>
-static void sine_boot_tone(void) {
-	audioPortStart(portNum);
-	port_started = 1;
-	f32 *portData = (f32*)((u64)config.audioDataStart);
-	if (!portData) { printf("[AUDIO] SINE_TEST: portData is NULL!\n"); return; }
-	int block;
-	unsigned int phase = 0;
-	for (block = 0; block < config.numBlocks; block++) {
-		f32 *buf = portData + config.channelCount * AUDIO_BLOCK_SAMPLES * block;
-		int i;
-		for (i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
-			float val = sinf((float)phase * 2.0f * 3.14159265f / 48000.0f * 440.0f) * 0.3f;
-			buf[i*2 + 0] = val;
-			buf[i*2 + 1] = val;
-			phase++;
-		}
-	}
-	printf("[AUDIO] SINE_TEST: filled %ld blocks with 440Hz tone (port started)\n", config.numBlocks);
-}
-#endif
-
 static void play_buffer(void){
 #ifndef THREADED_AUDIO
 	if(!port_started){
@@ -445,16 +422,11 @@ AiLenChanged( void )
 {
 	if(!audioEnabled) return;
 
-	static int aiLogCnt = 0;
 	short* stream = (short*)(AudioInfo.RDRAM +
 		         (*AudioInfo.AI_DRAM_ADDR_REG & 0xFFFFFF));
 	unsigned int length = *AudioInfo.AI_LEN_REG;
 
-	if (aiLogCnt < 20) {
-		aiLogCnt++;
-		printf("[AUDIO] AiLenChanged#%d: addr=%08X len=%u freq=%u ratio=%.3f\n",
-			aiLogCnt, *AudioInfo.AI_DRAM_ADDR_REG & 0xFFFFFF, length, freq, freq_ratio);
-	}
+	ATLOG("AiLenChanged: addr=%08x len=%u freq=%u ratio=%.3f", *AudioInfo.AI_DRAM_ADDR_REG & 0xFFFFFF, length, freq, freq_ratio);
 	add_to_buffer(stream, length);
 }
 
@@ -550,11 +522,6 @@ InitiateAudio( AUDIO_INFO Audio_Info )
 	dbg_printf("sysEventQueueDrain: %08x\n",ret);
 
 	ATLOG("InitiateAudio: freq=%u real_freq=%u ratio=%.3f", freq, real_freq, freq_ratio);
-
-#ifdef AUDIO_SINE_TEST
-	// sine_boot_tone(); // DISABLED with AUDIO_SINE_TEST
-#endif
-
 	return TRUE;
 }
 

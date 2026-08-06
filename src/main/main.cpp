@@ -184,10 +184,9 @@ char menuActive;
        char padNeedScan;
        char wpadNeedScan;
        char shutdownMenu = 0;
- 	   char nativeSaveDevice;
- 	   char saveStateDevice;
-        char autoSave;
-        char autoStart;
+	   char nativeSaveDevice;
+	   char saveStateDevice;
+       char autoSave;
        char screenMode = 0;
 	   char padAutoAssign;
 	   char padType[4];
@@ -198,6 +197,7 @@ char menuActive;
 //TODO: remove these declarations
 u32 dynacore;
 u32 interpcore;
+char autoStart;
 
 static struct {
 	const char* key;
@@ -210,11 +210,11 @@ static struct {
   { "FBTex", &glN64_useFrameBufferTextures, GLN64_FBTEX_DISABLE, GLN64_FBTEX_ENABLE },
   { "2xSaI", &glN64_use2xSaiTextures, GLN64_2XSAI_DISABLE, GLN64_2XSAI_ENABLE },
   { "ScreenMode", &screenMode, SCREENMODE_4x3, SCREENMODE_16x9_PILLARBOX },
-  { "Core", ((char*)&dynacore)+3, DYNACORE_INTERPRETER, DYNACORE_CACHED_INTERP },
+  { "Core", ((char*)&dynacore)+3, DYNACORE_INTERPRETER, DYNACORE_PURE_INTERP },
+  { "AutoStart", &autoStart, 0, 1 },
   { "NativeDevice", &nativeSaveDevice, NATIVESAVEDEVICE_SD, NATIVESAVEDEVICE_CARDB },
   { "StatesDevice", &saveStateDevice, SAVESTATEDEVICE_SD, SAVESTATEDEVICE_USB },
   { "AutoSave", &autoSave, AUTOSAVE_DISABLE, AUTOSAVE_ENABLE },
-  { "AutoStart", &autoStart, 0, 1 },
   { "LimitVIs", &Timers.limitVIs, LIMITVIS_NONE, LIMITVIS_WAIT_FOR_FRAME },
   { "Pak1", &pakMode[0], PAKMODE_MEMPAK, PAKMODE_RUMBLEPAK },
   { "Pak2", &pakMode[1], PAKMODE_MEMPAK, PAKMODE_RUMBLEPAK },
@@ -320,8 +320,8 @@ int main(int argc, char* argv[]){
 	Timers.limitVIs  = 1;
 	saveEnabled      = 0; // Don't save game
 	autoSave         = 1;
-	autoStart        = 0;
 	dynacore         = 1;
+	autoStart        = 0;
 	screenMode		 = 0;
 	padType[0]		 = PADTYPE_NONE;
 	padType[1]		 = PADTYPE_NONE;

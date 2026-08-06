@@ -36,12 +36,10 @@ extern "C" {
 #include "../ui/fileBrowser/fileBrowser.h"
 #ifdef PS3
 #include "../ui/fileBrowser/fileBrowser-ps3.h"
-#include <sys/stat.h>
 #else //PS3
 #include "../ui/fileBrowser/fileBrowser-libfat.h"
-#include <sys/stat.h>
-#include <sys/dirent.h>
-#endif //PS3
+#include "../ui/fileBrowser/fileBrowser-CARD.h"
+#endif //!PS3
 }
 
 void Func_TabGeneral();
@@ -54,12 +52,11 @@ void Func_NativeSaveSD();
 void Func_NativeSaveUSB();
 void Func_NativeSaveCardA();
 void Func_NativeSaveCardB();
-void Func_SaveStateHDD();
+void Func_SaveStateSD();
 void Func_SaveStateUSB();
 void Func_CpuPureInterp();
 void Func_CpuDynarec();
-void Func_CpuCachedInterp();
-void Func_SaveSettingsHDD();
+void Func_SaveSettingsSD();
 void Func_SaveSettingsUSB();
 
 void Func_ShowFpsOn();
@@ -89,52 +86,33 @@ void Func_AutoSaveNativeNo();
 void Func_CopySaves();
 void Func_DeleteSaves();
 void Func_ReturnFromSettingsFrame();
-/* Menu Tabs */
-#define FB_TAB_GENERAL			0
-#define FB_TAB_VIDEO			1
-#define	FB_TAB_INPUT			2
-#define FB_TAB_AUDIO			3
-#define	FB_TAB_SAVES			4
-/* Options General */
-#define FB_NATIVE_SAVE_HDD		5
-#define FB_NATIVE_SAVE_USB		6
-#define FB_SAVE_STATE_HDD		7
-#define FB_SAVE_STATE_USB		8
-#define FB_CPU_PURE_INTERP		9
-#define FB_CPU_DYNAREC			10
-#define FB_CPU_CACHED_INTERP	11
-#define	FB_SAVE_SETTINGS_HDD	12
-#define	FB_SAVE_SETTINGS_USB	13
-// #define	
-// #define		15
-// #define		16
 
-#define NUM_FRAME_BUTTONS 39
+
+#define NUM_FRAME_BUTTONS 38
 #define NUM_TAB_BUTTONS 5
 #define FRAME_BUTTONS settingsFrameButtons
 #define FRAME_STRINGS settingsFrameStrings
 #define NUM_FRAME_TEXTBOXES 13
 #define FRAME_TEXTBOXES settingsFrameTextBoxes
 
-static char FRAME_STRINGS[38][23] =
+static char FRAME_STRINGS[37][23] =
 	{ "General",
 	  "Video",
 	  "Input",
 	  "Audio",
 	  "Saves",
-	  //Strings for General tab [5]
+	//Strings for General tab [5]
 	  "Native Saves Device",
 	  "Save States Device",
 	  "Select CPU Core",
 	  "Save settings.cfg",
-	  "HDD",
+	  "SD",
 	  "USB",
-	  // "CardA",
-	  // "CardB",
+	  "CardA",
+	  "CardB",
 	  "Pure Interp",
 	  "Dynarec",
-	  "Cached",
-	//Strings for Video tab [16]
+	//Strings for Video tab [15]
 	  "Show FPS",
 	  "Screen Mode",
 	  "CPU Framebuffer",
@@ -144,19 +122,19 @@ static char FRAME_STRINGS[38][23] =
 	  "Off",
 	  "4:3",
 	  "16:9",
-	  "Force 16:9",
-	//Strings for Input tab [26]
+	  "Force 16:9", //[24]
+	//Strings for Input tab [25]
 	  "Configure Input",
 	  "Configure Paks",
 	  "Configure Buttons",
 	  "Save Button Configs",
 	  "Auto Load Slot:",
 	  "Default",
-	//Strings for Audio tab [32]
+	//Strings for Audio tab [31]
 	  "Disable Audio",
 	  "Yes",
 	  "No",
-	//Strings for Saves tab [35]
+	//Strings for Saves tab [34]
 	  "Auto Save Native Saves",
 	  "Copy Saves",
 	  "Delete Saves"};
@@ -179,50 +157,49 @@ struct ButtonInfo
 } FRAME_BUTTONS[NUM_FRAME_BUTTONS] =
 { //	button	buttonStyle buttonString		x		y		width	height	Up	Dwn	Lft	Rt	clickFunc				returnFunc
 	//Buttons for Tabs (starts at button[0])
-/*0*/{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_TAB_GENERAL],	 25.0,	 30.0,	110.0,	56.0,	-1,	-1,	 4,	 1,	Func_TabGeneral,		Func_ReturnFromSettingsFrame }, // General tab
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_TAB_VIDEO],	155.0,	 30.0,	100.0,	56.0,	-1,	-1,	 0,	 2,	Func_TabVideo,			Func_ReturnFromSettingsFrame }, // Video tab
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_TAB_INPUT],	275.0,	 30.0,	100.0,	56.0,	-1,	-1,	 1,	 3,	Func_TabInput,			Func_ReturnFromSettingsFrame }, // Input tab
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_TAB_AUDIO],	395.0,	 30.0,	100.0,	56.0,	-1,	-1,	 2,	 4,	Func_TabAudio,			Func_ReturnFromSettingsFrame }, // Audio tab
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_TAB_SAVES],	515.0,	 30.0,	100.0,	56.0,	-1,	-1,	 3,	 0,	Func_TabSaves,			Func_ReturnFromSettingsFrame }, // Saves tab
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[0],	 25.0,	 30.0,	110.0,	56.0,	-1,	-1,	 4,	 1,	Func_TabGeneral,		Func_ReturnFromSettingsFrame }, // General tab
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[1],	155.0,	 30.0,	100.0,	56.0,	-1,	-1,	 0,	 2,	Func_TabVideo,			Func_ReturnFromSettingsFrame }, // Video tab
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[2],	275.0,	 30.0,	100.0,	56.0,	-1,	-1,	 1,	 3,	Func_TabInput,			Func_ReturnFromSettingsFrame }, // Input tab
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[3],	395.0,	 30.0,	100.0,	56.0,	-1,	-1,	 2,	 4,	Func_TabAudio,			Func_ReturnFromSettingsFrame }, // Audio tab
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[4],	515.0,	 30.0,	100.0,	56.0,	-1,	-1,	 3,	 0,	Func_TabSaves,			Func_ReturnFromSettingsFrame }, // Saves tab
 	//Buttons for General Tab (starts at button[5])
-/*5*/{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_NATIVE_SAVE_HDD],	295.0,	100.0,	 55.0,	56.0,	 0,	 9,	 8,	 6,	Func_NativeSaveSD,		Func_ReturnFromSettingsFrame }, // Native Save: SD
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_NATIVE_SAVE_USB],	360.0,	100.0,	 70.0,	56.0,	 0,	10,	 5,	 7,	Func_NativeSaveUSB,		Func_ReturnFromSettingsFrame }, // Native Save: USB
-//	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[11],	440.0,	100.0,	 90.0,	56.0,	 0,	10,	 6,	 8,	Func_NativeSaveCardA,	Func_ReturnFromSettingsFrame }, // Native Save: Card A
-//	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[12],	540.0,	100.0,	 90.0,	56.0,	 0,	10,	 7,	 5,	Func_NativeSaveCardB,	Func_ReturnFromSettingsFrame }, // Native Save: Card B
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_SAVE_STATE_HDD],	295.0,	170.0,	 55.0,	56.0,	 5,	11,	10,	10,	Func_SaveStateHDD,		Func_ReturnFromSettingsFrame }, // Save State: SD
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_SAVE_STATE_USB],	360.0,	170.0,	 70.0,	56.0,	 6,	12,	 9,	 9,	Func_SaveStateUSB,		Func_ReturnFromSettingsFrame }, // Save State: USB
-/*11*/{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_CPU_PURE_INTERP],	295.0,	240.0,	100.0,	56.0,	 9,	14,	13,	12,	Func_CpuPureInterp,		Func_ReturnFromSettingsFrame }, // CPU: Pure Interp
-/*12*/{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_CPU_DYNAREC],	405.0,	240.0,	100.0,	56.0,	10,	15,	11,	13,	Func_CpuDynarec,		Func_ReturnFromSettingsFrame }, // CPU: Dynarec
-/*13*/{	NULL,	BTN_A_SEL,	FRAME_STRINGS[FB_CPU_CACHED_INTERP],	515.0,	240.0,	100.0,	56.0,	11,	15,	12,	11,	Func_CpuCachedInterp,	Func_ReturnFromSettingsFrame }, // CPU: Cached
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[FB_SAVE_SETTINGS_HDD],	295.0,	310.0,	 55.0,	56.0,	11,	0,	15,	15,	Func_SaveSettingsHDD,	Func_ReturnFromSettingsFrame }, // Save Settings: HDD
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[FB_SAVE_SETTINGS_USB],	360.0,	310.0,	 70.0,	56.0,	12,	0,	14,	14,	Func_SaveSettingsUSB,	Func_ReturnFromSettingsFrame }, // Save Settings: USB
-	//Buttons for Video Tab (starts at button[16])
-/*16*/	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	325.0,	100.0,	 75.0,	56.0,	 1,	18,	16,	16,	Func_ShowFpsOn,			Func_ReturnFromSettingsFrame }, // Show FPS: On
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[22],	420.0,	100.0,	 75.0,	56.0,	 1,	19,	15,	15,	Func_ShowFpsOff,		Func_ReturnFromSettingsFrame }, // Show FPS: Off
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[23],	230.0,	170.0,	 75.0,	56.0,	15,	20,	19,	18,	Func_ScreenMode4_3,		Func_ReturnFromSettingsFrame }, // ScreenMode: 4:3
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[24],	325.0,	170.0,	 75.0,	56.0,	15,	20,	17,	19,	Func_ScreenMode16_9,	Func_ReturnFromSettingsFrame }, // ScreenMode: 16:9
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[25],	420.0,	170.0,	155.0,	56.0,	16,	21,	18,	17,	Func_ScreenForce16_9,	Func_ReturnFromSettingsFrame }, // ScreenMode: Force 16:9 in-game
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	325.0,	240.0,	 75.0,	56.0,	18,	22,	21,	21,	Func_CpuFramebufferOn,	Func_ReturnFromSettingsFrame }, // CPU FB: On
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[22],	420.0,	240.0,	 75.0,	56.0,	19,	23,	20,	20,	Func_CpuFramebufferOff,	Func_ReturnFromSettingsFrame }, // CPU FB: Off
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	325.0,	310.0,	 75.0,	56.0,	20,	24,	23,	23,	Func_2xSaiTexturesOn,	Func_ReturnFromSettingsFrame }, // 2xSai: On
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[22],	420.0,	310.0,	 75.0,	56.0,	21,	25,	22,	22,	Func_2xSaiTexturesOff,	Func_ReturnFromSettingsFrame }, // 2xSai: Off
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	325.0,	380.0,	 75.0,	56.0,	22,	 1,	25,	25,	Func_FbTexturesOn,		Func_ReturnFromSettingsFrame }, // FbTex: On
-/*26*/	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[22],	420.0,	380.0,	 75.0,	56.0,	23,	 1,	24,	24,	Func_FbTexturesOff,		Func_ReturnFromSettingsFrame }, // FbTex: Off
-	//Buttons for Input Tab (starts at button[27])
-/*27*/	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[26],	180.0,	100.0,	280.0,	56.0,	 2,	28,	-1,	-1,	Func_ConfigureInput,	Func_ReturnFromSettingsFrame }, // Configure Mappings
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[27],	180.0,	170.0,	280.0,	56.0,	27,	29,	-1,	-1,	Func_ConfigurePaks,		Func_ReturnFromSettingsFrame }, // Configure Paks
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[28],	180.0,	240.0,	280.0,	56.0,	28,	30,	-1,	-1,	Func_ConfigureButtons,	Func_ReturnFromSettingsFrame }, // Configure Buttons
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	29,	32,	31,	31,	Func_SaveButtonsSD,		Func_ReturnFromSettingsFrame }, // Save Button Configs to SD
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[10],	360.0,	310.0,	 70.0,	56.0,	29,	32,	30,	30,	Func_SaveButtonsUSB,	Func_ReturnFromSettingsFrame }, // Save Button Configs to USB
-/*32*/	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[31],	295.0,	380.0,	135.0,	56.0,	29,	 2,	-1,	-1,	Func_ToggleButtonLoad,	Func_ReturnFromSettingsFrame }, // Toggle Button Load Slot
-	//Buttons for Audio Tab (starts at button[33])
-/*33*/	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	345.0,	100.0,	 75.0,	56.0,	 3,	 3,	34,	34,	Func_DisableAudioYes,	Func_ReturnFromSettingsFrame }, // Disable Audio: Yes
-/*34*/	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[34],	440.0,	100.0,	 75.0,	56.0,	 3,	 3,	33,	33,	Func_DisableAudioNo,	Func_ReturnFromSettingsFrame }, // Disable Audio: No
-	//Buttons for Saves Tab (starts at button[35])
-/*35*/{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	375.0,	100.0,	 75.0,	56.0,	 4,	37,	36,	36,	Func_AutoSaveNativeYes,	Func_ReturnFromSettingsFrame }, // Auto Save Native: Yes
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[34],	470.0,	100.0,	 75.0,	56.0,	 4,	37,	35,	35,	Func_AutoSaveNativeNo,	Func_ReturnFromSettingsFrame }, // Auto Save Native: No
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[36],	365.0,	170.0,	190.0,	56.0,	35,	38,	-1,	-1,	Func_CopySaves,			Func_ReturnFromSettingsFrame }, // Copy Saves
-/*38*/{	NULL,	BTN_A_NRM,	FRAME_STRINGS[37],	365.0,	240.0,	190.0,	56.0,	37,	 4,	-1,	-1,	Func_DeleteSaves,		Func_ReturnFromSettingsFrame }, // Delete Saves
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[9],	295.0,	100.0,	 55.0,	56.0,	 0,	 9,	 8,	 6,	Func_NativeSaveSD,		Func_ReturnFromSettingsFrame }, // Native Save: SD
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[10],	360.0,	100.0,	 70.0,	56.0,	 0,	10,	 5,	 7,	Func_NativeSaveUSB,		Func_ReturnFromSettingsFrame }, // Native Save: USB
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[11],	440.0,	100.0,	 90.0,	56.0,	 0,	10,	 6,	 8,	Func_NativeSaveCardA,	Func_ReturnFromSettingsFrame }, // Native Save: Card A
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[12],	540.0,	100.0,	 90.0,	56.0,	 0,	10,	 7,	 5,	Func_NativeSaveCardB,	Func_ReturnFromSettingsFrame }, // Native Save: Card B
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[9],	295.0,	170.0,	 55.0,	56.0,	 5,	11,	10,	10,	Func_SaveStateSD,		Func_ReturnFromSettingsFrame }, // Save State: SD
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[10],	360.0,	170.0,	 70.0,	56.0,	 6,	11,	 9,	 9,	Func_SaveStateUSB,		Func_ReturnFromSettingsFrame }, // Save State: USB
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[13],	295.0,	240.0,	160.0,	56.0,	 9,	13,	12,	12,	Func_CpuPureInterp,		Func_ReturnFromSettingsFrame }, // CPU: Pure Interp
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[14],	465.0,	240.0,	130.0,	56.0,	10,	14,	11,	11,	Func_CpuDynarec,		Func_ReturnFromSettingsFrame }, // CPU: Dynarec
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	11,	 0,	14,	14,	Func_SaveSettingsSD,	Func_ReturnFromSettingsFrame }, // Save Settings: SD
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[10],	360.0,	310.0,	 70.0,	56.0,	11,	 0,	13,	13,	Func_SaveSettingsUSB,	Func_ReturnFromSettingsFrame }, // Save Settings: USB
+	//Buttons for Video Tab (starts at button[15])
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	100.0,	 75.0,	56.0,	 1,	18,	16,	16,	Func_ShowFpsOn,			Func_ReturnFromSettingsFrame }, // Show FPS: On
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	100.0,	 75.0,	56.0,	 1,	19,	15,	15,	Func_ShowFpsOff,		Func_ReturnFromSettingsFrame }, // Show FPS: Off
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[22],	230.0,	170.0,	 75.0,	56.0,	15,	20,	19,	18,	Func_ScreenMode4_3,		Func_ReturnFromSettingsFrame }, // ScreenMode: 4:3
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[23],	325.0,	170.0,	 75.0,	56.0,	15,	20,	17,	19,	Func_ScreenMode16_9,	Func_ReturnFromSettingsFrame }, // ScreenMode: 16:9
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[24],	420.0,	170.0,	155.0,	56.0,	16,	21,	18,	17,	Func_ScreenForce16_9,	Func_ReturnFromSettingsFrame }, // ScreenMode: Force 16:9 in-game
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	240.0,	 75.0,	56.0,	18,	22,	21,	21,	Func_CpuFramebufferOn,	Func_ReturnFromSettingsFrame }, // CPU FB: On
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	240.0,	 75.0,	56.0,	19,	23,	20,	20,	Func_CpuFramebufferOff,	Func_ReturnFromSettingsFrame }, // CPU FB: Off
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	310.0,	 75.0,	56.0,	20,	24,	23,	23,	Func_2xSaiTexturesOn,	Func_ReturnFromSettingsFrame }, // 2xSai: On
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	310.0,	 75.0,	56.0,	21,	25,	22,	22,	Func_2xSaiTexturesOff,	Func_ReturnFromSettingsFrame }, // 2xSai: Off
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	380.0,	 75.0,	56.0,	22,	 1,	25,	25,	Func_FbTexturesOn,		Func_ReturnFromSettingsFrame }, // FbTex: On
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	380.0,	 75.0,	56.0,	23,	 1,	24,	24,	Func_FbTexturesOff,		Func_ReturnFromSettingsFrame }, // FbTex: Off
+	//Buttons for Input Tab (starts at button[26])
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[25],	180.0,	100.0,	280.0,	56.0,	 2,	27,	-1,	-1,	Func_ConfigureInput,	Func_ReturnFromSettingsFrame }, // Configure Mappings
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[26],	180.0,	170.0,	280.0,	56.0,	26,	28,	-1,	-1,	Func_ConfigurePaks,		Func_ReturnFromSettingsFrame }, // Configure Paks
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[27],	180.0,	240.0,	280.0,	56.0,	27,	29,	-1,	-1,	Func_ConfigureButtons,	Func_ReturnFromSettingsFrame }, // Configure Buttons
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	28,	31,	30,	30,	Func_SaveButtonsSD,		Func_ReturnFromSettingsFrame }, // Save Button Configs to SD
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[10],	360.0,	310.0,	 70.0,	56.0,	28,	31,	29,	29,	Func_SaveButtonsUSB,	Func_ReturnFromSettingsFrame }, // Save Button Configs to USB
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[30],	295.0,	380.0,	135.0,	56.0,	29,	 2,	-1,	-1,	Func_ToggleButtonLoad,	Func_ReturnFromSettingsFrame }, // Toggle Button Load Slot
+	//Buttons for Audio Tab (starts at button[32])
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[32],	345.0,	100.0,	 75.0,	56.0,	 3,	 3,	33,	33,	Func_DisableAudioYes,	Func_ReturnFromSettingsFrame }, // Disable Audio: Yes
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	440.0,	100.0,	 75.0,	56.0,	 3,	 3,	32,	32,	Func_DisableAudioNo,	Func_ReturnFromSettingsFrame }, // Disable Audio: No
+	//Buttons for Saves Tab (starts at button[34])
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[32],	375.0,	100.0,	 75.0,	56.0,	 4,	36,	35,	35,	Func_AutoSaveNativeYes,	Func_ReturnFromSettingsFrame }, // Auto Save Native: Yes
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	470.0,	100.0,	 75.0,	56.0,	 4,	36,	34,	34,	Func_AutoSaveNativeNo,	Func_ReturnFromSettingsFrame }, // Auto Save Native: No
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[35],	365.0,	170.0,	190.0,	56.0,	34,	37,	-1,	-1,	Func_CopySaves,			Func_ReturnFromSettingsFrame }, // Copy Saves
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[36],	365.0,	240.0,	190.0,	56.0,	36,	 4,	-1,	-1,	Func_DeleteSaves,		Func_ReturnFromSettingsFrame }, // Delete Saves
 };
 
 struct TextBoxInfo
@@ -328,7 +305,7 @@ void SettingsFrame::activateSubmenu(int submenu)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[5].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[15].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[13].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
 			for (int i = 0; i < 4; i++)
@@ -336,10 +313,9 @@ void SettingsFrame::activateSubmenu(int submenu)
 			FRAME_BUTTONS[0].button->setSelected(true);
 			FRAME_BUTTONS[5+nativeSaveDevice].button->setSelected(true);
 			FRAME_BUTTONS[9+saveStateDevice].button->setSelected(true);
-			if (dynacore == DYNACORE_PURE_INTERP)		FRAME_BUTTONS[11].button->setSelected(true);
-			else if (dynacore == DYNACORE_CACHED_INTERP)	FRAME_BUTTONS[13].button->setSelected(true);
-			else											FRAME_BUTTONS[12].button->setSelected(true);
-			for (int i = 5; i < 16; i++)
+			if (dynacore == DYNACORE_PURE_INTERP)	FRAME_BUTTONS[11].button->setSelected(true);
+			else									FRAME_BUTTONS[12].button->setSelected(true);
+			for (int i = 5; i < 15; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -357,18 +333,18 @@ void SettingsFrame::activateSubmenu(int submenu)
 			for (int i = 4; i < 9; i++)
 				FRAME_TEXTBOXES[i].textBox->setVisible(true);
 			FRAME_BUTTONS[1].button->setSelected(true);
-			if (showFPSonScreen == FPS_SHOW)	FRAME_BUTTONS[16].button->setSelected(true);
-			else								FRAME_BUTTONS[17].button->setSelected(true);
-			if (screenMode == SCREENMODE_4x3)		FRAME_BUTTONS[18].button->setSelected(true);
-			else if (screenMode == SCREENMODE_16x9)	FRAME_BUTTONS[19].button->setSelected(true);
-			else									FRAME_BUTTONS[20].button->setSelected(true);
-			if (renderCpuFramebuffer == CPUFRAMEBUFFER_ENABLE)	FRAME_BUTTONS[21].button->setSelected(true);
-			else												FRAME_BUTTONS[22].button->setSelected(true);
-			if (glN64_use2xSaiTextures == GLN64_2XSAI_ENABLE)	FRAME_BUTTONS[23].button->setSelected(true);
-			else												FRAME_BUTTONS[24].button->setSelected(true);
-			if (glN64_useFrameBufferTextures == GLN64_FBTEX_ENABLE)	FRAME_BUTTONS[25].button->setSelected(true);
-			else													FRAME_BUTTONS[26].button->setSelected(true);
-			for (int i = 15; i < 27; i++)
+			if (showFPSonScreen == FPS_SHOW)	FRAME_BUTTONS[15].button->setSelected(true);
+			else								FRAME_BUTTONS[16].button->setSelected(true);
+			if (screenMode == SCREENMODE_4x3)		FRAME_BUTTONS[17].button->setSelected(true);
+			else if (screenMode == SCREENMODE_16x9)	FRAME_BUTTONS[18].button->setSelected(true);
+			else									FRAME_BUTTONS[19].button->setSelected(true);
+			if (renderCpuFramebuffer == CPUFRAMEBUFFER_ENABLE)	FRAME_BUTTONS[20].button->setSelected(true);
+			else												FRAME_BUTTONS[21].button->setSelected(true);
+			if (glN64_use2xSaiTextures == GLN64_2XSAI_ENABLE)	FRAME_BUTTONS[22].button->setSelected(true);
+			else												FRAME_BUTTONS[23].button->setSelected(true);
+			if (glN64_useFrameBufferTextures == GLN64_FBTEX_ENABLE)	FRAME_BUTTONS[24].button->setSelected(true);
+			else													FRAME_BUTTONS[25].button->setSelected(true);
+			for (int i = 15; i < 26; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -379,16 +355,16 @@ void SettingsFrame::activateSubmenu(int submenu)
 			for (int i = 0; i < NUM_TAB_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[27].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[32].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[26].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[31].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
-			for (int i = 10; i < 12; i++)
+			for (int i = 9; i < 11; i++)
 				FRAME_TEXTBOXES[i].textBox->setVisible(true);
 			FRAME_BUTTONS[2].button->setSelected(true);
-			if (loadButtonSlot == LOADBUTTON_DEFAULT)	strcpy(FRAME_STRINGS[31], "Default");
-			else										sprintf(FRAME_STRINGS[31], "Slot %d", loadButtonSlot+1);
-			for (int i = 27; i < 33; i++)
+			if (loadButtonSlot == LOADBUTTON_DEFAULT)	strcpy(FRAME_STRINGS[30], "Default");
+			else										sprintf(FRAME_STRINGS[30], "Slot %d", loadButtonSlot+1);
+			for (int i = 26; i < 32; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -399,16 +375,16 @@ void SettingsFrame::activateSubmenu(int submenu)
 			for (int i = 0; i < NUM_TAB_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[33].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[33].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[32].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[32].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
-			for (int i = 12; i < 13; i++)
+			for (int i = 11; i < 12; i++)
 				FRAME_TEXTBOXES[i].textBox->setVisible(true);
 			FRAME_BUTTONS[3].button->setSelected(true);
-			if (audioEnabled == AUDIO_DISABLE)	FRAME_BUTTONS[33].button->setSelected(true);
-			else								FRAME_BUTTONS[34].button->setSelected(true);
-			for (int i = 33; i < 35; i++)
+			if (audioEnabled == AUDIO_DISABLE)	FRAME_BUTTONS[32].button->setSelected(true);
+			else								FRAME_BUTTONS[33].button->setSelected(true);
+			for (int i = 32; i < 34; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -419,16 +395,16 @@ void SettingsFrame::activateSubmenu(int submenu)
 			for (int i = 0; i < NUM_TAB_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[35].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[38].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[34].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[37].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
-			for (int i = 13; i < 14; i++)
+			for (int i = 12; i < 13; i++)
 				FRAME_TEXTBOXES[i].textBox->setVisible(true);
 			FRAME_BUTTONS[4].button->setSelected(true);
-			if (autoSave == AUTOSAVE_ENABLE)	FRAME_BUTTONS[35].button->setSelected(true);
-			else								FRAME_BUTTONS[36].button->setSelected(true);
-			for (int i = 35; i < 38; i++)
+			if (autoSave == AUTOSAVE_ENABLE)	FRAME_BUTTONS[34].button->setSelected(true);
+			else								FRAME_BUTTONS[35].button->setSelected(true);
+			for (int i = 34; i < NUM_FRAME_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -596,7 +572,7 @@ void Func_NativeSaveCardB()
 	nativeSaveDevice = NATIVESAVEDEVICE_CARDB;
 }
 
-void Func_SaveStateHDD()
+void Func_SaveStateSD()
 {
 	for (int i = 9; i <= 10; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
@@ -620,7 +596,7 @@ extern BOOL hasLoadedROM;
 
 void Func_CpuPureInterp()
 {
-	for (int i = 11; i <= 13; i++)
+	for (int i = 11; i <= 12; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
 	FRAME_BUTTONS[11].button->setSelected(true);
 
@@ -632,7 +608,7 @@ void Func_CpuPureInterp()
 
 void Func_CpuDynarec()
 {
-	for (int i = 11; i <= 13; i++)
+	for (int i = 11; i <= 12; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
 	FRAME_BUTTONS[12].button->setSelected(true);
 
@@ -642,32 +618,17 @@ void Func_CpuDynarec()
 	if(hasLoadedROM && needInit) cpu_init();
 }
 
-void Func_CpuCachedInterp()
-{
-	for (int i = 11; i <= 13; i++)
-		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[13].button->setSelected(true);
-
-	int needInit = 0;
-	if(hasLoadedROM && dynacore != DYNACORE_CACHED_INTERP){ cpu_deinit(); needInit = 1; }
-	dynacore = DYNACORE_CACHED_INTERP;
-	if(hasLoadedROM && needInit) cpu_init();
-}
-
 extern void writeConfig(FILE* f);
 
-void Func_SaveSettingsHDD()
+void Func_SaveSettingsSD()
 {
+#ifndef PS3
 	fileBrowser_file* configFile_file;
-	int (*configFile_init)(fileBrowser_file*) = fileBrowser_ps3_init;
+	int (*configFile_init)(fileBrowser_file*) = fileBrowser_libfat_init;
 	int num_written = 0;
-	configFile_file = &saveDir_ps3_Default;
+	configFile_file = &saveDir_libfat_Default;
 	if(configFile_init(configFile_file)) {                //only if device initialized ok
-		// Ensure the directory exists
-		mkdir("/dev_hdd0/game/WII64PS3N", 0777);
-		mkdir("/dev_hdd0/game/WII64PS3N/config", 0777);
-		
-		FILE* f = fopen( "/dev_hdd0/game/WII64PS3N/config/settings.cfg", "wb" ); //attempt to open file
+		FILE* f = fopen( "sd:/wii64/settings.cfg", "wb" );  //attempt to open file
 		if(f) {
 			writeConfig(f);                                   //write out the config
 			fclose(f);
@@ -675,9 +636,10 @@ void Func_SaveSettingsHDD()
 		}
 	}
 	if (num_written == 1)
-		menu::MessageBox::getInstance().setMessage("Saved settings.cfg to HDD");
+		menu::MessageBox::getInstance().setMessage("Saved settings.cfg to SD");
 	else
-		menu::MessageBox::getInstance().setMessage("Error saving settings.cfg to HDD");
+#endif //!PS3
+		menu::MessageBox::getInstance().setMessage("Error saving settings.cfg to SD");
 }
 
 void Func_SaveSettingsUSB()

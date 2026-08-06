@@ -193,7 +193,6 @@ void Func_Credits()
 	strcat(CreditsInfo,"tehpola - core\n");
 	strcat(CreditsInfo,"sepp256 - graphics & menu\n");
 	strcat(CreditsInfo,"emu_kidid - general coding\n");
-	strcat(CreditsInfo,"MauroArgento - refactor & upgrade\n");
 	strcat(CreditsInfo,"\n");
 	strcat(CreditsInfo,"Special Thanks To:\n");
 	strcat(CreditsInfo,"       drmr - for menu graphics\n");
@@ -201,8 +200,6 @@ void Func_Credits()
 	strcat(CreditsInfo,"Wintermute/Shagkur - devkitPro/libOGC\n");
 #ifdef HW_RVL
 	strcat(CreditsInfo,"Team Twiizers - for Wii homebrew\n");
-#else
-	strcat(CreditsInfo,"Big Pickle, Nemotron 3 Ultra, Gemini - assistans & coding\n");
 #endif
 
 	menu::MessageBox::getInstance().setMessage(CreditsInfo);

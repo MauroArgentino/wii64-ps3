@@ -801,10 +801,9 @@ void gDPLoadTLUT( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 
 	u16 pal = (gDP.tiles[tile].tmem - 256) >> 4;
 
-	#ifdef DEBUG
 	printf("[TLUT] Load: tile=%d tmem=0x%03X palette_field=%d pal_idx=%d count=%d fmt=%d size=%d\n",
 		tile, gDP.tiles[tile].tmem, gDP.tiles[tile].palette, pal, count, gDP.tiles[tile].format, gDP.tiles[tile].size);
-		#endif
+
 	int i = 0;
 	while (i < count)
 	{
@@ -837,10 +836,8 @@ void gDPLoadTLUT( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 	{
 		static u32 tlutLogCount = 0;
 		if (tlutLogCount < 30) {
-			#ifdef DEBUG
 			printf("[TLUT] tile=%d tmem=0x%03X count=%d palCRC=0x%08X\n",
 				tile, gDP.tiles[tile].tmem, count, gDP.paletteCRC256);
-			#endif
 			tlutLogCount++;
 		}
 	}

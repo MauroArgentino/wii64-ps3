@@ -2579,9 +2579,6 @@ void OGL_ReadScreen( void **dest, long *width, long *height )
 void OGL_RSXinitDlist()
 {
 	OGL.frameReady = 1;
-	static int dbgDlists = 0;
-	if (dbgDlists < 300) printf("[VIDBG] dlist#%d\n", ++dbgDlists);
-	else dbgDlists++;
 #ifdef SHOW_DEBUG
 	static int count=0;
 	sprintf(txtbuffer,"Dlist count %d", count++);

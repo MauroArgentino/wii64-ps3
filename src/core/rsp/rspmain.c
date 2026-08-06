@@ -36,7 +36,6 @@
 #include "hle.h"
 
 #include "Audio_#1.1.h"
-#include "../r4300/r4300.h"
 #include <ppu-types.h>
 //#define DEBUG_RSP 1
 
@@ -170,7 +169,6 @@ __declspec(dllexport) DWORD DoRspCycles ( DWORD Cycles )
 	}
 #endif
 	// Process DList
-	{ static int dbgRsp = 0; if (dbgRsp < 40) { extern R4300 r4300; printf("[VIDBG] TASK#%d type=%d flags=%08X ucode=%08X ucsize=%d ucdata=%08X ucdsize=%d data=%08X dsize=%d out=%08X pc=%08X SP=%08X\n", dbgRsp, task->type, task->flags, task->ucode, task->ucode_size, task->ucode_data, task->ucode_data_size, task->data_ptr, task->data_size, task->output_buff, r4300.pc, *rsp.SP_STATUS_REG); dbgRsp++; } }
 	if( task->type == 1 && task->data_ptr != 0 && GraphicsHle) {
 		if (rsp.ProcessDlistList != NULL) {
 			rsp.ProcessDlistList();

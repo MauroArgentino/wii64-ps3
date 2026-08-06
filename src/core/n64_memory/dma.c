@@ -37,25 +37,6 @@
 #include "../r4300/r4300.h"
 #include "../r4300/interrupt.h"
 #include "../r4300/macros.h"
-#include "../r4300/wii64_cached_interp.h"
-
-/* BUILD 00149: log DMA writes that land in the scheduler region 0x335980-
-   0x335C00 (word/SD CPU stores are already exonerated as the corruption
-   path for [0x803359B0]; DMA and byte/half stores remain candidates). */
-static void dma_watch_sched(u32 dst, u32 len, const char *who)
-{
-   /* BUILD 00162: detect OVERLAPS with the scheduler region, not just writes
-      that START inside it (a DMA beginning before 0x335980 can still land on
-      0x3359A0 if its length is long enough). */
-   if (dst + len > 0x335980 && dst < 0x335C00) {
-      static int dmaCnt = 0;
-      if (dmaCnt < 20) {
-         dmaCnt++;
-         printf("[QDMA] %s dst=%08X len=%08X pc=%08X Count=%08X\n",
-            who, dst, len, (unsigned int)r4300.pc, (unsigned int)Count);
-      }
-   }
-}
 #include "../../ui/fileBrowser/fileBrowser.h"
 #include "../r4300/Invalid_Code.h"
 #include "../../main/ROM-Cache.h"
@@ -245,32 +226,13 @@ void dma_pi_write()
      }
    else
      {
-      /* BUILD 00160: PI DMA (ROM->RDRAM) writes directly via ROMCache_read,
-         bypassing write_rdram -- the only uncaptured writer candidate for the
-         scheduler struct at 0x3359A0 (suspect values 0x459A0/0x006C02EC are
-         ROM audio offsets). Watch the whole scheduler region + dump ROM src. */
-      dma_watch_sched(pi_register.pi_dram_addr_reg & 0xFFFFFF, longueur, "PI->RDRAM");
-      if ((pi_register.pi_dram_addr_reg & 0xFFFFFF) + longueur > 0x335980 &&
-          (pi_register.pi_dram_addr_reg & 0xFFFFFF) < 0x335C00) {
-         static int piDump = 0;
-         if (piDump < 10) {
-            piDump++;
-            printf("[PIDUMP] dst=%08X romsrc=%08X len=%08X pc=%08X Count=%08X\n",
-               pi_register.pi_dram_addr_reg & 0xFFFFFF,
-               ((pi_register.pi_cart_addr_reg - 0x10000000) & 0x3FFFFFF),
-               longueur, (unsigned int)r4300.pc, (unsigned int)Count);
-         }
-      }
+     	/*printf("DMA transfer from cart address: %08x\n"
+     	       "To RDRAM address: %08x of length %u\n",
+     	       ((pi_register.pi_cart_addr_reg-0x10000000)&0x3FFFFFF)^S8,
+     	       ((unsigned int)(pi_register.pi_dram_addr_reg)^S8),
+     	       longueur);*/
 	ROMCache_read((u8*)((char*)rdram + ((u32)(pi_register.pi_dram_addr_reg)^S8)),
 	              (((pi_register.pi_cart_addr_reg-0x10000000)&0x3FFFFFF))^S8, longueur);
- 	if (ci.invalid_code)
- 	  {
- 	     u32 dst = ((u32)(pi_register.pi_dram_addr_reg) ^ S8) & 0xFFFFFF;
- 	     if (!ci.invalid_code[(dst + 0x80000000) >> 12])
- 	        invalidate_cached_code(dst + 0x80000000, longueur);
- 	     if (!ci.invalid_code[(dst + 0xa0000000) >> 12])
- 	        invalidate_cached_code(dst + 0xa0000000, longueur);
- 	  }
  	}
 
    if ((debug_count+Count) < 0x100000)
@@ -328,8 +290,6 @@ void dma_sp_read()
 {
    int i;
    if (!rdram) return;
-   dma_watch_sched(sp_register.sp_dram_addr_reg & 0xFFFFFF,
-      (sp_register.sp_wr_len_reg & 0xFFF) + 1, "SP->RDRAM");
    if ((sp_register.sp_mem_addr_reg & 0x1000) > 0)
      {
 	for (i=0; i<((sp_register.sp_wr_len_reg & 0xFFF)+1); i++)
@@ -364,7 +324,6 @@ void dma_si_read()
 {
    int i;
    if (!rdram) return;
-   dma_watch_sched(si_register.si_dram_addr, 64, "SI->RDRAM");
    if (si_register.si_pif_addr_rd64b != 0x1FC007C0)
      {
 //	printf("unknown SI use\n");

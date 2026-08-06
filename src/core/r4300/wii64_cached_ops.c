@@ -1363,15 +1363,6 @@ void cached_interp_TLBR(void)
 void cached_interp_TLBWI(void)
 {
    int idx = Index & 0x3F;
-   /* BUILD 00132: debug - log game TLB writes */
-   {
-     static int tlbLogCnt = 0;
-     if (tlbLogCnt < 40) {
-       tlbLogCnt++;
-       printf("[TLBWI] idx=%d EntryHi=%08X EntryLo0=%08X EntryLo1=%08X PageMask=%08X pc=%08X\n",
-         idx, (u32)EntryHi, (u32)EntryLo0, (u32)EntryLo1, (u32)PageMask, r4300.pc);
-     }
-   }
    tlb_unmap(idx);
    tlb_e[idx].g = (EntryLo0 & EntryLo1 & 1);
    tlb_e[idx].pfn_even = (EntryLo0 & 0x3FFFFFC0) >> 6;
@@ -1401,15 +1392,6 @@ void cached_interp_TLBWR(void)
 {
    Random = (Count / 2 % (32 - Wired)) + Wired;
    int idx = Random;
-   /* BUILD 00132: debug - log game TLB writes */
-   {
-     static int tlbLogCnt = 0;
-     if (tlbLogCnt < 40) {
-       tlbLogCnt++;
-       printf("[TLBWR] idx=%d EntryHi=%08X EntryLo0=%08X EntryLo1=%08X PageMask=%08X pc=%08X\n",
-         idx, (u32)EntryHi, (u32)EntryLo0, (u32)EntryLo1, (u32)PageMask, r4300.pc);
-     }
-   }
    tlb_unmap(idx);
    tlb_e[idx].g = (EntryLo0 & EntryLo1 & 1);
    tlb_e[idx].pfn_even = (EntryLo0 & 0x3FFFFFC0) >> 6;
@@ -1496,52 +1478,52 @@ static void cached_fpu_op_s(u32 funct)
          *r4300.fpr_double[fd] = (double)*r4300.fpr_single[fs];
          break;
       case 0x24:
+         set_trunc();
+         *r4300.fpr_single[fd] = (float)(s32)*r4300.fpr_double[fs];
          set_rounding();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_single[fs];
          break;
       case 0x25:
+         set_trunc();
+         *r4300.fpr_single[fd] = (float)(s64)*r4300.fpr_double[fs];
          set_rounding();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_single[fs];
          break;
       case 0x28:
          set_ceil();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_single[fs];
+         *r4300.fpr_single[fd] = (float)(s32)ceil(*r4300.fpr_double[fs]);
          set_rounding();
          break;
       case 0x29:
          set_ceil();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_single[fs];
+         *r4300.fpr_single[fd] = (float)(s64)ceil(*r4300.fpr_double[fs]);
          set_rounding();
          break;
       case 0x30:
          set_trunc();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_single[fs];
+         *r4300.fpr_single[fd] = (float)(s32)(*r4300.fpr_double[fs]);
          set_rounding();
          break;
       case 0x31:
          set_trunc();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_single[fs];
+         *r4300.fpr_single[fd] = (float)(s64)(*r4300.fpr_double[fs]);
          set_rounding();
          break;
       case 0x22:
          set_round();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_single[fs];
-         set_rounding();
-         break;
-      case 0x23:
-         set_round();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_single[fs];
+         *r4300.fpr_single[fd] = (float)(s32)(*r4300.fpr_double[fs] + 0.5);
          set_rounding();
          break;
       case 0x34:
          set_floor();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_single[fs];
+         *r4300.fpr_single[fd] = (float)(s32)floor(*r4300.fpr_double[fs]);
          set_rounding();
          break;
       case 0x35:
          set_floor();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_single[fs];
+         *r4300.fpr_single[fd] = (float)(s64)floor(*r4300.fpr_double[fs]);
          set_rounding();
+         break;
+      case 0x20:
+         *r4300.fpr_single[fd] = (float)*r4300.fpr_double[fs];
          break;
       default: printf("unimplemented FPU S op funct=0x%02x\n", funct); r4300.stop = 1; break;
    }
@@ -1567,52 +1549,27 @@ static void cached_fpu_op_d(u32 funct)
          *r4300.fpr_double[fd] = (double)(s32)r4300.fpr_data[fs];
          break;
       case 0x24:
+         set_trunc();
+         *r4300.fpr_double[fd] = (double)(s32)*r4300.fpr_double[fs];
          set_rounding();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_double[fs];
          break;
       case 0x25:
-         set_rounding();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_double[fs];
-         break;
-      case 0x28:
-         set_ceil();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_double[fs];
-         set_rounding();
-         break;
-      case 0x29:
-         set_ceil();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_double[fs];
+         set_trunc();
+         *r4300.fpr_double[fd] = (double)(s64)*r4300.fpr_double[fs];
          set_rounding();
          break;
       case 0x30:
          set_trunc();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_double[fs];
+         *r4300.fpr_double[fd] = (double)(s32)(*r4300.fpr_double[fs]);
          set_rounding();
          break;
       case 0x31:
          set_trunc();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_double[fs];
+         *r4300.fpr_double[fd] = (double)(s64)(*r4300.fpr_double[fs]);
          set_rounding();
          break;
-      case 0x22:
-         set_round();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_double[fs];
-         set_rounding();
-         break;
-      case 0x23:
-         set_round();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_double[fs];
-         set_rounding();
-         break;
-      case 0x34:
-         set_floor();
-         *((s32*)r4300.fpr_single[fd]) = (s32)*r4300.fpr_double[fs];
-         set_rounding();
-         break;
-      case 0x35:
-         set_floor();
-         *((s64*)r4300.fpr_double[fd]) = (s64)*r4300.fpr_double[fs];
-         set_rounding();
+      case 0x20:
+         *r4300.fpr_double[fd] = (double)*r4300.fpr_single[fs];
          break;
       default: printf("unimplemented FPU D op funct=0x%02x\n", funct); r4300.stop = 1; break;
    }
@@ -1851,41 +1808,19 @@ void cached_interp_CVT_L_D(void)
 void cached_interp_CVT_S_D(void)
 {
    if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
-   u32 fs = PC->f.cf.fs;
-   u32 fd = PC->f.cf.fd;
-   set_rounding();
-   *r4300.fpr_single[fd] = (float)*r4300.fpr_double[fs];
-   PC++;
+   cached_fpu_op_d(0x20); PC++;
 }
 
 void cached_interp_CVT_S_W(void)
 {
    if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
-   u32 fs = PC->f.cf.fs;
-   u32 fd = PC->f.cf.fd;
-   set_rounding();
-   *r4300.fpr_single[fd] = (float)*((s32*)r4300.fpr_single[fs]);
-   PC++;
+   cached_fpu_op_s(0x20); PC++;
 }
 
 void cached_interp_CVT_S_L(void)
 {
    if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
-   u32 fs = PC->f.cf.fs;
-   u32 fd = PC->f.cf.fd;
-   set_rounding();
-   *r4300.fpr_single[fd] = (float)*((s64*)r4300.fpr_double[fs]);
-   PC++;
-}
-
-void cached_interp_CVT_D_L(void)
-{
-   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
-   u32 fs = PC->f.cf.fs;
-   u32 fd = PC->f.cf.fd;
-   set_rounding();
-   *r4300.fpr_double[fd] = (double)*((s64*)r4300.fpr_double[fs]);
-   PC++;
+   r4300.stop = 1; PC++; printf("CVT_S_L not implemented\n");
 }
 
 void cached_interp_TRUNC_W_S(void)

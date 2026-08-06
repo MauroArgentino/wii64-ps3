@@ -44,24 +44,6 @@ extern u16 adpcmtable[0x88];
 
 extern u8 BufferSpace[0x10000];
 
-/* BUILD 00161: RSP audio HLE writes rsp.RDRAM directly (bypasses write_rdram)
-   and is the last uncaptured writer candidate for the scheduler struct at
-   0x3359A0. Watch every RSP->RDRAM store that lands in 0x335980-0x335C00. */
-#include "../r4300/r4300.h"
-static void rsp_watch_rdram(u32 phys, u32 len, const char *who)
-{
-   /* BUILD 00162: overlap detection (see dma_watch_sched). */
-   if (phys + len > 0x335980 && phys < 0x335C00) {
-      static int rspCnt = 0;
-      if (rspCnt < 30) {
-         rspCnt++;
-         printf("[QRSP] %s phys=%08X len=%08X pc=%08X Count=%08X\n",
-            who, phys, len, (unsigned int)r4300.pc,
-            (unsigned int)r4300.reg_cop0[9]);
-      }
-   }
-}
-
 /*
 static void SETVOL3 () { // Swapped Rate_Left and Vol
 	u8 Flags = (u8)(inst1 >> 0x10);
@@ -254,7 +236,6 @@ static void ENVMIXER3 () {
 	*(s16 *)(hleMixerWorkArea + 20) = LSig; // 20-21
 	*(s16 *)(hleMixerWorkArea + 22) = RSig; // 22-23
 	//*(u32 *)(hleMixerWorkArea + 24) = 0x13371337; // 22-23
-	rsp_watch_rdram(addy, 80, "ENVMIXER3");
 	memcpy(rsp.RDRAM+addy, (u8 *)hleMixerWorkArea,80);
 }
 //*/
@@ -539,7 +520,6 @@ static void SAVEBUFF3 () {
 	u32 cnt = (((inst1 >> 0xC)+3)&0xFFC);
 	v0 = (inst2 & 0xfffffc);
 	u32 src = (inst1&0xffc)+0x4f0;
-	rsp_watch_rdram(v0, cnt, "SAVEBUFF3");
 	memcpy (rsp.RDRAM+v0, BufferSpace+src, cnt);
 }
 
@@ -835,7 +815,6 @@ static void ADPCM3 () { // Verified to be 100% Accurate...
 		count-=32;
 	}
 	out-=16;
-	rsp_watch_rdram(Address, 32, "ADPCM3");
 	memcpy(&rsp.RDRAM[Address],out,32);
 }
 

@@ -37,8 +37,6 @@
 
 #define doBreak()
 
-static void exc_install_vectors(void);
-
 void address_error_exception()
 {
   printf("address_error_exception\n");
@@ -64,136 +62,6 @@ void XTLB_refill_exception(unsigned long long int addresse)
   printf("XTLB refill exception\n");
   r4300.stop=1;
   doBreak();   
-}
-
-void TLB_refill_exception(u32 address, int w)
-{
-  static int tlbref_count = 0;
-  int usual_handler = 0, i = 0;
-  exc_install_vectors();
-  if (!dynacore && w != 2 && interpcore != 2) {
-    update_count();
-  }
-  Cause = (w == 1) ? (3 << 2):(2 << 2);
-  BadVAddr = address;
-  Context = (Context & 0xFF80000F) | ((address >> 9) & 0x007FFFF0);
-  EntryHi = address & 0xFFFFE000;
-  /* BUILD 00134: debug - log only the first few TLB misses (no flood) */
-  if (tlbref_count < 5) {
-    u32 lutPage = address >> 12;
-    u32 insn = 0, qhead = 0, curThread = 0;
-    int ei;
-    if (r4300.pc >= 0x80000000 && r4300.pc < 0x80800000 && rdram)
-      insn = rdram[(r4300.pc & 0xFFFFFF) >> 2];
-    if (rdram) {
-      qhead     = rdram[(0x803359A8 & 0xFFFFFF) >> 2];
-      curThread = rdram[(0x803359B0 & 0xFFFFFF) >> 2];
-    }
-    printf("[TLBREF] addr=%08X w=%d pc=%08X EPC=%08X Status=%08X Count=%08X\n",
-      address, w, r4300.pc, EPC, (u32)Status, (u32)Count);
-    printf("          LUTr[%04X]=%08X LUTw[%04X]=%08X instr=%08X qhead=%08X curThr=%08X\n",
-      lutPage, tlb_LUT_r ? tlb_LUT_r[lutPage] : 0,
-      lutPage, tlb_LUT_w ? tlb_LUT_w[lutPage] : 0,
-      insn, qhead, curThread);
-    /* BUILD 00155: dump the 0x803359A0 thread struct context at crash time
-       (idle thread: next/prio/stack/type + saved ra/Status/EPC at 0x100/0x118/0x11C). */
-    if (rdram) {
-      u32 tb = 0x3359A0;
-      printf("          T0= %08X %08X %08X %08X %08X | EPCf= %08X Stf= %08X raf= %08X t0=%08X sp=%08X\n",
-        rdram[(tb)>>2], rdram[(tb+4)>>2], rdram[(tb+8)>>2], rdram[(tb+12)>>2], rdram[(tb+16)>>2],
-        rdram[(tb+0x11C)>>2], rdram[(tb+0x118)>>2], rdram[(tb+0x100)>>2],
-        (unsigned int)(u64)r4300.gpr[8], (unsigned int)(u64)r4300.gpr[29]);
-    }
-    for (ei = 0; ei < 32; ei++) {
-      if (tlb_e[ei].v_even || tlb_e[ei].v_odd)
-        printf("          TLB[%02d] vpn2=%04X mask=%X g=%d v_e=%d v_o=%d d_e=%d d_o=%d start_e=%08X end_e=%08X phys_e=%08X start_o=%08X end_o=%08X phys_o=%08X\n",
-          ei, tlb_e[ei].vpn2, tlb_e[ei].mask, tlb_e[ei].g,
-          tlb_e[ei].v_even, tlb_e[ei].v_odd, tlb_e[ei].d_even, tlb_e[ei].d_odd,
-          tlb_e[ei].start_even, tlb_e[ei].end_even, tlb_e[ei].phys_even,
-          tlb_e[ei].start_odd, tlb_e[ei].end_odd, tlb_e[ei].phys_odd);
-    }
-  }
-  tlbref_count++;
-  if (Status & 0x2) { // Test de EXL
-    r4300.pc = 0x80000180;
-    
-    if(r4300.delay_slot==1 || r4300.delay_slot==3) {
-      Cause |= 0x80000000;
-    }
-    else {
-      Cause &= 0x7FFFFFFF;
-    }
-  }
-  else {
-	if(w==2) {
-		EPC = address;
-	} else {
-		EPC = r4300.pc;
-	}
-       
-    Cause &= ~0x80000000;
-    Status |= 0x2; //EXL=1
-
-    if (address >= 0x80000000 && address < 0xc0000000) {
-      usual_handler = 1;
-    }
-    for (i=0; i<32; i++) {
-      if (address >= tlb_e[i].start_even && address <= tlb_e[i].end_even) {
-        usual_handler = 1;
-      }
-      if (address >= tlb_e[i].start_odd && address <= tlb_e[i].end_odd) {
-        usual_handler = 1;
-      }
-    }
-    if (usual_handler) {
-      r4300.pc = 0x80000180;
-    }
-    else {
-      r4300.pc = 0x80000000;
-    }
-  }
-  
-  if(r4300.delay_slot==1 || r4300.delay_slot==3) {
-    Cause |= 0x80000000;
-    EPC-=4;
-  }
-  else {
-    Cause &= 0x7FFFFFFF;
-  }
-  
-  if(w != 2 && interpcore != 2) {
-    EPC-=4;  // pure interp pre-advances r4300.pc by 4 before the read; cached interp sets r4300.pc = faulting instruction
-  }
-   
-  r4300.last_pc = r4300.pc;
-   
-  
-  if (r4300.delay_slot) {
-    r4300.skip_jump = r4300.pc;
-    r4300.next_interrupt = 0;
-  }
-  
-}
-
-void TLB_mod_exception()
-{
-  printf("TLB mod exception\n");
-  r4300.stop=1;
-  doBreak();
-}
-
-void integer_overflow_exception()
-{
-  printf("integer overflow exception\n");
-  r4300.stop=1;
-  doBreak();
-}
-
-void coprocessor_unusable_exception()
-{
-  printf("coprocessor_unusable_exception\n");
-  r4300.stop=1;
-  doBreak();
 }
 
 /* BUILD 00130: Self-healing exception vectors.
@@ -322,10 +190,103 @@ static void exc_install_vectors(void)
    }
 }
 
+void TLB_refill_exception(u32 address, int w)
+{
+  int usual_handler = 0, i = 0;
+  
+  exc_install_vectors();
+  if (!dynacore && w != 2) {
+    update_count();
+  }
+  Cause = (w == 1) ? (3 << 2):(2 << 2);
+  BadVAddr = address;
+  Context = (Context & 0xFF80000F) | ((address >> 9) & 0x007FFFF0);
+  EntryHi = address & 0xFFFFE000;
+  if (Status & 0x2) { // Test de EXL
+    r4300.pc = 0x80000180;
+    
+    if(r4300.delay_slot==1 || r4300.delay_slot==3) {
+      Cause |= 0x80000000;
+    }
+    else {
+      Cause &= 0x7FFFFFFF;
+    }
+  }
+  else {
+	if(w==2) {
+		EPC = address;
+	} else {
+		EPC = r4300.pc;
+	}
+       
+    Cause &= ~0x80000000;
+    Status |= 0x2; //EXL=1
+
+    if (address >= 0x80000000 && address < 0xc0000000) {
+      usual_handler = 1;
+    }
+    for (i=0; i<32; i++) {
+      if (address >= tlb_e[i].start_even && address <= tlb_e[i].end_even) {
+        usual_handler = 1;
+      }
+      if (address >= tlb_e[i].start_odd && address <= tlb_e[i].end_odd) {
+        usual_handler = 1;
+      }
+    }
+    if (usual_handler) {
+      r4300.pc = 0x80000180;
+    }
+    else {
+      r4300.pc = 0x80000000;
+    }
+  }
+  
+  if(r4300.delay_slot==1 || r4300.delay_slot==3) {
+    Cause |= 0x80000000;
+    EPC-=4;
+  }
+  else {
+    Cause &= 0x7FFFFFFF;
+  }
+  
+  if(w != 2) {
+    EPC-=4;  //wii64: wtf is w != 2 ?
+  }
+   
+  r4300.last_pc = r4300.pc;
+   
+  
+  if (r4300.delay_slot) {
+    r4300.skip_jump = r4300.pc;
+    r4300.next_interrupt = 0;
+  }
+  
+}
+
+void TLB_mod_exception()
+{
+  printf("TLB mod exception\n");
+  r4300.stop=1;
+  doBreak();
+}
+
+void integer_overflow_exception()
+{
+  printf("integer overflow exception\n");
+  r4300.stop=1;
+  doBreak();
+}
+
+void coprocessor_unusable_exception()
+{
+  printf("coprocessor_unusable_exception\n");
+  r4300.stop=1;
+  doBreak();
+}
+
 void exception_general()
 {
-  exc_install_vectors();
-  if (interpcore != 2) update_count();
+  update_count();
   Status |= 2;
    
   EPC = r4300.pc;

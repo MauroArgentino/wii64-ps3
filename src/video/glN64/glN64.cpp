@@ -48,17 +48,6 @@
 extern "C" { void _break(); }
 #endif
 
-#if defined(PS3) && defined(DEBUG)
-#include <stdarg.h>
-DebugInfo Debug = { 0, 0, 0, 0, 0, { 0, 0, 0, 0, 0 } };
-void OpenDebugDlg() { }
-void CloseDebugDlg() { }
-void DebugRSPState( DWORD pci, DWORD pc, DWORD cmd, DWORD w0, DWORD w1 ) { }
-void DebugMsg( WORD type, LPCSTR format, ... ) { }
-void StartDump( char *filename ) { }
-void EndDump() { }
-#endif
-
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 HWND		hWnd;
 HWND		hStatusBar;

@@ -827,13 +827,6 @@ static void TLBWI()
    tlb_e[idx].phys_odd = tlb_e[idx].pfn_odd << 12;
 
    tlb_map(idx);
-   { static int c=0; if (c++ < 200)
-       printf("[TLBWI] idx=%d vpn2=%X mask=%X pfnE=%X pfnO=%X v=%d%d d=%d%d g=%d ASID=%X\n",
-         idx, tlb_e[idx].vpn2, tlb_e[idx].mask,
-         tlb_e[idx].pfn_even, tlb_e[idx].pfn_odd,
-         tlb_e[idx].v_even, tlb_e[idx].v_odd,
-         tlb_e[idx].d_even, tlb_e[idx].d_odd,
-         tlb_e[idx].g, tlb_e[idx].asid); }
    r4300.pc+=4;
 }
 
@@ -868,13 +861,6 @@ static void TLBWR()
 	tlb_e[Random].phys_odd = tlb_e[Random].pfn_odd << 12;
 
 	tlb_map(Random);
-	{ static int c=0; if (c++ < 200)
-	    printf("[TLBWR] idx=%d vpn2=%X mask=%X pfnE=%X pfnO=%X v=%d%d d=%d%d g=%d ASID=%X\n",
-	      Random, tlb_e[Random].vpn2, tlb_e[Random].mask,
-	      tlb_e[Random].pfn_even, tlb_e[Random].pfn_odd,
-	      tlb_e[Random].v_even, tlb_e[Random].v_odd,
-	      tlb_e[Random].d_even, tlb_e[Random].d_odd,
-	      tlb_e[Random].g, tlb_e[Random].asid); }
 	r4300.pc+=4;
 }
 
