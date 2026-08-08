@@ -122,6 +122,7 @@ padInfo padinfo;
 
 static u32 previousButtonsPS3[4];
 static u32 previousAnalogPS3[4];
+static unsigned int input_probe_cnt;
 
 static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 {
@@ -133,6 +134,15 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 	if (!controller_PS3.available[Control]) return 0;
 
 	ioPadGetData(Control, &paddata);
+	{
+		static int gk_cnt = 0;
+		static u32 gk_skip = 0;
+		if (gk_cnt < 8 || (gk_cnt < 200 && (gk_skip++ % 500) == 0))
+		{
+			gk_cnt++;
+			printf("[GETKEYS] Control=%d len=%u\n", Control, paddata.len);
+		}
+	}
 	if (paddata.len)
 	{
 		buttonsPS3 = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
@@ -141,6 +151,13 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 		//0xRH-RV-LH-LV 0x00 = Left/Up, 0xFF = Right/Down
 		previousButtonsPS3[Control] = buttonsPS3;
 		previousAnalogPS3[Control] = analogPS3;
+		if (input_probe_cnt < 24)
+		{
+			input_probe_cnt++;
+			printf("[PADGET#%u] Control=%d avail=%d len=%u buttons=%04X analog=%08X\n",
+				input_probe_cnt, Control, controller_PS3.available[Control],
+				paddata.len, buttonsPS3, analogPS3);
+		}
 	}
 	else
 	{
@@ -252,4 +269,8 @@ static void refreshAvailable(void){
 	int i;
 	for(i=0; i<4; ++i)
 		controller_PS3.available[i] = padinfo.status[i];
+	printf("[PADINFO] status=%d%d%d%d avail=%d%d%d%d\n",
+		padinfo.status[0], padinfo.status[1], padinfo.status[2], padinfo.status[3],
+		controller_PS3.available[0], controller_PS3.available[1],
+		controller_PS3.available[2], controller_PS3.available[3]);
 }

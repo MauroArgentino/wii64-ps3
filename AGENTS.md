@@ -115,7 +115,13 @@ Flow: `main()` -> RSX/pad init -> `MenuContext` menu loop -> user picks ROM -> `
 
 8. **BLTZL/BGEZL used wrong helpers** — called `do_branch_taken/not_taken` instead of likely variants. **Fix:** changed to `do_branch_likely_taken/not_taken`.
 
+9. **COP1 funct table wrong** (`wii64_cached_interp.c:537`). The cached COP1 dispatch used incorrect funct codes (0x30→TRUNC_W, 0x28→CEIL_W, 0x34→FLOOR_W, 0x22→ROUND_W) inherited from the 2011 recompiler. Standard MIPS: `0x08-0x0F` = ROUND.L/TRUNC.L/CEIL.L/FLOOR.L/ROUND.W/TRUNC.W/CEIL.W/FLOOR.W, `0x30-0x37` = C.F..C.ULE, `0x38-0x3F` = C.SF..C.NGT. Any real TRUNC/CEIL/FLOOR/ROUND instruction hit `cached_interp_NI` → `stop=1`. SM64 boot stopped at `NI at 0x8001f930 (iw=0x4600020d trunc.w.s)`. **Fix:** rewrote cases to standard funct codes; C.SF/C.NGLE→C_F, C.SEQ/C.NGL→C_EQ, C.LT/C.NGE→C_OLT, C.LE/C.NGT→C_OLE (matching pure interpreter semantics).
+
+10. **BC1 decode wrong** (`wii64_cached_interp.c:485`). Used `switch (rt)` with `0x02→BC1T, 0x04→BC1FL, 0x06→BC1TL`. Standard MIPS: condition is `rt & 3` (bits 17-16): `0=BC1F, 1=BC1T, 2=BC1FL, 3=BC1TL` (pure uses `interp_cop1_bc[(op>>16)&3]`). With `rt=1` (BC1T) fell to `default: cached_interp_NI` → `stop=1`. SM64 stopped at `NI at 0x80319d0c (iw=0x45010002)`. **Fix:** `switch (rt & 3)`.
+
 **Remaining issues:** Trap handlers (TGE, TLT, TEQ, TNE, TGEI, etc.) and `cached_interp_BREAK` set `r4300.stop = 1` instead of calling `exception_general()` — won't crash the emulator but traps silently halt it. Not the cause of the black screen.
+
+11. **`update_count()` corrupts Count in cached mode — loader deadlock** (found 2026-08-07). `update_count()` does `Count += (r4300.pc - r4300.last_pc)/2`, but cached only syncs `last_pc` at run start (line 881) and in exceptions. So the first DMA/SI/SP/exception-triggered `update_count()` after a block transition adds a stale ±2^31 delta (observed `[CNTJUMP] +6E000008 pc=80000050 last=A4000040`, and `+80000474` inside osPiStartDma). This corrupts the event queue ordering (PI_INT at `0x000ADE8E` while `Count=0x814D2FD4`), so the main-loop check `r4300.next_interrupt <= Count` never fires PI_INT → DMA completion never delivered to queue `0x8034AF60` → SM64 loader thread blocked in osRecvMesg forever (idle spin 0x80246DD8, mi=00000000, black screen). **Fix:** in `update_count()`, if `interpcore == 2` (cached), just sync `last_pc` and return — the main loop already advances `Count += 2` per instruction. Use `interpcore`, NOT `dynacore`, to identify the cached run: `go()` sets `dynacore=0` for both pure and cached during the run.
 
 ## Crash prevention (addressed 2026-07-30)
 

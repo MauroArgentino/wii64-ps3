@@ -242,6 +242,15 @@ int saveMempak(fileBrowser_file* savepath){
 
 void internal_ReadController(int Control, BYTE *Command)
 {
+   static int pifrd_cnt = 0;
+   static u32 pifrd_skip = 0;
+   if (pifrd_cnt < 8 || (pifrd_cnt < 200 && (pifrd_skip++ % 100) == 0))
+     {
+	pifrd_cnt++;
+	printf("[PIFRD#%d] ctl=%d pres=%d tx=%d rx=%d cmd=0x%02X c3=0x%02X\n",
+		pifrd_cnt, Control, Controls[Control].Present,
+		Command[0], Command[1], Command[2], Command[3]);
+     }
    switch (Command[2])
      {
       case 1:
@@ -279,6 +288,16 @@ void internal_ControllerCommand(int Control, BYTE *Command)
 	  break;
 	if (Controls[Control].Present)
 	  {
+	     {
+		static int icc_cnt = 0;
+		if (icc_cnt < 6)
+		  {
+		     icc_cnt++;
+		     printf("[ICC_CMD0] Control=%d RawData=%d Plugin=%d\n",
+			    Control, Controls[Control].RawData,
+			    Controls[Control].Plugin);
+		  }
+	     }
 	     Command[3] = 0x05;
 	     Command[4] = 0x00;
 	     switch(Controls[Control].Plugin)
@@ -423,6 +442,19 @@ void update_pif_write()
 	   default:
 	     if (!(PIF_RAMb[i] & 0xC0))
 	       {
+		  {
+		     static int wdump_cnt = 0;
+		     static u32 wdump_skip = 0;
+		     if (wdump_cnt < 6 || (wdump_cnt < 60 && (wdump_skip++ % 100) == 0))
+		       {
+			  wdump_cnt++;
+			  printf("[PIFWRITE] %02X %02X %02X %02X %02X %02X %02X %02X | %02X %02X %02X %02X %02X %02X %02X %02X\n",
+				 PIF_RAMb[0],PIF_RAMb[1],PIF_RAMb[2],PIF_RAMb[3],
+				 PIF_RAMb[4],PIF_RAMb[5],PIF_RAMb[6],PIF_RAMb[7],
+				 PIF_RAMb[8],PIF_RAMb[9],PIF_RAMb[10],PIF_RAMb[11],
+				 PIF_RAMb[12],PIF_RAMb[13],PIF_RAMb[14],PIF_RAMb[15]);
+		       }
+		  }
 		  if (channel < 4)
 		    {
 		       if (Controls[channel].Present &&
@@ -457,6 +489,55 @@ void update_pif_read()
 //   printf("read\n");
    print_pif();
 #endif
+   {
+      static int dump_cnt = 0;
+      static u32 dump_skip = 0;
+      if (dump_cnt < 10 || (dump_cnt < 60 && (dump_skip++ % 100) == 0))
+	{
+	   dump_cnt++;
+	   printf("[PIFREAD] pc=%08X %02X %02X %02X %02X %02X %02X %02X %02X | %02X %02X %02X %02X %02X %02X %02X %02X\n",
+		  (unsigned int)r4300.pc,
+		  PIF_RAMb[0],PIF_RAMb[1],PIF_RAMb[2],PIF_RAMb[3],
+		  PIF_RAMb[4],PIF_RAMb[5],PIF_RAMb[6],PIF_RAMb[7],
+		  PIF_RAMb[8],PIF_RAMb[9],PIF_RAMb[10],PIF_RAMb[11],
+		  PIF_RAMb[12],PIF_RAMb[13],PIF_RAMb[14],PIF_RAMb[15]);
+	}
+   }
+   {
+      static const u32 vats[4] = { 0x803289CC, 0x803274FC, 0x8032857C, 0x80317088 };
+      static int done[4] = {0,0,0,0};
+      int vi, k;
+      u32 pc = (unsigned int)r4300.pc;
+      for (vi = 0; vi < 4; vi++)
+	{
+	   if (pc == vats[vi] && !done[vi])
+	     {
+		u32 va = vats[vi];
+		u32 pa;
+		done[vi] = 1;
+		if (va >= 0x80000000 && va < 0xC0000000)
+		  pa = va & 0x1FFFFFFF;
+		else
+		  pa = va;
+		printf("[CODEDUMP va=%08X pa=%08X ra=%08X sp=%08X a0=%08X a1=%08X v0=%08X v1=%08X]\n",
+		       va, pa,
+		       (u32)r4300.gpr[31], (u32)r4300.gpr[29],
+		       (u32)r4300.gpr[4], (u32)r4300.gpr[5],
+		       (u32)r4300.gpr[2], (u32)r4300.gpr[3]);
+		if (rdramb)
+		  {
+		     for (k = -12; k < 40; k++)
+		       {
+			  u32 a = pa + k*4;
+			  printf("   %c%03X: %02X %02X %02X %02X\n", (k<0)?'-':'+', (k<0)?(-k*4):(k*4),
+				 rdramb[a + 0], rdramb[a + 1],
+				 rdramb[a + 2], rdramb[a + 3]);
+		       }
+		  }
+		break;
+	     }
+	}
+   }
    while (i<0x40)
      {
 	switch(PIF_RAMb[i])

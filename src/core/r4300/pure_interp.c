@@ -255,6 +255,8 @@ static void DIVU()
    r4300.pc+=4;
 }
 
+static int p_dm_log_cnt = 0;
+
 static void DMULT()
 {
    unsigned long long int op1, op2, op3, op4;
@@ -298,6 +300,12 @@ static void DMULT()
 	if (!r4300.lo) r4300.hi++;
 	else r4300.lo = ~r4300.lo + 1;
      }
+   if (p_dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
+   {
+      p_dm_log_cnt++;
+      printf("[PDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+         (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
+   }
    r4300.pc+=4;
 }
 
@@ -325,6 +333,12 @@ static void DMULTU()
    r4300.lo = result1 | (result2 << 32);
    r4300.hi = (result3 & 0xFFFFFFFF) | (result4 << 32);
 
+   if (p_dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
+   {
+      p_dm_log_cnt++;
+      printf("[PDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+         (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
+   }
    r4300.pc+=4;
 }
 

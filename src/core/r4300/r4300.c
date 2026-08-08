@@ -182,9 +182,23 @@ int check_cop1_unusable()
 
 void update_count()
 {
+	static int dbg_delta = 0;
+	u32 old_Count = Count;
+	u32 old_last = r4300.last_pc;
 	//sprintf(txtbuffer, "trace: addr = 0x%08x\n", r4300.pc);
+	if (interpcore == 2)
+	{
+		r4300.last_pc = r4300.pc;
+		return;
+	}
 	Count = Count + (r4300.pc - r4300.last_pc) / 2;
 	r4300.last_pc = r4300.pc;
+	if ((Count - old_Count) > 0x1000000 && dbg_delta < 200)
+	{
+		printf("[CNTJUMP] +%08X pc=%08X last=%08X Count=%08X\n",
+			(unsigned int)(Count - old_Count), r4300.pc, old_last, (unsigned int)Count);
+		dbg_delta++;
+	}
 }
 
 void init_blocks()

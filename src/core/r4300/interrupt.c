@@ -44,7 +44,7 @@
 
 static int SPECIAL_done = 0;
 int vi_field            = 0;
-u32 next_vi   = 0;
+int dbg_vi_count        = 0;u32 next_vi   = 0;
 static interrupt_queue *q = NULL;
 
 void clear_queue()
@@ -324,6 +324,17 @@ int chk_status(int chk) {
   return 1;
 }
 
+void dbg_dump_queue(void)
+{
+   interrupt_queue *aux = q;
+   printf("[QUEUE]");
+   while (aux != NULL) {
+      printf(" (%d,%08X)", aux->type, (unsigned int)aux->count);
+      aux = aux->next;
+   }
+   printf(" Count=%08X next_vi=%08X\n", (unsigned int)Count, (unsigned int)next_vi);
+}
+
 void gen_interrupt()
 {
   if (savestates_job & LOADSTATE) {
@@ -347,6 +358,7 @@ void gen_interrupt()
   switch(q->type) {
     case SPECIAL_INT:
       if (Count > 0x10000000) {
+        remove_interrupt_event();
         return;
       }
       remove_interrupt_event();
@@ -354,6 +366,7 @@ void gen_interrupt()
       return;
     break;
     case VI_INT:
+      dbg_vi_count++;
       updateScreen();
 #ifdef PROFILE
       refresh_stat();

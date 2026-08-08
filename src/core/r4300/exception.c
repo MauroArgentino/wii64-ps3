@@ -286,6 +286,47 @@ void coprocessor_unusable_exception()
 
 void exception_general()
 {
+  static u32 dbg_ex = 0;
+  {
+     static const u32 vats[4] = { 0x803274FC, 0x8032857C, 0x80317088, 0x8031708C };
+     static int done[4] = {0,0,0,0};
+     int vi, k;
+     u32 pc = (unsigned int)r4300.pc;
+     for (vi = 0; vi < 4; vi++)
+       {
+	  if (pc == vats[vi] && !done[vi])
+	    {
+	       u32 va = vats[vi];
+	       u32 pa;
+	       done[vi] = 1;
+	       if (va >= 0x80000000 && va < 0xC0000000)
+		 pa = va & 0x1FFFFFFF;
+	       else
+		 pa = va;
+	       printf("[XCDUMP va=%08X pa=%08X ra=%08X sp=%08X a0=%08X a1=%08X v0=%08X v1=%08X]\n",
+		      va, pa,
+		      (u32)r4300.gpr[31], (u32)r4300.gpr[29],
+		      (u32)r4300.gpr[4], (u32)r4300.gpr[5],
+		      (u32)r4300.gpr[2], (u32)r4300.gpr[3]);
+	       if (rdramb)
+		 {
+		    for (k = -12; k < 40; k++)
+		      {
+			 u32 a = pa + k*4;
+			 printf("   %c%03X: %02X %02X %02X %02X\n", (k<0)?'-':'+', (k<0)?(-k*4):(k*4),
+				rdramb[a + 0], rdramb[a + 1],
+				rdramb[a + 2], rdramb[a + 3]);
+		      }
+		 }
+	       break;
+	    }
+       }
+  }
+  if (dbg_ex < 200)
+  {
+     printf("[EXC] Status=%08X Cause=%08X pc=%08X\n", (u32)Status, (u32)Cause, (u32)r4300.pc);
+     dbg_ex++;
+  }
   update_count();
   Status |= 2;
    

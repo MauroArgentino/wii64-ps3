@@ -604,3 +604,62 @@ siguen auto-desactivando el bit inmediatamente (comportamiento de pulso real: la
 interrupción se pierde si no se toma).
 
 ---
+
+## Fix 28 - Tabla de funct COP1 corregida (wii64_cached_interp.c)
+
+**Archivo:** `src/core/r4300/wii64_cached_interp.c`
+**Cambio (build 00204):** El dispatch COP1 del cached interpretaba mal los funct codes.
+
+**Problema:** La tabla heredada del recompilador de 2011 usaba funct codes incorrectos:
+`0x30→TRUNC_W`, `0x28→CEIL_W`, `0x34→FLOOR_W`, `0x22→ROUND_W`. El estándar MIPS es:
+`0x08-0x0F` = ROUND.L/TRUNC.L/CEIL.L/FLOOR.L/ROUND.W/TRUNC.W/CEIL.W/FLOOR.W, `0x30-0x37`
+= C.F..C.ULE, `0x38-0x3F` = C.SF..C.NGT. Cualquier TRUNC/CEIL/FLOOR/ROUND real caía en
+`cached_interp_NI` → `stop=1`. SM64 se detenía en `NI at 0x8001f930 (trunc.w.s)`.
+
+**Solución:** Reescribir los cases al estándar; los segundos 8 compares (C.SF..C.NGT)
+mapean a las condiciones del primer grupo (C.SF/C.NGLE→C_F, C.SEQ/C.NGL→C_EQ,
+C.LT/C.NGE→C_OLT, C.LE/C.NGT→C_OLE) igual que el pure.
+
+## Fix 29 - Decodificación BC1 corregida (wii64_cached_interp.c)
+
+**Archivo:** `src/core/r4300/wii64_cached_interp.c`
+**Cambio (build 00205):** El branch de punto flotante BC1 usaba `switch (rt)` con
+`0x02→BC1T, 0x04→BC1FL, 0x06→BC1TL`. El estándar MIPS usa `rt & 3` (bits 17-16):
+`0=BC1F, 1=BC1T, 2=BC1FL, 3=BC1TL` (el pure usa `interp_cop1_bc[(op>>16)&3]`). Con
+`rt=1` (BC1T) caía en `default: NI` → `stop=1`. SM64 se detenía en
+`NI at 0x80319d0c (iw=0x45010002)`.
+
+**Solución:** `switch (rt & 3)`.
+
+**Resultado:** Con ambos fixes, el cached interpreter ya bootea SM64 sin NI ni stop;
+emulación continua estable (~119s CPU sin crashes en 60s de test).
+
+## Fix 30 - update_count() corrupta Count en cached (r4300.c:183)
+
+**Archivo:** `src/core/r4300/r4300.c`
+**Cambio (build 00206):** `update_count()` no debe avanzar `Count` en modo cached interpreter.
+
+**Problema:** `update_count()` hac�a `Count += (r4300.pc - r4300.last_pc)/2`. En el cached
+interpreter el loop principal ya avanza `Count += 2` por instrucci�n (wii64_cached_interp.c:892),
+y `r4300.last_pc` solo se sincroniza al inicio del run (line 881) y en exception_general --
+nunca por instrucci�n. Cuando DMA/SI/SP/exception llamaban `update_count()`, el delta
+se calculaba contra un `last_pc` obsoleto (p.ej. `0xA4000040` de boot) produciendo
+saltos de �2^31 en Count.
+
+**S�ntoma observado en SM64 (cached):** `[CNTJUMP] +6E000008 pc=80000050 last=A4000040`
+en boot, y `+80000474` en la llamada a osPiStartDma. La corrupci�n de Count romp�a la cola
+de eventos: PI_INT quedaba programado en `0x000ADE8E` mientras `Count=0x814D2FD4`, el check
+del loop `r4300.next_interrupt <= Count` nunca disparaba PI_INT, el mensaje de fin de DMA
+nunca llegaba a la cola `0x8034AF60`, y el thread del loader quedaba bloqueado en
+osRecvMesg -> pantalla negra con el emulador vivo (~200% CPU, idle spin en 0x80246DD8).
+
+**Soluci�n:** Si `interpcore == 2` (cached), `update_count()` solo sincroniza
+`r4300.last_pc = r4300.pc` y retorna sin tocar `Count` (el loop principal ya lo avanza).
+`interpcore` (no `dynacore`) es la se�al correcta: durante el run, `go()` pone
+`dynacore=0` para ambos cores, as� que `dynacore` no distingue pure de cached.
+
+**Resultado (RPCS3, SM64 ESP, cached):** 0 CNTJUMP, sin bloques del loader; el juego pasa el
+osPiStartDma, el thread5 desbloquea, se lanzan tareas RSP (RSPSTART=1079, WR26B80=996),
+llega a la fase FRK/sprintf (N%%d, 484 llamadas, 799 MOD/DIV base=10 correctos), y la
+emulaci�n corre continua sin crashes ni access violations. Sigue en pantalla negra por
+el video glN64/RSX, no por el core.

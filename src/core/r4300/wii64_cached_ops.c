@@ -12,6 +12,8 @@
 
 extern u32 op;
 
+static int dm_log_cnt = 0;
+
 #define CACHED_MEM_EXC() \
    do { \
       if (r4300.pc != PC->addr) \
@@ -65,8 +67,7 @@ void cached_interp_SRAV(void)
 
 void cached_interp_MFHI(void)
 {
-   LOW_WORD(rrd) = LOW_WORD(r4300.hi);
-   sign_extended(rrd);
+   rrd = r4300.hi;
    PC++;
 }
 
@@ -78,8 +79,7 @@ void cached_interp_MTHI(void)
 
 void cached_interp_MFLO(void)
 {
-   LOW_WORD(rrd) = LOW_WORD(r4300.lo);
-   sign_extended(rrd);
+   rrd = r4300.lo;
    PC++;
 }
 
@@ -145,19 +145,86 @@ void cached_interp_DIVU(void)
 
 void cached_interp_DMULT(void)
 {
-   r4300.lo = rrs * rrt;
-   r4300.hi = 0;
-   asm("mulld %0,%1,%2; mulhdu %3,%1,%2"
-       : "=r"(r4300.lo), "=r"(r4300.hi)
-       : "r"(rrs), "r"(rrt));
+   unsigned long long int op1, op2, op3, op4;
+   unsigned long long int result1, result2, result3, result4;
+   unsigned long long int temp1, temp2, temp3, temp4;
+   int sign = 0;
+
+   if (rrs < 0)
+     {
+	op2 = -rrs;
+	sign = 1 - sign;
+     }
+   else op2 = rrs;
+   if (rrt < 0)
+     {
+	op4 = -rrt;
+	sign = 1 - sign;
+     }
+   else op4 = rrt;
+
+   op1 = op2 & 0xFFFFFFFF;
+   op2 = (op2 >> 32) & 0xFFFFFFFF;
+   op3 = op4 & 0xFFFFFFFF;
+   op4 = (op4 >> 32) & 0xFFFFFFFF;
+
+   temp1 = op1 * op3;
+   temp2 = (temp1 >> 32) + op1 * op4;
+   temp3 = op2 * op3;
+   temp4 = (temp3 >> 32) + op2 * op4;
+
+   result1 = temp1 & 0xFFFFFFFF;
+   result2 = temp2 + (temp3 & 0xFFFFFFFF);
+   result3 = (result2 >> 32) + temp4;
+   result4 = (result3 >> 32);
+
+   r4300.lo = result1 | (result2 << 32);
+   r4300.hi = (result3 & 0xFFFFFFFF) | (result4 << 32);
+   if (sign)
+     {
+	r4300.hi = ~r4300.hi;
+	if (!r4300.lo) r4300.hi++;
+	else r4300.lo = ~r4300.lo + 1;
+     }
+   if (dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
+   {
+      dm_log_cnt++;
+      printf("[CDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+         (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
+   }
    PC++;
 }
 
 void cached_interp_DMULTU(void)
 {
-   asm("mulld %0,%1,%2; mulhdu %3,%1,%2"
-       : "=r"(r4300.lo), "=r"(r4300.hi)
-       : "r"(rrs), "r"(rrt));
+   unsigned long long int op1, op2, op3, op4;
+   unsigned long long int result1, result2, result3, result4;
+   unsigned long long int temp1, temp2, temp3, temp4;
+
+   op1 = rrs & 0xFFFFFFFF;
+   op2 = (rrs >> 32) & 0xFFFFFFFF;
+   op3 = rrt & 0xFFFFFFFF;
+   op4 = (rrt >> 32) & 0xFFFFFFFF;
+
+   temp1 = op1 * op3;
+   temp2 = (temp1 >> 32) + op1 * op4;
+   temp3 = op2 * op3;
+   temp4 = (temp3 >> 32) + op2 * op4;
+
+   result1 = temp1 & 0xFFFFFFFF;
+   result2 = temp2 + (temp3 & 0xFFFFFFFF);
+   result3 = (result2 >> 32) + temp4;
+   result4 = (result3 >> 32);
+
+   r4300.lo = result1 | (result2 << 32);
+   r4300.hi = (result3 & 0xFFFFFFFF) | (result4 << 32);
+
+   if (dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
+   {
+      dm_log_cnt++;
+      printf("[CDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+         (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
+   }
    PC++;
 }
 
@@ -1474,56 +1541,61 @@ static void cached_fpu_op_s(u32 funct)
       case 0x05: *r4300.fpr_single[fd] = (float)fabs(*r4300.fpr_single[fs]); break;
       case 0x06: *r4300.fpr_single[fd] = *r4300.fpr_single[fs]; break;
       case 0x07: *r4300.fpr_single[fd] = -*r4300.fpr_single[fs]; break;
+      case 0x20:
+         *r4300.fpr_single[fd] = *((s32*)r4300.fpr_single[fs]);
+         break;
       case 0x21:
          *r4300.fpr_double[fd] = (double)*r4300.fpr_single[fs];
          break;
+      case 0x22:
+         set_round();
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_single[fs];
+         set_rounding();
+         break;
+      case 0x23:
+         set_round();
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_single[fs];
+         set_rounding();
+         break;
       case 0x24:
-         set_trunc();
-         *r4300.fpr_single[fd] = (float)(s32)*r4300.fpr_double[fs];
+         set_rounding();
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
       case 0x25:
-         set_trunc();
-         *r4300.fpr_single[fd] = (float)(s64)*r4300.fpr_double[fs];
+         set_rounding();
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
       case 0x28:
          set_ceil();
-         *r4300.fpr_single[fd] = (float)(s32)ceil(*r4300.fpr_double[fs]);
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
       case 0x29:
          set_ceil();
-         *r4300.fpr_single[fd] = (float)(s64)ceil(*r4300.fpr_double[fs]);
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
       case 0x30:
          set_trunc();
-         *r4300.fpr_single[fd] = (float)(s32)(*r4300.fpr_double[fs]);
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
       case 0x31:
          set_trunc();
-         *r4300.fpr_single[fd] = (float)(s64)(*r4300.fpr_double[fs]);
-         set_rounding();
-         break;
-      case 0x22:
-         set_round();
-         *r4300.fpr_single[fd] = (float)(s32)(*r4300.fpr_double[fs] + 0.5);
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
       case 0x34:
          set_floor();
-         *r4300.fpr_single[fd] = (float)(s32)floor(*r4300.fpr_double[fs]);
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
       case 0x35:
          set_floor();
-         *r4300.fpr_single[fd] = (float)(s64)floor(*r4300.fpr_double[fs]);
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_single[fs];
          set_rounding();
-         break;
-      case 0x20:
-         *r4300.fpr_single[fd] = (float)*r4300.fpr_double[fs];
          break;
       default: printf("unimplemented FPU S op funct=0x%02x\n", funct); r4300.stop = 1; break;
    }
@@ -1545,31 +1617,61 @@ static void cached_fpu_op_d(u32 funct)
       case 0x05: *r4300.fpr_double[fd] = fabs(*r4300.fpr_double[fs]); break;
       case 0x06: *r4300.fpr_double[fd] = *r4300.fpr_double[fs]; break;
       case 0x07: *r4300.fpr_double[fd] = -*r4300.fpr_double[fs]; break;
+      case 0x20:
+         *r4300.fpr_single[fd] = (float)*r4300.fpr_double[fs];
+         break;
       case 0x21:
-         *r4300.fpr_double[fd] = (double)(s32)r4300.fpr_data[fs];
+         *r4300.fpr_double[fd] = *((s32*)r4300.fpr_single[fs]);
+         break;
+      case 0x22:
+         set_round();
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_double[fs];
+         set_rounding();
+         break;
+      case 0x23:
+         set_round();
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_double[fs];
+         set_rounding();
          break;
       case 0x24:
-         set_trunc();
-         *r4300.fpr_double[fd] = (double)(s32)*r4300.fpr_double[fs];
+         set_rounding();
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_double[fs];
          set_rounding();
          break;
       case 0x25:
-         set_trunc();
-         *r4300.fpr_double[fd] = (double)(s64)*r4300.fpr_double[fs];
+         set_rounding();
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_double[fs];
+         set_rounding();
+         break;
+      case 0x28:
+         set_ceil();
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_double[fs];
+         set_rounding();
+         break;
+      case 0x29:
+         set_ceil();
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_double[fs];
          set_rounding();
          break;
       case 0x30:
          set_trunc();
-         *r4300.fpr_double[fd] = (double)(s32)(*r4300.fpr_double[fs]);
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_double[fs];
          set_rounding();
          break;
       case 0x31:
          set_trunc();
-         *r4300.fpr_double[fd] = (double)(s64)(*r4300.fpr_double[fs]);
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_double[fs];
          set_rounding();
          break;
-      case 0x20:
-         *r4300.fpr_double[fd] = (double)*r4300.fpr_single[fs];
+      case 0x34:
+         set_floor();
+         *((s32*)r4300.fpr_single[fd]) = *r4300.fpr_double[fs];
+         set_rounding();
+         break;
+      case 0x35:
+         set_floor();
+         *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_double[fs];
+         set_rounding();
          break;
       default: printf("unimplemented FPU D op funct=0x%02x\n", funct); r4300.stop = 1; break;
    }
@@ -1820,7 +1922,15 @@ void cached_interp_CVT_S_W(void)
 void cached_interp_CVT_S_L(void)
 {
    if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
-   r4300.stop = 1; PC++; printf("CVT_S_L not implemented\n");
+   *r4300.fpr_single[cffd] = (float)(*((long long*)r4300.fpr_double[cffs]));
+   PC++;
+}
+
+void cached_interp_CVT_D_L(void)
+{
+   if (check_cop1_unusable()) { cached_interpreter_jump_to(r4300.pc); return; }
+   *r4300.fpr_double[cffd] = *((long long*)(r4300.fpr_double[cffs]));
+   PC++;
 }
 
 void cached_interp_TRUNC_W_S(void)

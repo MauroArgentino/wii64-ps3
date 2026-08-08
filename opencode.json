@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "external_directory": {
+      "C:/Users/tupri/Downloads/rpcs3-v0.0.41-19607-7a90d09c_win64_msvc/**": "allow",
+      "C:/Users/tupri/AppData/Local/Temp/opencode/**": "allow",
+      "*": "ask"
+    },
+    "bash": {
+      "*": "allow"
+    }
+  }
+}

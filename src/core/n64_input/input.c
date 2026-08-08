@@ -252,6 +252,17 @@ EXPORT void CALL ReadController ( int Control, BYTE * Command )
 		// expected: controller gets 1 byte (command), controller sends back 3 bytes
 		// should be:	Command[0] == 0x01
 		//				Command[1] == 0x03
+		{
+			static int rdgs_cnt = 0;
+			if (rdgs_cnt < 6)
+			{
+				rdgs_cnt++;
+				printf("[RD_GETSTATUS] Control=%d RawData=%d Plugin=%d Present=%d\n",
+					Control, control_info.Controls[Control].RawData,
+					control_info.Controls[Control].Plugin,
+					control_info.Controls[Control].Present);
+			}
+		}
 		Command[3] = RD_GAMEPAD | RD_ABSOLUTE;
 		Command[4] = RD_NOEEPROM;
 		if(control_info.Controls[Control].Present)
@@ -416,6 +427,11 @@ void auto_assign_controllers(void){
 		unassign_controller(i);
 		padType[i] = PADTYPE_NONE;
 	}
+
+	for(i=0; i<4; ++i)
+		printf("[ASSIGN] vc%d control=%p number=%d present=%d\n",
+			i, virtualControllers[i].control, virtualControllers[i].number,
+			control_info.Controls[i].Present);
 }
 
 int load_configurations(FILE* f, controller_t* controller){

@@ -207,6 +207,7 @@ static u32 *readdps[0x20];
 static FrameBufferInfo frameBufferInfos[6];
 static char framebufferRead[0x800];
 static int firstFrameBufferSetting;
+static int wr26b80_cnt = 0;
 extern void dbg_printf(const char *fmt,...);
 int init_memory()
 {
@@ -798,11 +799,25 @@ void update_SP()
    //if (get_event(SP_INT)) return;
    if (!(sp_register.w_sp_status_reg & 0x1) && 
        !(sp_register.w_sp_status_reg & 0x4)) return;
-   if (!sp_register.halt && !sp_register.broke)
-     {
+    if (!sp_register.halt && !sp_register.broke)
+      {
 	int save_pc = rsp_register.rsp_pc & ~0xFFF;
+	printf("[RSPSTART] pc=%08X SP_DMEM[FC0]=%d\n", rsp_register.rsp_pc, SP_DMEM[0xFC0/4]);
 	if (SP_DMEM[0xFC0/4] == 1)
 	  {
+	     if (rdram)
+	       {
+		  int pi;
+		  printf("[POOLSNP] Count=%08X flag=%08X c448=%08X c44C=%08X c450=%08X heads=",
+		     (unsigned int)Count,
+		     (unsigned int)rdram[(0x801CA428 & MEMMASK)>>2],
+		     (unsigned int)rdram[(0x801CA448 & MEMMASK)>>2],
+		     (unsigned int)rdram[(0x801CA44C & MEMMASK)>>2],
+		     (unsigned int)rdram[(0x801CA450 & MEMMASK)>>2]);
+		  for(pi=0; pi<8; pi++)
+		    printf("%08X ", (unsigned int)rdram[((0x801CA8B0 + pi*16) & MEMMASK)>>2]);
+		  printf("\n");
+	       }
 	     // unprotecting old frame buffers
 	     if(fBGetFrameBufferInfo && fBRead && fBWrite && 
 		frameBufferInfos[0].addr)
@@ -1230,6 +1245,18 @@ static void invalidate_code_rdram(u32 size)
 void write_rdram()
 {
    if (!rdramb) { trash = word; return; }
+   if ((address & MEMMASK) == 0x226B80 && wr26b80_cnt < 60)
+   {
+      wr26b80_cnt++;
+      printf("[WR26B80] pc=%08X old=%08X new=%08X\n", (unsigned int)r4300.pc,
+         (unsigned int)*(u32 *)(rdramb + (address & MEMMASK)), (unsigned int)word);
+   }
+   if ((address & MEMMASK) == 0x1A83E4)
+      printf("[WROBJ] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
+         (unsigned int)word, (unsigned int)Count);
+   if ((address & MEMMASK) == 0x1BA0C0)
+      printf("[WRNAME] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
+         (unsigned int)word, (unsigned int)Count);
    *((u32 *)(rdramb + (address & MEMMASK))) = word;
    invalidate_code_rdram(4);
 }
