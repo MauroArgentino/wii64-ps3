@@ -313,9 +313,44 @@ void dma_si_write()
 //	printf("unknown SI use\n");
 	r4300.stop=1;
      }
+   {
+      static int siw_cnt = 0;
+      static u32 siw_skip = 0;
+      if (siw_cnt < 16 || (siw_cnt < 200 && (siw_skip++ % 50) == 0))
+	{
+	   int k;
+	   siw_cnt++;
+	   printf("[SIWRITE] pc=%08X dram=%08X cnt=%d srcRDRAM:",
+		  (unsigned int)r4300.pc,
+		  (unsigned int)si_register.si_dram_addr,
+		  siw_cnt);
+	   for (k = 0; k < 16; k++)
+	     {
+		if ((k & 7) == 0) printf("\n   %02X:", k);
+		printf(" %02X", rdramb[si_register.si_dram_addr + k]);
+	     }
+	   printf("\n");
+	}
+   }
    for (i=0; i<(64/4); i++)
      PIF_RAM[i] = sl(rdram[si_register.si_dram_addr/4+i]);
    update_pif_write();
+   {
+      static int siwa_cnt = 0;
+      static u32 siwa_skip = 0;
+      if (siwa_cnt < 16 || (siwa_cnt < 200 && (siwa_skip++ % 50) == 0))
+	{
+	   int k;
+	   siwa_cnt++;
+	   printf("[SIWRITE_A] cnt=%d after_pifw:", siwa_cnt);
+	   for (k = 0; k < 16; k++)
+	     {
+		if ((k & 7) == 0) printf("\n   %02X:", k);
+		printf(" %02X", PIF_RAMb[k]);
+	     }
+	   printf("\n");
+	}
+   }
    update_count();
    add_interrupt_event(SI_INT, /*0x100*/0x900);
 }
@@ -330,6 +365,25 @@ void dma_si_read()
 	r4300.stop=1;
      }
    update_pif_read();
+   {
+      static int sir_cnt = 0;
+      static u32 sir_skip = 0;
+      if (sir_cnt < 16 || (sir_cnt < 200 && (sir_skip++ % 50) == 0))
+	{
+	   int k;
+	   sir_cnt++;
+	   printf("[SIREAD] pc=%08X dram=%08X cnt=%d pifram:",
+		  (unsigned int)r4300.pc,
+		  (unsigned int)si_register.si_dram_addr,
+		  sir_cnt);
+	   for (k = 0; k < 16; k++)
+	     {
+		if ((k & 7) == 0) printf("\n   %02X:", k);
+		printf(" %02X", PIF_RAMb[k]);
+	     }
+	   printf("\n");
+	}
+   }
    for (i=0; i<(64/4); i++)
      rdram[si_register.si_dram_addr/4+i] = sl(PIF_RAM[i]);
    update_count();

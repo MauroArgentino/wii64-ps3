@@ -257,23 +257,41 @@ void internal_ReadController(int Control, BYTE *Command)
 	if (Controls[Control].Present)
 	  {
 	     BUTTONS Keys;
+	     Command[1] = 0x04;
 	     getKeys(Control, &Keys);
 	     *((u32 *)(Command + 3)) = Keys.Value;
+	     {
+		static int gk_cnt = 0;
+		if (gk_cnt < 20 || (gk_cnt < 200 && (gk_cnt++ % 100) == 0))
+		  {
+		     gk_cnt++;
+		     printf("[READ_BTN] ctl=%d val=%08X\n",
+			    Control, (unsigned int)Keys.Value);
+		  }
+	     }
 	  }
+	else
+	  Command[1] = 0x84;
 	break;
       case 2: // read controller pack
 	if (Controls[Control].Present)
 	  {
+	     Command[1] = 0x21;
 	     if (Controls[Control].Plugin == PLUGIN_RAW)
 	       if (controllerCommand != NULL) readController(Control, Command);
 	  }
+	else
+	  Command[1] = 0xA1;
 	break;
       case 3: // write controller pack
 	if (Controls[Control].Present)
 	  {
+	     Command[1] = 0x01;
 	     if (Controls[Control].Plugin == PLUGIN_RAW)
 	       if (controllerCommand != NULL) readController(Control, Command);
 	  }
+	else
+	  Command[1] = 0x81;
 	break;
      }
 }
@@ -282,7 +300,7 @@ void internal_ControllerCommand(int Control, BYTE *Command)
 {
    switch (Command[2])
      {
-      case 0x00: // check
+      case 0x00: // check (REQUEST_STATUS / RESET)
       case 0xFF:
 	if ((Command[1] & 0x80))
 	  break;
@@ -298,6 +316,7 @@ void internal_ControllerCommand(int Control, BYTE *Command)
 			    Controls[Control].Plugin);
 		  }
 	     }
+	     Command[1] = 0x03;
 	     Command[3] = 0x05;
 	     Command[4] = 0x00;
 	     switch(Controls[Control].Plugin)
@@ -314,15 +333,18 @@ void internal_ControllerCommand(int Control, BYTE *Command)
 	       }
 	  }
 	else
-	  Command[1] |= 0x80;
+	  Command[1] = 0x83;
 	break;
       case 0x01:
 	if (!Controls[Control].Present)
-	  Command[1] |= 0x80;
+	  Command[1] = 0x84;
+	else
+	  Command[1] = 0x04;
 	break;
       case 0x02: // read controller pack
 	if (Controls[Control].Present)
 	  {
+	     Command[1] = 0x21;
 	     switch(Controls[Control].Plugin)
 	       {
 		case PLUGIN_MEMPAK:
@@ -357,11 +379,12 @@ void internal_ControllerCommand(int Control, BYTE *Command)
 	       }
 	  }
 	else
-	  Command[1] |= 0x80;
+	  Command[1] = 0xA1;
 	break;
       case 0x03: // write controller pack
 	if (Controls[Control].Present)
 	  {
+	     Command[1] = 0x01;
 	     switch(Controls[Control].Plugin)
 	       {
 		case PLUGIN_MEMPAK:
@@ -389,7 +412,7 @@ void internal_ControllerCommand(int Control, BYTE *Command)
        }
 	  }
 	else
-	  Command[1] |= 0x80;
+	  Command[1] = 0x81;
 	break;
      }
 }

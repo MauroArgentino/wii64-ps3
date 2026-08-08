@@ -1252,11 +1252,25 @@ void write_rdram()
          (unsigned int)*(u32 *)(rdramb + (address & MEMMASK)), (unsigned int)word);
    }
    if ((address & MEMMASK) == 0x1A83E4)
-      printf("[WROBJ] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
-         (unsigned int)word, (unsigned int)Count);
+   {
+      static int wrobj_cnt = 0;
+      if (wrobj_cnt < 5 || (wrobj_cnt < 200 && (wrobj_cnt++ % 5000) == 0))
+	{
+	   wrobj_cnt++;
+	   printf("[WROBJ] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
+		  (unsigned int)word, (unsigned int)Count);
+	}
+   }
    if ((address & MEMMASK) == 0x1BA0C0)
-      printf("[WRNAME] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
-         (unsigned int)word, (unsigned int)Count);
+   {
+      static int wrname_cnt = 0;
+      if (wrname_cnt < 5 || (wrname_cnt < 200 && (wrname_cnt++ % 5000) == 0))
+	{
+	   wrname_cnt++;
+	   printf("[WRNAME] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
+		  (unsigned int)word, (unsigned int)Count);
+	}
+   }
    *((u32 *)(rdramb + (address & MEMMASK))) = word;
    invalidate_code_rdram(4);
 }
