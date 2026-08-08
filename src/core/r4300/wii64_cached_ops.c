@@ -1035,10 +1035,10 @@ void cached_interp_SWL(void)
    u32 mem = (u32)(old_word & 0xFFFFFFFF);
    switch (addr & 3)
    {
-      case 0: val = (val >> 24) | (mem & 0xFFFFFF00); break;
-      case 1: val = (val >> 16) | (mem & 0xFFFF0000); break;
-      case 2: val = (val >> 8)  | (mem & 0xFF000000); break;
-      case 3: break;
+      case 0: break;
+      case 1: val = (val >> 8)  | (mem & 0xFF000000); break;
+      case 2: val = (val >> 16) | (mem & 0xFFFF0000); break;
+      case 3: val = (val >> 24) | (mem & 0xFFFFFF00); break;
    }
    word = val;
    address = addr & ~3;
@@ -1060,10 +1060,10 @@ void cached_interp_SWR(void)
    u32 mem = (u32)(old_word & 0xFFFFFFFF);
    switch (addr & 3)
    {
-      case 0: break;
-      case 1: val = (val << 8)  | (mem & 0x000000FF); break;
-      case 2: val = (val << 16) | (mem & 0x0000FFFF); break;
-      case 3: val = (val << 24) | (mem & 0x00FFFFFF); break;
+      case 0: val = (val << 24) | (mem & 0x00FFFFFF); break;
+      case 1: val = (val << 16) | (mem & 0x0000FFFF); break;
+      case 2: val = (val << 8)  | (mem & 0x000000FF); break;
+      case 3: break;
    }
    word = val;
    address = addr & ~3;

@@ -434,6 +434,32 @@ void VI_RSX_showFPS(){
 	if(showFPSonScreen)
 		menu::IplFont::getInstance().drawString(10,35,caption, 1.0, false);
 
+	// Frame counter timer (always visible)
+	{
+		extern u32 gettick();
+		static u32 viFrameCount = 0;
+		static u32 viTotalSecs = 0;
+		static u32 viAccumUs = 0;
+		static u32 viLastTick = 0;
+		viFrameCount++;
+		u32 now = gettick();
+		if (viLastTick == 0) viLastTick = now;
+		u32 delta = now - viLastTick;
+		viLastTick = now;
+		viAccumUs += (u32)(((u64)delta * 8) / 16000);
+		while (viAccumUs >= 1000000) {
+			viTotalSecs++;
+			viAccumUs -= 1000000;
+		}
+		char timerStr[64];
+		u32 secs = viTotalSecs % 60;
+		u32 mins = viTotalSecs / 60;
+		sprintf(timerStr, "T=%02d:%02d F=%d", mins, secs, viFrameCount);
+		GXColor timerColor = {255,255,80,255};
+		menu::IplFont::getInstance().drawInit(timerColor);
+		menu::IplFont::getInstance().drawString(10, 55, timerStr, 0.8, false);
+	}
+
 #ifdef DEBUG
 	// Render state debug (shown whenever a ROM is loaded)
 	if (ROM_HEADER)

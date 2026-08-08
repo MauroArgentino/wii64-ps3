@@ -1251,6 +1251,25 @@ void write_rdram()
       printf("[WR26B80] pc=%08X old=%08X new=%08X\n", (unsigned int)r4300.pc,
          (unsigned int)*(u32 *)(rdramb + (address & MEMMASK)), (unsigned int)word);
    }
+   {
+      u32 pa = address & MEMMASK;
+      if (pa >= 0x367050 && pa < 0x367090)
+      {
+         static int pif_wr_cnt = 0;
+         if (word != 0 && pif_wr_cnt < 60)
+         {
+            u32 iaddr = ((u32)r4300.pc & 0x1FFFFFFF) & ~3;
+            u32 iw = 0;
+            if (rdramb && iaddr < 0x800000)
+              iw = (u32)rdramb[iaddr] << 24 | (u32)rdramb[iaddr+1] << 16 |
+                   (u32)rdramb[iaddr+2] << 8 | (u32)rdramb[iaddr+3];
+            pif_wr_cnt++;
+            printf("[PIFBUF_WR] pc=%08X iw=%08X addr=%08X val=%08X off=%d\n",
+                   (unsigned int)r4300.pc, iw, (unsigned int)address,
+                   (unsigned int)word, (int)(pa - 0x367050));
+         }
+      }
+   }
    if ((address & MEMMASK) == 0x1A83E4)
    {
       static int wrobj_cnt = 0;
@@ -1278,6 +1297,20 @@ void write_rdram()
 void write_rdramb()
 {
    if (!rdramb) { trash = byte; return; }
+   {
+      u32 pa = (address & MEMMASK) ^ S8;
+      if (pa >= 0x367050 && pa < 0x367090)
+      {
+         static int pif_wrb_cnt = 0;
+         if (pif_wrb_cnt < 80)
+         {
+            pif_wrb_cnt++;
+            printf("[PIFBUF_SB] pc=%08X addr=%08X val=%02X off=%d\n",
+                   (unsigned int)r4300.pc, (unsigned int)address,
+                   (unsigned char)byte, (int)(pa - 0x367050));
+         }
+      }
+   }
    *((rdramb + ((address & MEMMASK)^S8))) = byte;
    invalidate_code_rdram(1);
 }
