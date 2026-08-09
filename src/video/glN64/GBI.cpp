@@ -385,7 +385,9 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 {
 	MicrocodeInfo *current;
 
+#ifdef DEBUG_PROBES
 	printf( "[GBI] DetectMicrocode called: uc_start=0x%08X uc_dstart=0x%08X uc_dsize=%d\n", uc_start, uc_dstart, uc_dsize );
+#endif
 
 	for (unsigned int i = 0; i < GBI.numMicrocodes; i++)
 	{
@@ -410,13 +412,17 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 
 	// See if we can identify it by CRC
 	uc_crc = CRC_Calculate( 0xFFFFFFFF, &RDRAM[uc_start & 0x1FFFFFFF], 4096 );
+#ifdef DEBUG_PROBES
 	printf( "[GBI] Detecting ucode: CRC=0x%08X uc_start=0x%08X\n", uc_crc, uc_start );
+#endif
 	for (u32 i = 0; i < sizeof( specialMicrocodes ) / sizeof( SpecialMicrocodeInfo ); i++)
 	{
 		if (uc_crc == specialMicrocodes[i].crc)
 		{
 			current->type = specialMicrocodes[i].type;
+#ifdef DEBUG_PROBES
 			printf( "[GBI] Matched by CRC: %s (type=%d)\n", specialMicrocodes[i].text, current->type );
+#endif
 			return current;
 		}
 	}
@@ -484,7 +490,9 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 			if (type != NONE)
 			{
 				current->type = type;
+#ifdef DEBUG_PROBES
 				printf( "[GBI] Matched by string: '%s' -> type=%d\n", uc_str, current->type );
+#endif
 				return current;
 			}
 
@@ -497,7 +505,9 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 		if (strcmp( uc_str, specialMicrocodes[i].text ) == 0)
 		{
 			current->type = specialMicrocodes[i].type;
+#ifdef DEBUG_PROBES
 			printf( "[GBI] Matched by string: '%s' -> %s (type=%d)\n", uc_str, specialMicrocodes[i].text, current->type );
+#endif
 			return current;
 		}
 	}
@@ -506,7 +516,9 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 	current->type = DialogBox( hInstance, MAKEINTRESOURCE( IDD_MICROCODEDLG ), hWnd, MicrocodeDlgProc );
 #else // !__LINUX__
+#ifdef DEBUG_PROBES
 	printf( "[GBI] UNKNOWN ucode! uc_str='%s' CRC=0x%08X\n", uc_str, uc_crc );
+#endif
 	printf( "glN64: Warning - unknown ucode!!!\n" );
 # if !(defined(__GX__)||defined(PS3))
 	//TODO: Make sure having ucode = NONE is ok
@@ -551,7 +563,9 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 				"F3DGOLDEN", "F3DEX3", "None"
 			};
 			const char *ucName = (current->type <= NONE) ? ucNames[current->type] : "UNKNOWN";
+#ifdef DEBUG_PROBES
 			printf("[GBI] ucode type=%d (%s)\n", current->type, ucName);
+#endif
 		}
 
 		switch (current->type)

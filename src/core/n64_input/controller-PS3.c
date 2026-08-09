@@ -122,7 +122,9 @@ padInfo padinfo;
 
 static u32 previousButtonsPS3[4];
 static u32 previousAnalogPS3[4];
+#ifdef DEBUG_PROBES
 static unsigned int input_probe_cnt;
+#endif
 
 static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 {
@@ -134,6 +136,7 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 	if (!controller_PS3.available[Control]) return 0;
 
 	ioPadGetData(Control, &paddata);
+#ifdef DEBUG_PROBES
 	{
 		static int gk_cnt = 0;
 		static u32 gk_skip = 0;
@@ -143,6 +146,7 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 			printf("[GETKEYS] Control=%d len=%u\n", Control, paddata.len);
 		}
 	}
+#endif
 	if (paddata.len)
 	{
 		buttonsPS3 = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
@@ -151,6 +155,7 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 		//0xRH-RV-LH-LV 0x00 = Left/Up, 0xFF = Right/Down
 		previousButtonsPS3[Control] = buttonsPS3;
 		previousAnalogPS3[Control] = analogPS3;
+#ifdef DEBUG_PROBES
 		if (input_probe_cnt < 24)
 		{
 			input_probe_cnt++;
@@ -158,6 +163,7 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 				input_probe_cnt, Control, controller_PS3.available[Control],
 				paddata.len, buttonsPS3, analogPS3);
 		}
+#endif
 	}
 	else
 	{
@@ -269,8 +275,10 @@ static void refreshAvailable(void){
 	int i;
 	for(i=0; i<4; ++i)
 		controller_PS3.available[i] = padinfo.status[i];
+#ifdef DEBUG_PROBES
 	printf("[PADINFO] status=%d%d%d%d avail=%d%d%d%d\n",
 		padinfo.status[0], padinfo.status[1], padinfo.status[2], padinfo.status[3],
 		controller_PS3.available[0], controller_PS3.available[1],
 		controller_PS3.available[2], controller_PS3.available[3]);
+#endif
 }

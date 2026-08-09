@@ -1214,7 +1214,7 @@ void TextureCache_Load( CachedTexture *texInfo )
 	{
 GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
-	#ifdef DEBUG
+	#ifdef DEBUG_PROBES
 	{
 		/* Log every texture load: format, size, palette, tmem, dimensions */
 		static u32 texLogCount = 0;

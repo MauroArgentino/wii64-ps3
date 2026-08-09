@@ -313,6 +313,7 @@ void dma_si_write()
 //	printf("unknown SI use\n");
 	r4300.stop=1;
      }
+#ifdef DEBUG_PROBES
    {
       static int siw_cnt = 0;
       static u32 siw_skip = 0;
@@ -332,9 +333,11 @@ void dma_si_write()
 	   printf("\n");
 	}
    }
+#endif
    for (i=0; i<(64/4); i++)
      PIF_RAM[i] = sl(rdram[si_register.si_dram_addr/4+i]);
    update_pif_write();
+#ifdef DEBUG_PROBES
    {
       static int siwa_cnt = 0;
       static u32 siwa_skip = 0;
@@ -351,6 +354,7 @@ void dma_si_write()
 	   printf("\n");
 	}
    }
+#endif
    update_count();
    add_interrupt_event(SI_INT, /*0x100*/0x900);
 }
@@ -365,6 +369,7 @@ void dma_si_read()
 	r4300.stop=1;
      }
    update_pif_read();
+#ifdef DEBUG_PROBES
    {
       static int sir_cnt = 0;
       static u32 sir_skip = 0;
@@ -384,6 +389,7 @@ void dma_si_read()
 	   printf("\n");
 	}
    }
+#endif
    for (i=0; i<(64/4); i++)
      rdram[si_register.si_dram_addr/4+i] = sl(PIF_RAM[i]);
    update_count();

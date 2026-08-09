@@ -286,7 +286,10 @@ void coprocessor_unusable_exception()
 
 void exception_general()
 {
+#ifdef DEBUG_PROBES
   static u32 dbg_ex = 0;
+#endif
+#ifdef DEBUG_PROBES
   {
      static const u32 vats[4] = { 0x803274FC, 0x8032857C, 0x80317088, 0x8031708C };
      static int done[4] = {0,0,0,0};
@@ -322,11 +325,14 @@ void exception_general()
 	    }
        }
   }
+#endif
+#ifdef DEBUG_PROBES
   if (dbg_ex < 200)
   {
      printf("[EXC] Status=%08X Cause=%08X pc=%08X\n", (u32)Status, (u32)Cause, (u32)r4300.pc);
      dbg_ex++;
   }
+#endif
   update_count();
   Status |= 2;
    

@@ -207,7 +207,9 @@ static u32 *readdps[0x20];
 static FrameBufferInfo frameBufferInfos[6];
 static char framebufferRead[0x800];
 static int firstFrameBufferSetting;
+#ifdef DEBUG_PROBES
 static int wr26b80_cnt = 0;
+#endif
 extern void dbg_printf(const char *fmt,...);
 int init_memory()
 {
@@ -802,9 +804,12 @@ void update_SP()
     if (!sp_register.halt && !sp_register.broke)
       {
 	int save_pc = rsp_register.rsp_pc & ~0xFFF;
+#ifdef DEBUG_PROBES
 	printf("[RSPSTART] pc=%08X SP_DMEM[FC0]=%d\n", rsp_register.rsp_pc, SP_DMEM[0xFC0/4]);
+#endif
 	if (SP_DMEM[0xFC0/4] == 1)
 	  {
+#ifdef DEBUG_PROBES
 	     if (rdram)
 	       {
 		  int pi;
@@ -818,6 +823,7 @@ void update_SP()
 		    printf("%08X ", (unsigned int)rdram[((0x801CA8B0 + pi*16) & MEMMASK)>>2]);
 		  printf("\n");
 	       }
+#endif
 	     // unprotecting old frame buffers
 	     if(fBGetFrameBufferInfo && fBRead && fBWrite && 
 		frameBufferInfos[0].addr)
@@ -1245,12 +1251,15 @@ static void invalidate_code_rdram(u32 size)
 void write_rdram()
 {
    if (!rdramb) { trash = word; return; }
+#ifdef DEBUG_PROBES
    if ((address & MEMMASK) == 0x226B80 && wr26b80_cnt < 60)
    {
       wr26b80_cnt++;
       printf("[WR26B80] pc=%08X old=%08X new=%08X\n", (unsigned int)r4300.pc,
          (unsigned int)*(u32 *)(rdramb + (address & MEMMASK)), (unsigned int)word);
    }
+#endif
+#ifdef DEBUG_PROBES
    {
       u32 pa = address & MEMMASK;
       if (pa >= 0x367050 && pa < 0x367090)
@@ -1270,6 +1279,8 @@ void write_rdram()
          }
       }
    }
+#endif
+#ifdef DEBUG_PROBES
    if ((address & MEMMASK) == 0x1A83E4)
    {
       static int wrobj_cnt = 0;
@@ -1280,6 +1291,8 @@ void write_rdram()
 		  (unsigned int)word, (unsigned int)Count);
 	}
    }
+#endif
+#ifdef DEBUG_PROBES
    if ((address & MEMMASK) == 0x1BA0C0)
    {
       static int wrname_cnt = 0;
@@ -1290,6 +1303,7 @@ void write_rdram()
 		  (unsigned int)word, (unsigned int)Count);
 	}
    }
+#endif
    *((u32 *)(rdramb + (address & MEMMASK))) = word;
    invalidate_code_rdram(4);
 }
@@ -1297,6 +1311,7 @@ void write_rdram()
 void write_rdramb()
 {
    if (!rdramb) { trash = byte; return; }
+#ifdef DEBUG_PROBES
    {
       u32 pa = (address & MEMMASK) ^ S8;
       if (pa >= 0x367050 && pa < 0x367090)
@@ -1311,6 +1326,7 @@ void write_rdramb()
          }
       }
    }
+#endif
    *((rdramb + ((address & MEMMASK)^S8))) = byte;
    invalidate_code_rdram(1);
 }
