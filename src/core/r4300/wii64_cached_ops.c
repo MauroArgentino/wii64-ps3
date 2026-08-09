@@ -12,7 +12,9 @@
 
 extern u32 op;
 
+#ifdef DEBUG_PROBES
 static int dm_log_cnt = 0;
+#endif
 
 #define CACHED_MEM_EXC() \
    do { \
@@ -186,12 +188,14 @@ void cached_interp_DMULT(void)
 	if (!r4300.lo) r4300.hi++;
 	else r4300.lo = ~r4300.lo + 1;
      }
+#ifdef DEBUG_PROBES
    if (dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       dm_log_cnt++;
       printf("[CDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
+#endif
    PC++;
 }
 
@@ -219,12 +223,14 @@ void cached_interp_DMULTU(void)
    r4300.lo = result1 | (result2 << 32);
    r4300.hi = (result3 & 0xFFFFFFFF) | (result4 << 32);
 
+#ifdef DEBUG_PROBES
    if (dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       dm_log_cnt++;
       printf("[CDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
+#endif
    PC++;
 }
 
@@ -992,10 +998,10 @@ void cached_interp_LWL(void)
    u32 val = (u32)(aligned_val & 0xFFFFFFFF);
    switch (addr & 3)
    {
-      case 0: LOW_WORD(irt) = (LOW_WORD(irt) & 0x00FFFFFF) | (val << 24); break;
-      case 1: LOW_WORD(irt) = (LOW_WORD(irt) & 0x0000FFFF) | (val << 16); break;
-      case 2: LOW_WORD(irt) = (LOW_WORD(irt) & 0x000000FF) | (val << 8); break;
-      case 3: LOW_WORD(irt) = val; break;
+      case 0: LOW_WORD(irt) = val; break;
+      case 1: LOW_WORD(irt) = (LOW_WORD(irt) & 0x000000FF) | (val << 8); break;
+      case 2: LOW_WORD(irt) = (LOW_WORD(irt) & 0x0000FFFF) | (val << 16); break;
+      case 3: LOW_WORD(irt) = (LOW_WORD(irt) & 0x00FFFFFF) | (val << 24); break;
    }
    sign_extended(irt);
    PC++;
@@ -1013,10 +1019,10 @@ void cached_interp_LWR(void)
    u32 val = (u32)(aligned_val & 0xFFFFFFFF);
    switch (addr & 3)
    {
-      case 0: LOW_WORD(irt) = val; break;
-      case 1: LOW_WORD(irt) = (LOW_WORD(irt) & 0xFF000000) | (val >> 8); break;
-      case 2: LOW_WORD(irt) = (LOW_WORD(irt) & 0xFFFF0000) | (val >> 16); break;
-      case 3: LOW_WORD(irt) = (LOW_WORD(irt) & 0xFFFFFF00) | (val >> 24); break;
+      case 0: LOW_WORD(irt) = (LOW_WORD(irt) & 0xFFFFFF00) | (val >> 24); break;
+      case 1: LOW_WORD(irt) = (LOW_WORD(irt) & 0xFFFF0000) | (val >> 16); break;
+      case 2: LOW_WORD(irt) = (LOW_WORD(irt) & 0xFF000000) | (val >> 8); break;
+      case 3: LOW_WORD(irt) = val; break;
    }
    sign_extended(irt);
    PC++;
