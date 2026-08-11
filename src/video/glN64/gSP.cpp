@@ -583,6 +583,73 @@ void gSPVertex( u32 v, u32 n, u32 v0 )
 #endif
 }
 
+void gSPF3DAMVertex( u32 v, u32 n, u32 v0 )
+{
+	u32 address = RSP_SegmentToPhysical( v );
+
+	if ((address + sizeof( Vertex ) * n) > RDRAMSize)
+	{
+#ifdef DEBUG
+		DebugMsg( DEBUG_HIGH | DEBUG_ERROR | DEBUG_VERTEX, "// Attempting to load vertices from invalid address\n" );
+		DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_VERTEX, "gSPF3DAMVertex( 0x%08X, %i, %i );\n",
+			v, n, v0 );
+#endif
+		return;
+	}
+
+	Vertex *vertex = (Vertex*)&RDRAM[address];
+
+	if ((n + v0) < (80))
+	{
+		for (unsigned int i = v0; i < n + v0; i++)
+		{
+			const u32 s0 = (u32)vertex->s;
+			const u32 t0 = (u32)vertex->t;
+			const u32 acum_0 = ((_SHIFTR( gSP.textureCoordScaleOrg, 0, 16 ) * t0) << 1) + 0x8000;
+			const u32 acum_1 = ((_SHIFTR( gSP.textureCoordScale[1], 0, 16 ) * t0) << 1) + 0x8000;
+			const u32 sres = ((_SHIFTR( gSP.textureCoordScaleOrg, 16, 16 ) * s0) << 1) + acum_0;
+			const u32 tres = ((_SHIFTR( gSP.textureCoordScale[1], 16, 16 ) * s0) << 1) + acum_1;
+			const s16 s = _SHIFTR( sres, 16, 16 ) + _SHIFTR( gSP.textureCoordScale[0], 16, 16 );
+			const s16 t = _SHIFTR( tres, 16, 16 ) + _SHIFTR( gSP.textureCoordScale[0], 0, 16 );
+
+			gSP.vertices[i].x = vertex->x;
+			gSP.vertices[i].y = vertex->y;
+			gSP.vertices[i].z = vertex->z;
+			gSP.vertices[i].flag = vertex->flag;
+			gSP.vertices[i].s = _FIXED2FLOAT( s, 5 );
+			gSP.vertices[i].t = _FIXED2FLOAT( t, 5 );
+
+			if (gSP.geometryMode & G_LIGHTING)
+			{
+				gSP.vertices[i].nx = vertex->normal.x;
+				gSP.vertices[i].ny = vertex->normal.y;
+				gSP.vertices[i].nz = vertex->normal.z;
+				gSP.vertices[i].a = vertex->color.a * 0.0039215689f;
+			}
+			else
+			{
+				gSP.vertices[i].r = vertex->color.r * 0.0039215689f;
+				gSP.vertices[i].g = vertex->color.g * 0.0039215689f;
+				gSP.vertices[i].b = vertex->color.b * 0.0039215689f;
+				gSP.vertices[i].a = vertex->color.a * 0.0039215689f;
+			}
+
+			gSPProcessVertex( i );
+
+			vertex++;
+		}
+	}
+#ifdef DEBUG
+	else
+		DebugMsg( DEBUG_HIGH | DEBUG_ERROR | DEBUG_VERTEX, "// Attempting to load vertices past vertex buffer size\n" );
+#endif
+
+#ifdef DEBUG
+	DebugMsg( DEBUG_HIGH | DEBUG_HANDLED | DEBUG_VERTEX, "gSPF3DAMVertex( 0x%08X, %i, %i );\n",
+		v, n, v0 );
+#endif
+}
+
 void gSPCIVertex( u32 v, u32 n, u32 v0 )
 {
 	u32 address = RSP_SegmentToPhysical( v );
@@ -927,6 +994,12 @@ void gSPInterpolateVertex( SPVertex *dest, f32 percent, SPVertex *first, SPVerte
 
 void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 {
+	static u32 dbg_total = 0, dbg_culled = 0, dbg_nonclip = 0, dbg_direct = 0;
+	if (++dbg_total >= 3000)
+	{
+		printf("[TRI-DBG] total=%d culled=%d NoNclip=%d direct=%d NoN=%d\n", dbg_total, dbg_culled, dbg_nonclip, dbg_direct, GBI.current->NoN);
+		dbg_total = dbg_culled = dbg_nonclip = dbg_direct = 0;
+	}
 	if ((v0 < 80) && (v1 < 80) && (v2 < 80))
 	{
 #ifndef __GX__
@@ -946,10 +1019,11 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 			((gSP.vertices[v0].zClip > 0.1f) &&
 			 (gSP.vertices[v1].zClip > 0.1f) &&
 			 (gSP.vertices[v2].zClip > 0.1f)) ||
+			(!GBI.current->NoN &&
 			((gSP.vertices[v0].zClip < -0.1f) &&
 			 (gSP.vertices[v1].zClip < -0.1f) &&
-			 (gSP.vertices[v2].zClip < -0.1f)))
-			 return;
+			 (gSP.vertices[v2].zClip < -0.1f))))
+			{ dbg_culled++; return; }
 
 		// NoN work-around, clips triangles, and draws the clipped-off parts with clamped z
 		if (GBI.current->NoN &&
@@ -957,6 +1031,7 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 			(gSP.vertices[v1].zClip < 0.0f) ||
 			(gSP.vertices[v2].zClip < 0.0f)))
 		{
+			dbg_nonclip++;
 			SPVertex nearVertices[4];
 			SPVertex clippedVertices[4];
 			//s32 numNearTris = 0;
@@ -1027,7 +1102,10 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 //				glDepthFunc( GL_LEQUAL );
 		}
 		else
+		{
+			dbg_direct++;
 			OGL_AddTriangle( gSP.vertices, v0, v1, v2 );
+		}
 
 #else // !__GX__
 		if(1)
@@ -1049,9 +1127,10 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 				((gSP.vertices[v0].zClip > 0.1f) &&
 				 (gSP.vertices[v1].zClip > 0.1f) &&
 				 (gSP.vertices[v2].zClip > 0.1f)) ||
+				(!GBI.current->NoN &&
 				((gSP.vertices[v0].zClip < -0.1f) &&
 				 (gSP.vertices[v1].zClip < -0.1f) &&
-				 (gSP.vertices[v2].zClip < -0.1f)))
+				 (gSP.vertices[v2].zClip < -0.1f))))
 				 return;
 		}
 

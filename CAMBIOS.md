@@ -663,3 +663,39 @@ osPiStartDma, el thread5 desbloquea, se lanzan tareas RSP (RSPSTART=1079, WR26B8
 llega a la fase FRK/sprintf (N%%d, 484 llamadas, 799 MOD/DIV base=10 correctos), y la
 emulaci�n corre continua sin crashes ni access violations. Sigue en pantalla negra por
 el video glN64/RSX, no por el core.
+
+---
+
+## Fix 31 — Causa raíz del intérprete puro: guard `pc != ipc` en saltos/ramas (pure_interp_ps3.c)
+
+**Archivo:** `src/core/r4300/pure_interp_ps3.c`
+**Cambio (build 00378):** En los 24 handlers de salto/rama (J, JAL, JR, JALR, BEQ, BNE,
+BEQL, BNEQL, BGEZ, BGTZ, BLEZ, BLTZ y variantes likely), el guard de excepción de delay
+slot era `if (r4300.pc != ipc) return;` → cambiado a `if (r4300.pc != ipc + 8) return;`.
+
+**Problema (raíz de casi todos los fallos del core puro):** El delay slot avanza `r4300.pc`
+de `ipc+4` a `ipc+8` antes de que se evalúe el guard. Con `pc != ipc` la condición era
+**siempre verdadera**, así que el handler retornaba temprano y el salto/rama NUNCA se
+ejecutaba (fall-through). El boot CIC corría 100% lineal (0x8A0→0x8A8 en vez de saltar a
+0x90C), y al llegar a `sw $k0,4($s4)` con `s4=0` entraba en refill TLB → la tormenta
+`[TLBREF]`/VECFIX/garbage registrada desde el principio. Un macro de acceso a memoria
+con la misma firma (`PS3_MEM_EXC`, línea 85) era correcto y no se tocó.
+
+**Diagnóstico:** Trace `[BOOT]` en pure_interp_ps3.c mostró que las instrucciones del boot
+se sucedían en orden estrictamente lineal — cada `jal`/`jr` caía a la siguiente dirección
+en vez de al destino. La corrección es exactamente simétrica a la del cached interpreter:
+ahí el fix (Fix 11) fue "el delay slot ejecuta la instrucción en `ipc+4`, el branch actúa
+después"; aquí el guard debe comparar contra `ipc+8` (pc tras ejecutar el delay slot) para
+detectar solo excepciones reales del slot.
+
+**Resultado (RPCS3, MK64 Europa + SM64 ESP, Core=2 / DYNACORE_PURE_INTERP):**
+- `TLBREF=0`, `VECFIX=0`, `NI=0` en todo el run.
+- Boot CIC completo → transición al OS del juego (0x80000158) → ejecución de código real
+  (0x8004xxxx/0x800B/0x800Cxxxx) alternando con el idle 0x80000594.
+- **Video renderizando**: título de la ventana de RPCS3 muestra `FPS: 14.38` (MK64) y
+  `FPS: 17-31` (SM64), frames animados (25% de celdas cambian en 6s), sin access
+  violations ni crashes, log de RPCS3 limpio.
+
+El intérprete puro pasa a ser el core funcional de referencia en RPCS3 (el dynarec sigue
+sin funcionar en RPCS3, ver nota en AGENTS.md).
+

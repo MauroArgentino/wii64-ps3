@@ -193,7 +193,23 @@ static void exc_install_vectors(void)
 void TLB_refill_exception(u32 address, int w)
 {
   int usual_handler = 0, i = 0;
-  
+  static unsigned int dbg_tlb_n = 0;
+
+  if (dbg_tlb_n < 30) {
+    printf("[TLBREF] n=%u addr=%08X w=%d pc=%08X Status=%08X Cause=%08X delay=%d\n",
+           dbg_tlb_n, (unsigned int)address, w,
+           (unsigned int)r4300.pc,
+           (unsigned int)Status, (unsigned int)Cause, r4300.delay_slot);
+    printf("[TLBREF]    DMEM@pc: %08X %08X %08X %08X %08X | t9=%08X t8=%08X t7=%08X t6=%08X\n",
+           SP_DMEM[(r4300.pc & 0xFFF) / 4],
+           SP_DMEM[((r4300.pc & 0xFFF) / 4) + 1],
+           SP_DMEM[((r4300.pc & 0xFFF) / 4) + 2],
+           SP_DMEM[((r4300.pc & 0xFFF) / 4) + 3],
+           SP_DMEM[((r4300.pc & 0xFFF) / 4) + 4],
+           (unsigned int)r4300.gpr[25], (unsigned int)r4300.gpr[24],
+           (unsigned int)r4300.gpr[23], (unsigned int)r4300.gpr[22]);
+    dbg_tlb_n++;
+  }
   exc_install_vectors();
   if (!dynacore && w != 2) {
     update_count();
@@ -286,6 +302,13 @@ void coprocessor_unusable_exception()
 
 void exception_general()
 {
+  static unsigned int dbg_gen_n = 0;
+  if (dbg_gen_n < 30) {
+    printf("[GENEX] n=%u pc=%08X EPC=%08X Status=%08X Cause=%08X BadVAddr=%08X delay=%d\n",
+           dbg_gen_n, (unsigned int)r4300.pc, (unsigned int)EPC,
+           (unsigned int)Status, (unsigned int)Cause, (unsigned int)BadVAddr, r4300.delay_slot);
+    dbg_gen_n++;
+  }
 #ifdef DEBUG_PROBES
   static u32 dbg_ex = 0;
 #endif

@@ -10,6 +10,7 @@
 #include <sysutil/video.h>
 
 #include "rsxutil.h"
+#include "../main/wii64config.h"
 
 #define GCM_LABEL_INDEX		255
 
@@ -126,18 +127,33 @@ void init_screen(void *host_addr,u32 size) {
 
 	videoGetResolution(state.displayMode.resolution,&res);
 	
-	videoResolution res_1080;
-	// Attempt to set 1920x1080 resolution for the menu.
-	if (videoGetResolution(VIDEO_RESOLUTION_1080, &res_1080) == 0) {
-		// 1080p is supported, use it.
+	// Selecciona la resolucion interna segun settings.cfg (vidResolution).
+	// El modo de salida (vconfig.resolution) acompana al interno para evitar
+	// escalados raros; si el hardware no soporta el modo pedido, se cae al
+	// mejor modo detectado (normalmente 1080p o xdetectado).
+	int target_res_id;
+	switch (vidResolution) {
+		case RESOLUTION_320X240: target_res_id = VIDEO_RESOLUTION_480; break;
+		case RESOLUTION_640X480: target_res_id = VIDEO_RESOLUTION_480; break;
+		case RESOLUTION_720P:    target_res_id = VIDEO_RESOLUTION_720; break;
+		default:                 target_res_id = VIDEO_RESOLUTION_1080; break;
+	}
+	videoResolution res_target;
+	if (videoGetResolution(target_res_id, &res_target) == 0) {
+		vconfig.resolution = target_res_id;
+	} else if (videoGetResolution(VIDEO_RESOLUTION_1080, &res_target) == 0) {
 		vconfig.resolution = VIDEO_RESOLUTION_1080;
-		display_width = 1920;
-		display_height = 1080;
+		res_target = res;
 	} else {
-		// 1080p is not supported, fall back to the detected resolution
 		vconfig.resolution = state.displayMode.resolution;
-		display_width = res.width;
-		display_height = res.height;
+		res_target = res;
+	}
+
+	switch (vidResolution) {
+		case RESOLUTION_320X240: display_width = 320;  display_height = 240;  break;
+		case RESOLUTION_640X480: display_width = 640;  display_height = 480;  break;
+		case RESOLUTION_720P:    display_width = 1280; display_height = 720;  break;
+		default:                 display_width = 1920; display_height = 1080; break;
 	}
 
 	vconfig.format = VIDEO_BUFFER_FORMAT_XRGB;
@@ -175,7 +191,13 @@ void init_screen(void *host_addr,u32 size) {
 
 	depth_pitch = display_width*sizeof(u32); // Z24S8 = 4 bytes per pixel
 	depth_buffer = (u32*)rsxMemalign(64,(display_height*depth_pitch)*2);
-	rsxAddressToOffset(depth_buffer,&depth_offset);
+	if (!depth_buffer) {
+		printf("[RSX] WARN: rsxMemalign failed for depth_buffer (%u bytes) at %ux%u\n",
+		       display_height*depth_pitch*2, display_width, display_height);
+		depth_offset = 0;
+	} else {
+		rsxAddressToOffset(depth_buffer, &depth_offset);
+	}
 
 	gcmSetDisplayBuffer(0,color_offset[0],color_pitch,display_width,display_height);
 	gcmSetDisplayBuffer(1,color_offset[1],color_pitch,display_width,display_height);
@@ -258,4 +280,56 @@ void RSX_SetInternalResolution(uint32_t w, uint32_t h) {
 void RSX_SetDisplayResolution(uint32_t w, uint32_t h) {
     g_video_config.display_w = w ? w : 1920;
     g_video_config.display_h = h ? h : 1080;
+}
+
+/* Aplica la resolución interna de render configurada en settings.cfg
+   (0=320x240, 1=640x480, 2=720p, 3=1080p). Libera y realoca los
+   color/depth buffers al nuevo tamano para ahorrar VRAM, vital para que
+   las texturas de framebuffer del glN64 quepan en el heap de 32 MB. */
+void RSX_ApplyConfigResolution() {
+    uint32_t w, h;
+    switch (vidResolution) {
+        case RESOLUTION_320X240: w = 320;  h = 240;  break;
+        case RESOLUTION_640X480: w = 640;  h = 480;  break;
+        case RESOLUTION_720P:    w = 1280; h = 720;  break;
+        default:                 w = 1920; h = 1080; break;
+    }
+
+    if (w == display_width && h == display_height) return;
+
+    waitRSXIdle();
+
+    if (depth_buffer)  { rsxFree(depth_buffer);  depth_buffer  = NULL; }
+    if (color_buffer[0]) { rsxFree(color_buffer[0]); color_buffer[0] = NULL; }
+    if (color_buffer[1]) { rsxFree(color_buffer[1]); color_buffer[1] = NULL; }
+
+    display_width = w;
+    display_height = h;
+    color_pitch = display_width * sizeof(u32);
+    depth_pitch = display_width * sizeof(u32);
+
+    printf("[RSX] ApplyConfigResolution: vidResolution=%d -> %ux%u (pitch=%u)\n",
+           (int)vidResolution, w, h, color_pitch);
+
+    color_buffer[0] = (u32*)rsxMemalign(64, display_height * color_pitch);
+    color_buffer[1] = (u32*)rsxMemalign(64, display_height * color_pitch);
+    if (!color_buffer[0] || !color_buffer[1]) {
+        printf("[RSX] ERROR: rsxMemalign fallo al realocar color_buffer %ux%u\n", w, h);
+        return;
+    }
+    rsxAddressToOffset(color_buffer[0], &color_offset[0]);
+    rsxAddressToOffset(color_buffer[1], &color_offset[1]);
+
+    depth_buffer = (u32*)rsxMemalign(64, display_height * depth_pitch * 2);
+    if (!depth_buffer) {
+        printf("[RSX] ERROR: rsxMemalign fallo al realocar depth_buffer %ux%u\n", w, h);
+    } else {
+        rsxAddressToOffset(depth_buffer, &depth_offset);
+    }
+
+    gcmSetDisplayBuffer(0, color_offset[0], color_pitch, display_width, display_height);
+    gcmSetDisplayBuffer(1, color_offset[1], color_pitch, display_width, display_height);
+
+    setRenderTarget(curr_fb);
+    rsxFlushBuffer(context);
 }

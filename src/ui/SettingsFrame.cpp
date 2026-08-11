@@ -30,6 +30,7 @@
 #include "libgui/MessageBox.h"
 //#include "../main/timers.h"
 #include "../main/wii64config.h"
+#include "../main/rsxutil.h"
 
 extern "C" {
 #include "../core/n64_input/controller.h"
@@ -71,6 +72,11 @@ void Func_2xSaiTexturesOff();
 void Func_FbTexturesOn();
 void Func_FbTexturesOff();
 
+void Func_Resolution320x240();
+void Func_Resolution640x480();
+void Func_Resolution720p();
+void Func_Resolution1080p();
+
 void Func_ConfigureInput();
 void Func_ConfigurePaks();
 void Func_ConfigureButtons();
@@ -88,14 +94,14 @@ void Func_DeleteSaves();
 void Func_ReturnFromSettingsFrame();
 
 
-#define NUM_FRAME_BUTTONS 38
+#define NUM_FRAME_BUTTONS 42
 #define NUM_TAB_BUTTONS 5
 #define FRAME_BUTTONS settingsFrameButtons
 #define FRAME_STRINGS settingsFrameStrings
-#define NUM_FRAME_TEXTBOXES 13
+#define NUM_FRAME_TEXTBOXES 14
 #define FRAME_TEXTBOXES settingsFrameTextBoxes
 
-static char FRAME_STRINGS[37][23] =
+static char FRAME_STRINGS[42][23] =
 	{ "General",
 	  "Video",
 	  "Input",
@@ -137,7 +143,13 @@ static char FRAME_STRINGS[37][23] =
 	//Strings for Saves tab [34]
 	  "Auto Save Native Saves",
 	  "Copy Saves",
-	  "Delete Saves"};
+	  "Delete Saves",
+	//Strings for Resolution [37]
+	  "Resolution",
+	  "320x240",
+	  "640x480",
+	  "720p",
+	  "1080p"};
 
 struct ButtonInfo
 {
@@ -183,8 +195,8 @@ struct ButtonInfo
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	240.0,	 75.0,	56.0,	19,	23,	20,	20,	Func_CpuFramebufferOff,	Func_ReturnFromSettingsFrame }, // CPU FB: Off
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	310.0,	 75.0,	56.0,	20,	24,	23,	23,	Func_2xSaiTexturesOn,	Func_ReturnFromSettingsFrame }, // 2xSai: On
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	310.0,	 75.0,	56.0,	21,	25,	22,	22,	Func_2xSaiTexturesOff,	Func_ReturnFromSettingsFrame }, // 2xSai: Off
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	380.0,	 75.0,	56.0,	22,	 1,	25,	25,	Func_FbTexturesOn,		Func_ReturnFromSettingsFrame }, // FbTex: On
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	380.0,	 75.0,	56.0,	23,	 1,	24,	24,	Func_FbTexturesOff,		Func_ReturnFromSettingsFrame }, // FbTex: Off
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	380.0,	 75.0,	56.0,	22,	39,	25,	25,	Func_FbTexturesOn,		Func_ReturnFromSettingsFrame }, // FbTex: On
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	380.0,	 75.0,	56.0,	23,	40,	24,	24,	Func_FbTexturesOff,		Func_ReturnFromSettingsFrame }, // FbTex: Off
 	//Buttons for Input Tab (starts at button[26])
 	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[25],	180.0,	100.0,	280.0,	56.0,	 2,	27,	-1,	-1,	Func_ConfigureInput,	Func_ReturnFromSettingsFrame }, // Configure Mappings
 	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[26],	180.0,	170.0,	280.0,	56.0,	26,	28,	-1,	-1,	Func_ConfigurePaks,		Func_ReturnFromSettingsFrame }, // Configure Paks
@@ -200,6 +212,11 @@ struct ButtonInfo
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	470.0,	100.0,	 75.0,	56.0,	 4,	36,	34,	34,	Func_AutoSaveNativeNo,	Func_ReturnFromSettingsFrame }, // Auto Save Native: No
 	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[35],	365.0,	170.0,	190.0,	56.0,	34,	37,	-1,	-1,	Func_CopySaves,			Func_ReturnFromSettingsFrame }, // Copy Saves
 	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[36],	365.0,	240.0,	190.0,	56.0,	36,	 4,	-1,	-1,	Func_DeleteSaves,		Func_ReturnFromSettingsFrame }, // Delete Saves
+	//Buttons for Resolution (starts at button[38])
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[38],	230.0,	450.0,	 85.0,	56.0,	24,	 1,	41,	39,	Func_Resolution320x240,	Func_ReturnFromSettingsFrame }, // Resolution: 320x240
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[39],	325.0,	450.0,	 85.0,	56.0,	24,	 1,	38,	40,	Func_Resolution640x480,	Func_ReturnFromSettingsFrame }, // Resolution: 640x480
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[40],	420.0,	450.0,	 85.0,	56.0,	25,	 1,	39,	41,	Func_Resolution720p,	Func_ReturnFromSettingsFrame }, // Resolution: 720p
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[41],	525.0,	450.0,	 85.0,	56.0,	25,	 1,	40,	38,	Func_Resolution1080p,	Func_ReturnFromSettingsFrame }, // Resolution: 1080p
 };
 
 struct TextBoxInfo
@@ -223,6 +240,7 @@ struct TextBoxInfo
 	{	NULL,	FRAME_STRINGS[17],	190.0,	268.0,	 1.0,	true }, // CPU Framebuffer: On/Off
 	{	NULL,	FRAME_STRINGS[18],	190.0,	338.0,	 1.0,	true }, // 2xSai: On/Off
 	{	NULL,	FRAME_STRINGS[19],	190.0,	408.0,	 1.0,	true }, // FBTex: On/Off
+	{	NULL,	FRAME_STRINGS[37],	130.0,	478.0,	 1.0,	true }, // Resolution: 320x240/640x480/720p/1080p
 	//TextBoxes for Input Tab (starts at textBox[9])
 	{	NULL,	FRAME_STRINGS[28],	155.0,	338.0,	 1.0,	true }, // 2xSai: On/Off
 	{	NULL,	FRAME_STRINGS[29],	155.0,	408.0,	 1.0,	true }, // 2xSai: On/Off
@@ -321,16 +339,16 @@ void SettingsFrame::activateSubmenu(int submenu)
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
 			break;
-		case SUBMENU_VIDEO:
+case SUBMENU_VIDEO:
 			setDefaultFocus(FRAME_BUTTONS[1].button);
 			for (int i = 0; i < NUM_TAB_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[15].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[24].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[38].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
-			for (int i = 4; i < 9; i++)
+			for (int i = 4; i < 10; i++)
 				FRAME_TEXTBOXES[i].textBox->setVisible(true);
 			FRAME_BUTTONS[1].button->setSelected(true);
 			if (showFPSonScreen == FPS_SHOW)	FRAME_BUTTONS[15].button->setSelected(true);
@@ -344,7 +362,16 @@ void SettingsFrame::activateSubmenu(int submenu)
 			else												FRAME_BUTTONS[23].button->setSelected(true);
 			if (glN64_useFrameBufferTextures == GLN64_FBTEX_ENABLE)	FRAME_BUTTONS[24].button->setSelected(true);
 			else													FRAME_BUTTONS[25].button->setSelected(true);
+			if (vidResolution == RESOLUTION_320X240)		FRAME_BUTTONS[38].button->setSelected(true);
+			else if (vidResolution == RESOLUTION_640X480)	FRAME_BUTTONS[39].button->setSelected(true);
+			else if (vidResolution == RESOLUTION_720P)		FRAME_BUTTONS[40].button->setSelected(true);
+			else											FRAME_BUTTONS[41].button->setSelected(true);
 			for (int i = 15; i < 26; i++)
+			{
+				FRAME_BUTTONS[i].button->setVisible(true);
+				FRAME_BUTTONS[i].button->setActive(true);
+			}
+			for (int i = 38; i < 42; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -941,6 +968,42 @@ void Func_CopySaves()
 void Func_DeleteSaves()
 {
 	menu::MessageBox::getInstance().setMessage("Delete Saves not implemented");
+}
+
+void Func_Resolution320x240()
+{
+	for (int i = 38; i < 42; i++)
+		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[38].button->setSelected(true);
+	vidResolution = RESOLUTION_320X240;
+	RSX_ApplyConfigResolution();
+}
+
+void Func_Resolution640x480()
+{
+	for (int i = 38; i < 42; i++)
+		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[39].button->setSelected(true);
+	vidResolution = RESOLUTION_640X480;
+	RSX_ApplyConfigResolution();
+}
+
+void Func_Resolution720p()
+{
+	for (int i = 38; i < 42; i++)
+		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[40].button->setSelected(true);
+	vidResolution = RESOLUTION_720P;
+	RSX_ApplyConfigResolution();
+}
+
+void Func_Resolution1080p()
+{
+	for (int i = 38; i < 42; i++)
+		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[41].button->setSelected(true);
+	vidResolution = RESOLUTION_1080P;
+	RSX_ApplyConfigResolution();
 }
 
 void Func_ReturnFromSettingsFrame()

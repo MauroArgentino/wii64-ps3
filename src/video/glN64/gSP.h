@@ -74,6 +74,9 @@ struct gSPInfo
 		s32 level, on, tile;
     } texture;
 
+	u32 textureCoordScaleOrg;
+	u32 textureCoordScale[2];
+
 	gDPTile *textureTile[2];
 
 	struct
@@ -131,6 +134,7 @@ void gSPForceMatrix( u32 mptr );
 void gSPLight( u32 l, s32 n );
 void gSPLookAt( u32 l, s32 n );
 void gSPVertex( u32 v, u32 n, u32 v0 );
+void gSPF3DAMVertex( u32 v, u32 n, u32 v0 );
 void gSPCIVertex( u32 v, u32 n, u32 v0 );
 void gSPDMAVertex( u32 v, u32 n, u32 v0 );
 void gSPDisplayList( u32 dl );

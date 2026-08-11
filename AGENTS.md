@@ -123,6 +123,14 @@ Flow: `main()` -> RSX/pad init -> `MenuContext` menu loop -> user picks ROM -> `
 
 11. **`update_count()` corrupts Count in cached mode — loader deadlock** (found 2026-08-07). `update_count()` does `Count += (r4300.pc - r4300.last_pc)/2`, but cached only syncs `last_pc` at run start (line 881) and in exceptions. So the first DMA/SI/SP/exception-triggered `update_count()` after a block transition adds a stale ±2^31 delta (observed `[CNTJUMP] +6E000008 pc=80000050 last=A4000040`, and `+80000474` inside osPiStartDma). This corrupts the event queue ordering (PI_INT at `0x000ADE8E` while `Count=0x814D2FD4`), so the main-loop check `r4300.next_interrupt <= Count` never fires PI_INT → DMA completion never delivered to queue `0x8034AF60` → SM64 loader thread blocked in osRecvMesg forever (idle spin 0x80246DD8, mi=00000000, black screen). **Fix:** in `update_count()`, if `interpcore == 2` (cached), just sync `last_pc` and return — the main loop already advances `Count += 2` per instruction. Use `interpcore`, NOT `dynacore`, to identify the cached run: `go()` sets `dynacore=0` for both pure and cached during the run.
 
+## Pure interpreter: root-cause fix (2026-08-10)
+
+**The pure interpreter (DYNACORE_PURE_INTERP / Core=2) now boots and renders games.** Before this fix it was the broken core: TLBREF storms, VECFIX garbage, black screen.
+
+**Root cause:** all 24 jump/branch handlers in `pure_interp_ps3.c` (J, JAL, JR, JALR, BEQ, BNE, BEQL, BNEQL, BGEZ/BGEZL, BGTZ, BLEZ, BLTZ/BLTZL, etc.) had `if (r4300.pc != ipc) return;` as the delay-slot-exception guard. Since the delay slot advances `r4300.pc` from `ipc+4` to `ipc+8`, the condition was **always true** → every jump/branch fell through and never jumped. The CIC boot ran 100% linearly, hit `sw $k0,4($s4)` with `s4=0` → TLB refill → storm. **Fix:** `if (r4300.pc != ipc + 8) return;`. `PS3_MEM_EXC` (line 85, same signature) is correct — leave it alone.
+
+**Verified (build 00378, RPCS3):** MK64 (Europa) and SM64 (ESP) with `Core = 2`: `TLBREF=0`, `VECFIX=0`, `NI=0`; game boots CIC → OS (0x80000158) → real game code (0x8004/0x800B/0x800C) alternating with idle 0x80000594; RPCS3 window title shows `FPS: 14.38` (MK64) / `FPS: 17-31` (SM64) with animated frames — video renders, no access violations. The pure interpreter is now the reference core on RPCS3 (dynarec still crashes RPCS3).
+
 ## Crash prevention (addressed 2026-07-30)
 
 Known RPCS3 crash: "VM: Access violation writing location 0x0 (unmapped memory)" after prolonged emulation. Root cause: none of the 40+ `malloc`/`calloc`/`rsxMemalign` sites checked for NULL. Once VRAM or heap runs out, writes through NULL pointers crash RPCS3/PS3.

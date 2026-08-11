@@ -893,11 +893,17 @@ void gDPFillRectangle( s32 ulx, s32 uly, s32 lrx, s32 lry )
 
 		if ((ulx == 0) && (uly == 0) && ((unsigned int)lrx == VI.width) && ((unsigned int)lry == VI.height))
 		{
+#ifdef DEBUG_PROBES
+			printf("[FILL-CLR] fullscreen clear (%d,%d,%d,%d) cycle=FILL addr=%08x\n", ulx, uly, lrx, lry, gDP.colorImage.address);
+#endif
 			OGL_ClearColorBuffer( &gDP.fillColor.r );
 			return;
 		}
 	}
 
+#ifdef DEBUG_PROBES
+	printf("[FILL-RECT] (%d,%d,%d,%d) cycle=%d addr=%08x\n", ulx, uly, lrx, lry, gDP.otherMode.cycleType, gDP.colorImage.address);
+#endif
 	OGL_DrawRect( ulx, uly, lrx, lry, &gDP.fillColor.r );
 	
 	if (depthBuffer.current) depthBuffer.current->cleared = FALSE;

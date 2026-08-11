@@ -27,6 +27,7 @@
 #include "Textures.h"
 #include "Combiner.h"
 #include "Types.h"
+#include <cstdio>
 #include "../../main/game_hacks.h"
 
 FrameBufferInfo frameBuffer;
@@ -187,6 +188,7 @@ void FrameBuffer_Destroy()
 
 void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 {
+	printf("[FB-SAVE] addr=%08x size=%d %dx%d\n", address, size, width, height);
 	FrameBuffer *current = frameBuffer.top;
 
 	// Search through saved frame buffers
@@ -282,9 +284,22 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 	current->texture->mirrorS = 0;
 	current->texture->mirrorT = 0;
 #ifndef __GX__
+#ifdef PS3
+	// RSX supports NPOT textures; round to even for transfer alignment.
+	if(current->texture->width & 0x1)	current->texture->realWidth = current->texture->width + 1;
+	else								current->texture->realWidth = current->texture->width;
+	if(!current->texture->realWidth)	current->texture->realWidth = 2;
+
+	if(current->texture->height & 0x1)	current->texture->realHeight = current->texture->height + 1;
+	else								current->texture->realHeight = current->texture->height;
+	if(!current->texture->realHeight)	current->texture->realHeight = 2;
+
+	current->texture->textureBytes = current->texture->realWidth * current->texture->realHeight * 4;
+#else
 	current->texture->realWidth = pow2( (unsigned long)(current->width * OGL.scaleX) );
 	current->texture->realHeight = pow2( (unsigned long)(current->height * OGL.scaleY) );
 	current->texture->textureBytes = current->texture->realWidth * current->texture->realHeight * 4;
+#endif // PS3
 #else //!__GX__
 	//realWidth & realHeight should be multiple of 2 for EFB->Texture Copy
 	if(current->texture->width & 0x1)	current->texture->realWidth = current->texture->width + 1;
@@ -375,6 +390,15 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 			4);
 		rsxFlushBuffer(context);
 		rsxInvalidateTextureCache(context, GCM_INVALIDATE_TEXTURE);
+	}
+	else
+	{
+		printf("[FB-SAVE] WARN: rsxMemalign failed for framebuffer texture %lu bytes (w=%lu h=%lu rw=%lu rh=%lu)\n",
+		       (unsigned long)current->texture->textureBytes,
+		       (unsigned long)current->texture->width,
+		       (unsigned long)current->texture->height,
+		       (unsigned long)current->texture->realWidth,
+		       (unsigned long)current->texture->realHeight);
 	}
 #elif defined(__GX__)
 	//Note: texture realWidth and realHeight should be multiple of 2!
@@ -570,6 +594,7 @@ void FrameBuffer_RenderBuffer( u32 address )
 
 void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
 {
+	printf("[FB-RESTORE] addr=%08x size=%d %dx%d\n", address, size, width, width);
 	FrameBuffer *current = frameBuffer.top;
 
 	while (current != NULL)

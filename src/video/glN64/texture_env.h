@@ -22,6 +22,7 @@ struct TexEnv
 	} fragment;
 
 	BOOL usesT0, usesT1;
+	BOOL multiplyByPrimAlpha;
 };
 
 void Init_texture_env();

@@ -26,7 +26,9 @@
 #define ZSORT		11
 #define F3DGOLDEN	12
 #define F3DEX3		13
-#define NONE		14
+#define F3DBETA		15
+#define F3DAM		16
+#define NONE		17
 
 
 
@@ -47,13 +49,15 @@ const char *MicrocodeTypes[] =
 	"ZSort",
 	"F3DGOLDEN",
 	"F3DEX3",
+	"F3DBETA",
+	"F3DAM",
 	"None"
 };
 #else
 extern const char *MicrocodeTypes[];
 #endif
 
-static const int numMicrocodeTypes = 15;
+static const int numMicrocodeTypes = 17;
 
 
 // Fixed point conversion factors
@@ -638,6 +642,7 @@ static const char *aAText[] =
 #endif
 
 extern u32 G_RDPHALF_1, G_RDPHALF_2, G_RDPHALF_CONT;
+extern u32 G_PERSPNORM;
 extern u32 G_SPNOOP;
 extern u32 G_SETOTHERMODE_H, G_SETOTHERMODE_L;
 extern u32 G_DL, G_ENDDL, G_CULLDL, G_BRANCH_Z;

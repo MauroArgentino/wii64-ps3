@@ -263,6 +263,7 @@ void OGL_InitStates()
 	OGL.vertexTexcoord_id = -1;
 	OGL.textureUnit_id = -1;
 	OGL.mode_id = -1;
+	OGL.primAlpha_id = -1;
 	OGL.vp_ucode = NULL;
 	OGL.fp_ucode = NULL;
 
@@ -292,6 +293,7 @@ void OGL_InitStates()
 
 	OGL.mode_id = rsxFragmentProgramGetConst(OGL.fpo,"mode");
 	OGL.alpha_mode_id = rsxFragmentProgramGetConst(OGL.fpo,"alpha_mode");
+	OGL.primAlpha_id = rsxFragmentProgramGetConst(OGL.fpo,"primAlpha");
 	OGL.shader_alpha_mode = 0.0f;
 	OGL.textureUnit_id = rsxFragmentProgramGetAttrib(OGL.fpo,"texture");
 
@@ -1468,8 +1470,32 @@ static inline void submitRSXVertex(int id, const GLVertex *v)
 }
 #endif
 
+u32 glN64_depthClearCount = 0;
+
 void OGL_DrawTriangles()
 {
+#ifdef PS3
+	// PS3: Upload shader mode + alpha_mode per-draw. rsxLoadFragmentProgramLocation
+	// (called in VI_UpdateScreen and Set_texture_env) resets fragment params to defaults.
+	// The OSD (IplFont/Gui) also uses different fragment programs, and the restore in
+	// VI_UpdateScreen doesn't survive until the next frame's draws. Per-draw upload guarantees
+	// the correct values reach the RSX for every triangle batch.
+	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
+	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
+	if (OGL.primAlpha_id >= 0)
+		rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.primAlpha_id, &gDP.primColor.a, OGL.fp_offset);
+	// VI_UpdateScreen's rsxLoadFragmentProgramLocation invalidates the RSX texture
+	// unit binding every frame; textures were only re-bound on CHANGED_TEXTURE, so most
+	// draws sampled the default (white) texture -> flat vertex-color shading. Re-issue
+	// the texture binding per draw so modulate/passtex draws sample the real texels.
+	if (combiner.usesT0 || combiner.usesT1)
+	{
+		if (cache.current[0] && cache.current[0]->rsxTextureBuffer)
+			TextureCache_BindToRSX(cache.current[0]);
+		else
+			TextureCache_ActivateDummy(0);
+	}
+#endif
 	if (OGL.usePolygonStipple && (gDP.otherMode.alphaCompare == G_AC_DITHER) && !(gDP.otherMode.alphaCvgSel))
 	{
 		OGL.lastStipple = (OGL.lastStipple + 1) & 0x7;
@@ -1511,7 +1537,246 @@ void OGL_DrawTriangles()
 		}
 	}
 #endif
+#ifdef DEBUG_PROBES
+	{
+		// Draw debug: throttle to ~1 line/sec, log batch NDC extents + cull/depth state
+		static int dbg_frame = 0;
+		static int dbg_lines = 0;
+		if ((dbg_frame++ & 0x3FF) == 0) {
+			float minNX = 1e9f, maxNX = -1e9f, minNY = 1e9f, maxNY = -1e9f;
+			float minNZ = 1e9f, maxNZ = -1e9f;
+			float minW = 1e9f, maxW = -1e9f;
+			float minR = 1e9f, maxR = -1e9f, minG = 1e9f, maxG = -1e9f, minB = 1e9f, maxB = -1e9f;
+			int inside = 0, insideZ = 0;
+			for (int i = 0; i < OGL.numVertices; i += 3) {
+				const GLVertex *v = &OGL.vertices[i];
+				for (int j = 0; j < 3; j++) {
+					float nx = v[j].w > 0.0f ? v[j].x / v[j].w : 0.0f;
+					float ny = v[j].w > 0.0f ? v[j].y / v[j].w : 0.0f;
+					float nz = v[j].w > 0.0f ? v[j].z / v[j].w : 0.0f;
+					if (nx < minNX) minNX = nx; if (nx > maxNX) maxNX = nx;
+					if (ny < minNY) minNY = ny; if (ny > maxNY) maxNY = ny;
+					if (nz < minNZ) minNZ = nz; if (nz > maxNZ) maxNZ = nz;
+					if (v[j].w < minW) minW = v[j].w; if (v[j].w > maxW) maxW = v[j].w;
+					if (v[j].color.r < minR) minR = v[j].color.r; if (v[j].color.r > maxR) maxR = v[j].color.r;
+					if (v[j].color.g < minG) minG = v[j].color.g; if (v[j].color.g > maxG) maxG = v[j].color.g;
+					if (v[j].color.b < minB) minB = v[j].color.b; if (v[j].color.b > maxB) maxB = v[j].color.b;
+					if (nx >= -1.0f && nx <= 1.0f && ny >= -1.0f && ny <= 1.0f) inside++;
+					if (nx >= -1.0f && nx <= 1.0f && ny >= -1.0f && ny <= 1.0f && nz >= 0.0f && nz <= 1.0f) insideZ++;
+				}
+			}
+			int cullBits = gSP.geometryMode & (G_CULL_BACK | G_CULL_FRONT);
+			u32 tex0 = 0, tex1 = 0;
+			u32 texW = 0, texH = 0;
+			int texFmt = -1, texSize = -1;
+			if (cache.current[0]) {
+				texFmt = (int)cache.current[0]->format;
+				texSize = (int)cache.current[0]->size;
+				texW = cache.current[0]->realWidth;
+				texH = cache.current[0]->realHeight;
+				if (cache.current[0]->rsxTextureBuffer) {
+					tex0 = cache.current[0]->rsxTextureBuffer[0];
+					tex1 = cache.current[0]->rsxTextureBuffer[texW > 1 ? 1 : 0];
+				}
+			}
+			printf("[DRW-DBG] verts=%d tris=%d NDC x[%.2f,%.2f] y[%.2f,%.2f] z[%.2f,%.2f] w[%.2f,%.2f] inside=%d inZ=%d cull=%d zbuf=%d depthCmp=%d lit=%d colR[%.2f,%.2f] colG[%.2f,%.2f] colB[%.2f,%.2f] texFmt=%d size=%d %dx%d tex[%08x,%08x]\n",
+				OGL.numVertices, OGL.numTriangles, minNX, maxNX, minNY, maxNY, minNZ, maxNZ, minW, maxW, inside, insideZ,
+				cullBits, !!(gSP.geometryMode & G_ZBUFFER), gDP.otherMode.depthCompare,
+				!!(gSP.geometryMode & G_LIGHTING), minR, maxR, minG, maxG, minB, maxB,
+				texFmt, texSize, texW, texH, tex0, tex1);
+			if (++dbg_lines > 30) dbg_lines = 0;
+		}
+	}
+#endif
+#ifdef DEBUG_PROBES
+	static bool lastBatchAllFar = false;
+#endif
 	rsxDrawVertexBegin(context,GCM_TYPE_TRIANGLES);
+#ifdef DEBUG_PROBES
+	// TEMPORAL: diagnostic — classify triangles, dump first far tri coords + screen area
+	{
+		static u32 frameIdx = 0;
+		static u32 nFront3 = 0, nFront0 = 0, nPartial = 0;
+		static u32 nearCnt = 0, midCnt = 0, farCnt = 0;
+		static u32 farTexNull = 0, farTexBlack = 0, farTexColor = 0, totalFlushes = 0;
+		static u32 farDetailLeft = 0;
+		static u32 nearDetailLeft = 0;
+		static u32 nearStateDumps = 0;
+		static u32 globalDrawCall = 0;
+		globalDrawCall++;
+		bool hasNear = false;
+		bool allFarBatch = true;
+		float vp_w = gSP.viewport.width * OGL.scaleX;
+		float vp_h = gSP.viewport.height * OGL.scaleY;
+		float vp_x = gSP.viewport.x * OGL.scaleX;
+		float vp_y = gSP.viewport.y * OGL.scaleY;
+		float vpNear = gSP.viewport.nearz, vpFar = gSP.viewport.farz;
+		if (vpNear < 0.0f) vpNear = 0.0f;
+		if (vpFar > 1.0f) vpFar = 1.0f;
+		if (vpNear >= vpFar) vpFar = vpNear + 0.001f;
+		float zScale = (vpFar - vpNear) * 0.5f;
+		float zOffset = (vpFar + vpNear) * 0.5f;
+		const GLVertex *firstFarTri = NULL, *firstNearTri = NULL;
+		for (int i = 0; i < OGL.numVertices; i += 3) {
+			const GLVertex *v = &OGL.vertices[i];
+			float avgW = (v[0].w + v[1].w + v[2].w) / 3.0f;
+			int nf = 0;
+			for (int j = 0; j < 3; j++) if (v[j].w > NEAR_CLIP_EPS) nf++;
+			if (nf == 3) nFront3++; else if (nf == 0) nFront0++; else nPartial++;
+			if (avgW < 50.0f) {
+				nearCnt++;
+				hasNear = true;
+				allFarBatch = false;
+				if (!firstNearTri && nf == 3) firstNearTri = v;
+				if (nearDetailLeft > 0 && nf == 3) {
+					nearDetailLeft--;
+					float sx[3], sy[3];
+					for (int j = 0; j < 3; j++) {
+						float invW = v[j].w > 0.0f ? 1.0f / v[j].w : 0.0f;
+						float ndcX = v[j].x * invW;
+						float ndcY = v[j].y * invW;
+						sx[j] = ndcX * (vp_w * 0.5f) + (vp_x + vp_w * 0.5f);
+						sy[j] = ndcY * (-vp_h * 0.5f) + (vp_y + vp_h * 0.5f);
+					}
+					float area = fabsf((sx[1]-sx[0])*(sy[2]-sy[0]) - (sx[2]-sx[0])*(sy[1]-sy[0])) * 0.5f;
+					printf("[NEAR-TRI] w=[%.1f,%.1f,%.1f] clip=[(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)] screen=[(%.1f,%.1f)(%.1f,%.1f)(%.1f,%.1f)] area=%.2fpx col[%.2f,%.2f,%.2f] tex[%08x]\n",
+						v[0].w, v[1].w, v[2].w,
+						v[0].x, v[0].y, v[0].z, v[0].w,
+						v[1].x, v[1].y, v[1].z, v[1].w,
+						v[2].x, v[2].y, v[2].z, v[2].w,
+						sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], area,
+						v[0].color.r, v[0].color.g, v[0].color.b,
+						cache.current[0] && cache.current[0]->rsxTextureBuffer ? cache.current[0]->rsxTextureBuffer[0] : 0);
+				}
+			}
+			else if (avgW < 300.0f) {
+				midCnt++;
+				allFarBatch = false;
+			}
+			else {
+				farCnt++;
+				if (!firstFarTri && nf == 3) firstFarTri = v;
+				if (!cache.current[0] || !cache.current[0]->rsxTextureBuffer) farTexNull++;
+				else if (cache.current[0]->rsxTextureBuffer[0] == 0) farTexBlack++;
+				else farTexColor++;
+				if (farDetailLeft > 0 && nf == 3) {
+					farDetailLeft--;
+					float sx[3], sy[3];
+					for (int j = 0; j < 3; j++) {
+						float invW = v[j].w > 0.0f ? 1.0f / v[j].w : 0.0f;
+						float ndcX = v[j].x * invW;
+						float ndcY = v[j].y * invW;
+						sx[j] = ndcX * (vp_w * 0.5f) + (vp_x + vp_w * 0.5f);
+						sy[j] = ndcY * (-vp_h * 0.5f) + (vp_y + vp_h * 0.5f);
+					}
+					float area = fabsf((sx[1]-sx[0])*(sy[2]-sy[0]) - (sx[2]-sx[0])*(sy[1]-sy[0])) * 0.5f;
+					printf("[FAR-TRI] w=[%.1f,%.1f,%.1f] clip=[(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)] screen=[(%.1f,%.1f)(%.1f,%.1f)(%.1f,%.1f)] area=%.2fpx\n",
+						v[0].w, v[1].w, v[2].w,
+						v[0].x, v[0].y, v[0].z, v[0].w,
+						v[1].x, v[1].y, v[1].z, v[1].w,
+						v[2].x, v[2].y, v[2].z, v[2].w,
+						sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], area);
+				}
+			}
+		}
+		lastBatchAllFar = allFarBatch;
+		if (lastBatchAllFar && (globalDrawCall & 0xFF) == 0) {
+			int cullBits = gSP.geometryMode & (G_CULL_BACK | G_CULL_FRONT);
+			u32 tex0 = 0; u32 texW = 0, texH = 0; int texFmt = -1, texSize = -1;
+			if (cache.current[0]) {
+				texFmt = (int)cache.current[0]->format;
+				texSize = (int)cache.current[0]->size;
+				texW = cache.current[0]->realWidth;
+				texH = cache.current[0]->realHeight;
+				if (cache.current[0]->rsxTextureBuffer) tex0 = cache.current[0]->rsxTextureBuffer[0];
+			}
+			printf("[FAR-STATE] tris=%d cull=%d zbuf=%d depthCmp=%d depthUpdate=%d cycle=%d texFmt=%d size=%d %dx%d tex[%08x] dclears=%u\n",
+				OGL.numTriangles, cullBits, !!(gSP.geometryMode & G_ZBUFFER), gDP.otherMode.depthCompare,
+				gDP.otherMode.depthUpdate, gDP.otherMode.cycleType,
+				texFmt, texSize, texW, texH, tex0, glN64_depthClearCount);
+		}
+		if (hasNear && nearStateDumps < 8) {
+			nearStateDumps++;
+			int cullBits = gSP.geometryMode & (G_CULL_BACK | G_CULL_FRONT);
+			u32 tex0 = 0; u32 texW = 0, texH = 0; int texFmt = -1, texSize = -1;
+			if (cache.current[0]) {
+				texFmt = (int)cache.current[0]->format;
+				texSize = (int)cache.current[0]->size;
+				texW = cache.current[0]->realWidth;
+				texH = cache.current[0]->realHeight;
+				if (cache.current[0]->rsxTextureBuffer) tex0 = cache.current[0]->rsxTextureBuffer[0];
+			}
+			printf("[NEAR-STATE] tris=%d cull=%d zbuf=%d depthCmp=%d depthUpdate=%d cycle=%d forceBlend=%d alphaCmp=%d cvgXAlpha=%d alphaMode=%.0f primA=%.2f texFmt=%d size=%d %dx%d tex[%08x] mode=%.0f\n",
+				OGL.numTriangles, cullBits, !!(gSP.geometryMode & G_ZBUFFER), gDP.otherMode.depthCompare,
+				gDP.otherMode.depthUpdate, gDP.otherMode.cycleType, gDP.otherMode.forceBlender,
+				gDP.otherMode.alphaCompare, gDP.otherMode.alphaCvgSel, (double)OGL.shader_alpha_mode, gDP.primColor.a,
+				texFmt, texSize, texW, texH, tex0, (double)OGL.shader_mode);
+		}
+		if ((globalDrawCall & 0xFF) == 0) {
+			if (firstFarTri) {
+				float ndcZ = firstFarTri[0].z / firstFarTri[0].w;
+				float zWin = ndcZ * zScale + zOffset;
+				printf("[Z-DBG] FAR tri vp near=%.3f far=%.3f zScale=%.4f zOff=%.4f z/w=%.4f zWin=%.4f\n",
+					(double)gSP.viewport.nearz, (double)gSP.viewport.farz,
+					(double)zScale, (double)zOffset, (double)ndcZ, (double)zWin);
+			}
+			if (firstNearTri) {
+				float ndcZ = firstNearTri[0].z / firstNearTri[0].w;
+				float zWin = ndcZ * zScale + zOffset;
+				printf("[Z-DBG] NEAR tri w=%.1f z/w=%.4f zWin=%.4f\n",
+					(double)firstNearTri[0].w, (double)ndcZ, (double)zWin);
+			}
+		}
+		totalFlushes++;
+		if ((frameIdx++ & 0x3FF) == 0) {
+			printf("BUCKETS flush=%d f3=%d f0=%d fp=%d near=%d mid=%d far=%d farTex null=%d black=%d color=%d vp %.0f,%.0f %.0fx%.0f sc %.0f,%.0f %.0fx%.0f\n",
+				totalFlushes, nFront3, nFront0, nPartial, nearCnt, midCnt, farCnt, farTexNull, farTexBlack, farTexColor,
+				vp_x, vp_y, vp_w, vp_h,
+				gDP.scissor.ulx * OGL.scaleX, gDP.scissor.uly * OGL.scaleY,
+				(gDP.scissor.lrx - gDP.scissor.ulx) * OGL.scaleX,
+				(gDP.scissor.lry - gDP.scissor.uly) * OGL.scaleY);
+			nFront3 = nFront0 = nPartial = 0;
+			nearCnt = midCnt = farCnt = farTexNull = farTexBlack = farTexColor = 0;
+			farDetailLeft = 5;
+			nearDetailLeft = 5;
+		}
+	}
+#endif
+#ifdef DEBUG_PROBES
+	{
+		// TEMPORAL v00361: per-draw UV/mode probe — ALL textured draws (no mode filter).
+		// Goal: capture near (small W) character draws vs far billboards vs passcolor draws
+		// so we can see what mode/UV/texture the flat/gray close-up sprites use.
+		static u32 uvProbeCount = 0;
+		if (uvProbeCount < 800 && cache.current[0]) {
+			CachedTexture *tc = cache.current[0];
+			float minS0 = 1e9f, maxS0 = -1e9f, minT0 = 1e9f, maxT0 = -1e9f;
+			float minS1 = 1e9f, maxS1 = -1e9f, minT1 = 1e9f, maxT1 = -1e9f;
+			float wMin = 1e9f, wMax = -1e9f;
+			for (int i = 0; i < OGL.numVertices; i++) {
+				const GLVertex *v = &OGL.vertices[i];
+				if (v->s0 < minS0) minS0 = v->s0; if (v->s0 > maxS0) maxS0 = v->s0;
+				if (v->t0 < minT0) minT0 = v->t0; if (v->t0 > maxT0) maxT0 = v->t0;
+				if (v->s1 < minS1) minS1 = v->s1; if (v->s1 > maxS1) maxS1 = v->s1;
+				if (v->t1 < minT1) minT1 = v->t1; if (v->t1 > maxT1) maxT1 = v->t1;
+				if (v->w < wMin) wMin = v->w; if (v->w > wMax) wMax = v->w;
+			}
+			u32 texel0 = tc->rsxTextureBuffer ? tc->rsxTextureBuffer[0] : 0;
+			uvProbeCount++;
+			printf("[UVP] %u mode=%.0f uT0=%d uT1=%d lit=%d cycle=%d fmt=%d sz=%d %dx%d taddr=%08x texel0=%08x w[%.0f,%.0f] s0[%.3f,%.3f] t0[%.3f,%.3f] s1[%.3f,%.3f] t1[%.3f,%.3f] col[%.2f,%.2f,%.2f,%.2f] bl[%d,%d,%d,%d]\n",
+				uvProbeCount, (double)OGL.shader_mode, combiner.usesT0, combiner.usesT1,
+				!!(gSP.geometryMode & G_LIGHTING), (int)gDP.otherMode.cycleType,
+				(int)tc->format, (int)tc->size, tc->realWidth, tc->realHeight, tc->address, texel0,
+				(double)wMin, (double)wMax,
+				(double)minS0, (double)maxS0, (double)minT0, (double)maxT0,
+				(double)minS1, (double)maxS1, (double)minT1, (double)maxT1,
+				(double)OGL.vertices[0].color.r, (double)OGL.vertices[0].color.g,
+				(double)OGL.vertices[0].color.b, (double)OGL.vertices[0].color.a,
+				(int)gDP.otherMode.c1_m1a, (int)gDP.otherMode.c2_m1a,
+				(int)gDP.otherMode.c1_m1b, (int)gDP.otherMode.c2_m1b);
+		}
+	}
+#endif
 	for (int i = 0; i < OGL.numVertices; i += 3) {
 		const GLVertex *v = &OGL.vertices[i];
 
@@ -2402,6 +2667,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 
 void OGL_ClearDepthBuffer()
 {
+	glN64_depthClearCount++;
 #ifdef PS3
 	rsxSetScissor(context, 0, 0, display_width, display_height);
 
@@ -2666,9 +2932,9 @@ void OGL_RSXinitDlist()
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.projMatrix_id,(float*)&OGL.projMatrix);
 	rsxSetVertexProgramParameter(context,OGL.vpo,OGL.modelViewMatrix_id,(float*)&OGL.modelViewMatrix);
 
+	rsxLoadFragmentProgramLocation(context,OGL.fpo,OGL.fp_offset,GCM_LOCATION_RSX);
 	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.mode_id,&OGL.shader_mode,OGL.fp_offset);
 	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.alpha_mode_id,&OGL.shader_alpha_mode,OGL.fp_offset);
-	rsxLoadFragmentProgramLocation(context,OGL.fpo,OGL.fp_offset,GCM_LOCATION_RSX);
 
 	//Temporary Dummy Texture
 	int ind = 0;

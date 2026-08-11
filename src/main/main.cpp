@@ -188,6 +188,7 @@ char menuActive;
 	   char saveStateDevice;
        char autoSave;
        char screenMode = 0;
+       char vidResolution = 3;
 	   char padAutoAssign;
 	   char padType[4];
 	   char padAssign[4];
@@ -210,6 +211,7 @@ static struct {
   { "FBTex", &glN64_useFrameBufferTextures, GLN64_FBTEX_DISABLE, GLN64_FBTEX_ENABLE },
   { "2xSaI", &glN64_use2xSaiTextures, GLN64_2XSAI_DISABLE, GLN64_2XSAI_ENABLE },
   { "ScreenMode", &screenMode, SCREENMODE_4x3, SCREENMODE_16x9_PILLARBOX },
+  { "Resolution", &vidResolution, RESOLUTION_320X240, RESOLUTION_1080P },
   { "Core", ((char*)&dynacore)+3, DYNACORE_INTERPRETER, DYNACORE_CACHED_INTERP },
   { "AutoStart", &autoStart, 0, 1 },
   { "NativeDevice", &nativeSaveDevice, NATIVESAVEDEVICE_SD, NATIVESAVEDEVICE_CARDB },
@@ -257,7 +259,7 @@ static void autostart_test(void)
 	n = romFile_readDir(romFile_topLevel, &dir);
 	printf("[AUTOSTART] dynacore=%d, rom dir entries=%d\n", dynacore, n);
 	for (i = 0; i < n; i++) {
-		if (dir[i].attr == 0 && strstr(dir[i].name, "Super Mario 64")) {
+		if (dir[i].attr == 0 && strstr(dir[i].name, "Mario Kart 64")) {
 			printf("[AUTOSTART] loading: %s (size=0x%x)\n", dir[i].name, dir[i].size);
 			if (!loadROM(&dir[i])) {
 				menuActive = 0;
@@ -306,9 +308,6 @@ int main(int argc, char* argv[]){
 
 	//Initialize controls once before menu runs <- needed?
 	control_info_init();
-
-	void* vmode=NULL;
-	MenuContext *menu = new MenuContext(vmode);
 
 	// Default Settings
 	audioEnabled     = 1; // Audio
@@ -367,6 +366,13 @@ int main(int argc, char* argv[]){
 	for(i=1; i<argc; ++i){
 		handleConfigPair(argv[i]);
 	}
+
+	// Aplica la resolución interna configurada (320x240 / 640x480 / 720p / 1080p)
+	// ANTES de crear el menú para que Graphics cachee las dimensiones correctas.
+	RSX_ApplyConfigResolution();
+
+	void* vmode=NULL;
+	MenuContext *menu = new MenuContext(vmode);
 
 	// TEMPORAL: autostart de prueba activado por "AutoStart = 1" en settings.cfg
 	if (autoStart) {

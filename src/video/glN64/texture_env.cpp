@@ -21,8 +21,10 @@
 #endif
 #include "OpenGL.h"
 #include "Combiner.h"
+#include "Textures.h"
 #include "texture_env.h"
 #include "../../main/game_hacks.h"
+#include <stdio.h>
 
 void Init_texture_env()
 {
@@ -43,6 +45,8 @@ TexEnv *Compile_texture_env( Combiner *color, Combiner *alpha )
 	texEnv->usesT0 = FALSE;
 	texEnv->usesT1 = FALSE;
 	texEnv->mode = GL_MODULATE;  // safe default — was uninitialized garbage
+	texEnv->multiplyByPrimAlpha = FALSE;  // PS3 smoke-fix: N64 2-cycle TEXEL0_ALPHA*PRIMITIVE_ALPHA
+	                                          // is dropped to TEXEL0_ALPHA only; this flags primAlpha multiply
 
 	texEnv->fragment.color = texEnv->fragment.alpha = COMBINED;
 
@@ -83,7 +87,12 @@ TexEnv *Compile_texture_env( Combiner *color, Combiner *alpha )
 						if (texEnv->fragment.alpha == TEXEL0_ALPHA || texEnv->fragment.alpha == TEXEL1_ALPHA)
 						{
 							// Keep texel alpha as source when multiplying by primitive/env/shade
-							// texEnv->fragment.alpha already correctly set to TEXEL0/1 from LOAD
+							// texEnv->fragment.alpha already correctly set to TEXEL0/1 from LOAD.
+							// N64 2-cycle alpha = TEXEL0_ALPHA * PRIMITIVE_ALPHA (or similar) is
+							// approximated as just TEXEL0_ALPHA here. Mark it so the shader multiplies
+							// by gDP.primColor.a (PS3 smoke puff fade fix).
+							if (alpha->stage[i].op[j].param1 == PRIMITIVE_ALPHA)
+								texEnv->multiplyByPrimAlpha = TRUE;
 						}
 						else
 						{
@@ -219,6 +228,33 @@ void Set_texture_env( TexEnv *texEnv )
 		OGL.shader_mode = SHADER_PASSCOLOR;
 	}
 
+	// TEMPORAL v00357: log combiner-mode transitions to diagnose untextured
+	// characters (GoldenEye gray silhouettes). Logs on change + first 60 draws.
+#ifdef DEBUG_PROBES
+	{
+		static int prevMode = -999, prevT0 = -1, prevT1 = -1;
+		static int logCount = 0;
+		int curMode = (int)OGL.shader_mode;
+		if (curMode != prevMode || (int)combiner.usesT0 != prevT0 || (int)combiner.usesT1 != prevT1) {
+			prevMode = curMode; prevT0 = (int)combiner.usesT0; prevT1 = (int)combiner.usesT1;
+			logCount++;
+			if (logCount <= 60) {
+				u32 taddr = 0, tW = 0, tH = 0; int tFmt = -1, tSize = -1, tPal = -1; u32 tMem = 0;
+				if (cache.current[0]) {
+					taddr = cache.current[0]->address; tW = cache.current[0]->realWidth; tH = cache.current[0]->realHeight;
+					tFmt = (int)cache.current[0]->format; tSize = (int)cache.current[0]->size;
+					tPal = (int)cache.current[0]->palette; tMem = cache.current[0]->tMem;
+				}
+				printf("[TEXMODE] #%d mode=%d usesT0=%d usesT1=%d alphaMode=%.0f texDummy=%d addr=0x%08X fmt=%d size=%d pal=%d tmem=0x%03X %dx%d\n",
+					logCount, curMode, (int)combiner.usesT0, (int)combiner.usesT1,
+					(double)OGL.shader_alpha_mode,
+					(cache.current[0] && cache.current[0]->rsxTextureBuffer) ? 0 : 1,
+					taddr, tFmt, tSize, tPal, tMem, tW, tH);
+			}
+		}
+	}
+#endif
+
 	// Map alpha combiner output to shader alpha_mode
 	// 0 = 1.0 (opaque), 1 = color.a (texel), 2 = color0.a (shade/vertex)
 	switch (texEnv->fragment.alpha)
@@ -232,15 +268,17 @@ void Set_texture_env( TexEnv *texEnv )
 		break;
 	case TEXEL0_ALPHA:
 	case TEXEL1_ALPHA:
-		OGL.shader_alpha_mode = 1.0f;
+		OGL.shader_alpha_mode = texEnv->multiplyByPrimAlpha ? 4.0f : 1.0f;
 		break;
 	default:
 		OGL.shader_alpha_mode = 0.0f;
 	}
 
+	rsxLoadFragmentProgramLocation(context,OGL.fpo,OGL.fp_offset,GCM_LOCATION_RSX);
 	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.mode_id,&OGL.shader_mode,OGL.fp_offset);
 	rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.alpha_mode_id,&OGL.shader_alpha_mode,OGL.fp_offset);
-	rsxLoadFragmentProgramLocation(context,OGL.fpo,OGL.fp_offset,GCM_LOCATION_RSX);
+	if (OGL.primAlpha_id >= 0)
+		rsxSetFragmentProgramParameter(context,OGL.fpo,OGL.primAlpha_id,&gDP.primColor.a,OGL.fp_offset);
 
 #elif defined(__GX__)
 	u8 GXmode;

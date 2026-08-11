@@ -22,7 +22,9 @@
 #include "../../main/GameHackManager.h"
 extern GameHackManager *g_game_hack_mgr;
 
+#ifdef DEBUG
 static int texDebugCount = 0;
+#endif
 
 #if !defined(__LINUX__) && !defined(PS3) && !defined(__PPC__)
 # include <windows.h>
@@ -1693,6 +1695,37 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
 	free( dest );
 
+	// TEMPORAL v00359: log texture uploads + sample texels to check whether VRAM
+	// content is correct (discriminates broken upload vs combiner). Cap raised to
+	// catch the I4 character / blood sprite uploads that missed the old 40-line cap.
+#ifdef DEBUG_PROBES
+	{
+		static u32 texLoadCount = 0;
+		if (texLoadCount < 400) {
+			texLoadCount++;
+			u32 t0 = 0xDEADBEEF, t1 = 0xDEADBEEF, t2 = 0xDEADBEEF, t3 = 0xDEADBEEF;
+			u32 tc = 0xDEADBEEF, tb = 0xDEADBEEF;
+			if (texInfo->rsxTextureBuffer) {
+				u32 w = texInfo->realWidth, h = texInfo->realHeight;
+				u32 stepX = w > 1 ? w / 2 : 1, stepY = h > 1 ? h / 2 : 1;
+				u32 pitch = texInfo->rsxTex.pitch ? texInfo->rsxTex.pitch : (w * 4 + 127) & ~127u;
+				t0 = texInfo->rsxTextureBuffer[0];
+				if (w > 1) t1 = texInfo->rsxTextureBuffer[1];
+				if (stepX < w && stepY < h) tc = texInfo->rsxTextureBuffer[stepY * (pitch >> 2) + stepX];
+				if (stepY < h) t2 = texInfo->rsxTextureBuffer[stepY * (pitch >> 2)];
+				if (w > 1) t3 = texInfo->rsxTextureBuffer[(h - 1) * (pitch >> 2) + (w - 1)];
+				else       t3 = texInfo->rsxTextureBuffer[(h - 1) * (pitch >> 2)];
+				tb = texInfo->rsxTextureBuffer[(h - 1) * (pitch >> 2)];
+			}
+			printf("[TEXLOAD] #%u fmt=%d size=%d lut=%d pal=%d tmem=0x%03X w=%d h=%d addr=0x%08X off=0x%X pitch=%d texel[tl=%08X tr=%08X mid=%08X bl=%08X br=%08X %08X]\n",
+				texLoadCount, texInfo->format, texInfo->size, gDP.otherMode.textureLUT,
+				texInfo->palette, texInfo->tMem, texInfo->realWidth, texInfo->realHeight,
+				texInfo->address, texInfo->rsxTextureOffset, texInfo->rsxTex.pitch,
+				t0, t1, tc, t2, t3, tb);
+		}
+	}
+#endif
+
 	#ifdef DEBUG
 	// DEBUG: Log texture info for Kirby 64 debugging
 	if (texDebugCount < 20) {
@@ -1778,13 +1811,13 @@ u32 TextureCache_CalculateCRC( u32 t, u32 width, u32 height )
 	return crc;
 }
 
-void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
+void TextureCache_BindToRSX( CachedTexture *texture )
 {
 #ifdef PS3
 	if (!texture || !texture->rsxTextureBuffer)
 	{
 		// Texture allocation failed or NULL - activate dummy texture to avoid crash
-		TextureCache_ActivateDummy(t);
+		TextureCache_ActivateDummy(0);
 		return;
 	}
 	//TODO: Implement two texture units
@@ -1806,6 +1839,15 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 	else                  wrapT = texture->clampT ? GCM_TEXTURE_CLAMP_TO_EDGE : GCM_TEXTURE_REPEAT;
 	rsxTextureWrapMode(context,OGL.textureUnit_id,wrapS,wrapT,GCM_TEXTURE_CLAMP_TO_EDGE,0,GCM_TEXTURE_ZFUNC_LESS,0);
 //	dbg_printf("TextureCache_ActivateTexture %d\r\n", t);
+#else
+	(void)texture;
+#endif
+}
+
+void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
+{
+#ifdef PS3
+	TextureCache_BindToRSX(texture);
 #elif defined(__GX__)
 	if (!((gDP.otherMode.textureFilter == G_TF_BILERP) || (gDP.otherMode.textureFilter == G_TF_AVERAGE) || (OGL.forceBilinear)))
 		OGL.GXuseMinMagNearest = true;

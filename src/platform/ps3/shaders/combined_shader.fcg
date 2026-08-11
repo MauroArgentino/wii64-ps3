@@ -6,6 +6,7 @@ void main
 	
 	uniform float mode,
 	uniform float alpha_mode,
+	uniform float primAlpha,
 	uniform sampler2D texture,
 	
 	out float4 oColor
@@ -14,14 +15,34 @@ void main
 	float4 color = tex2D(texture,texcoord);
 	float4 modtex = color * color0;
 
-	// DECAL: blend RGB by texel alpha, alpha from alpha combiner.
 	// alpha_mode selects output alpha source:
 	//   0 = 1.0 (opaque)
 	//   1 = color.a (texel alpha)
-	//   2 = color0.a (shade/vertex alpha — Nintendo logo, etc.)
+	//   2 = color0.a (shade/vertex alpha)
+	//   3 = color.a * color0.a (texel * vertex, GL_MODULATE standard)
+	//   4 = color.a * primAlpha (texel * primitive alpha: N64 2-cycle TEXEL0_ALPHA *
+	//        PRIMITIVE_ALPHA approximation — glN64 drops the prim factor in its single-source
+	//        reduction; da4='1' primMultiply uses uniform primAlpha = gDP.primColor.a)
 	float da1 = 1.0 - clamp(abs(alpha_mode - 1.0), 0.0, 1.0);
 	float da2 = 1.0 - clamp(abs(alpha_mode - 2.0), 0.0, 1.0);
-	float decal_alpha = (1.0 - da1 - da2) * 1.0 + da1 * color.a + da2 * color0.a;
+	float da3 = 1.0 - clamp(abs(alpha_mode - 3.0), 0.0, 1.0);
+	float da4 = 1.0 - clamp(abs(alpha_mode - 4.0), 0.0, 1.0);
+	float decal_alpha = (1.0 - da1 - da2 - da3 - da4) * 1.0
+	                  + da1 * color.a
+	                  + da2 * color0.a
+	                  + da3 * (color.a * color0.a)
+	                  + da4 * (color.a * primAlpha);
+
+	// MODULATE: by default alpha = texel * vertex (modtex.a). When the N64 smoke combiner
+	// is `TEXEL0_ALPHA * PRIMITIVE_ALPHA` the vertex factor is actually the primitive alpha,
+	// so da4 swaps the vertex factor for primAlpha and leaves modtex.rgb untouched.
+	// Safety: primAlpha only applies when nonzero — if a game leaves gDP.primColor.a at its
+	// default 0 (state static), fall back to color0.a (vertex) so old behavior is preserved.
+	float primActive = clamp(primAlpha * 9999.0, 0.0, 1.0);
+	float effPrim = primActive * primAlpha + (1.0 - primActive) * color0.a;
+	float modtex_alpha = modtex.a * (1.0 - da4) + (color.a * effPrim) * da4;
+	float4 modtex_prim = float4(modtex.rgb, modtex_alpha);
+
 	float4 decal   = float4(color.rgb * color.a + color0.rgb * (1.0 - color.a), decal_alpha);
 	float4 pastex  = color;
 	float4 passcol = color0;
@@ -35,5 +56,5 @@ void main
 	oColor = (1.0 - m1 - m2 - m3) * decal
 	       + m1 * pastex
 	       + m2 * passcol
-	       + m3 * modtex;
+	       + m3 * modtex_prim;
 }

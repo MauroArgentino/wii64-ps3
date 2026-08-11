@@ -4,7 +4,7 @@
 #include <ppu-types.h>
 
 #define CB_SIZE		0x100000
-#define HOST_SIZE	(32*1024*1024)
+#define HOST_SIZE	(64*1024*1024)
 
 extern gcmContextData *context;
 extern u32 display_width;
@@ -50,6 +50,7 @@ void RSX_ConfigureViewport(uint32_t internal_w, uint32_t internal_h,
                            uint32_t display_w, uint32_t display_h);
 void RSX_SetInternalResolution(uint32_t w, uint32_t h);
 void RSX_SetDisplayResolution(uint32_t w, uint32_t h);
+void RSX_ApplyConfigResolution(void);
 
 #ifdef __cplusplus
 }

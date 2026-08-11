@@ -167,6 +167,7 @@ struct GLInfo
 	s32 textureUnit_id;
 	s32 mode_id;
 	s32 alpha_mode_id;
+	s32 primAlpha_id;
 	f32 shader_mode;
 	f32 shader_alpha_mode;
 

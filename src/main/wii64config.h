@@ -108,6 +108,15 @@ enum screenMode
 	SCREENMODE_16x9_PILLARBOX
 };
 
+extern char vidResolution;
+enum vidResolution
+{
+	RESOLUTION_320X240=0,
+	RESOLUTION_640X480,
+	RESOLUTION_720P,
+	RESOLUTION_1080P
+};
+
 extern char padAutoAssign;
 enum padAutoAssign
 {

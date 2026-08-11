@@ -157,9 +157,9 @@ void VI_UpdateScreen()
 	rsxLoadVertexProgram(context, OGL.vpo, OGL.vp_ucode);
 	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.projMatrix_id, (float*)&OGL.projMatrix);
 	rsxSetVertexProgramParameter(context, OGL.vpo, OGL.modelViewMatrix_id, (float*)&OGL.modelViewMatrix);
+	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
 	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.mode_id, &OGL.shader_mode, OGL.fp_offset);
 	rsxSetFragmentProgramParameter(context, OGL.fpo, OGL.alpha_mode_id, &OGL.shader_alpha_mode, OGL.fp_offset);
-	rsxLoadFragmentProgramLocation(context, OGL.fpo, OGL.fp_offset, GCM_LOCATION_RSX);
 	flip();
 	OGL.frameReady = 0;
 	gSP.changed &= ~CHANGED_COLORBUFFER;
@@ -446,7 +446,7 @@ void VI_RSX_showFPS(){
 		if (viLastTick == 0) viLastTick = now;
 		u32 delta = now - viLastTick;
 		viLastTick = now;
-		viAccumUs += (u32)(((u64)delta * 8) / 16000);
+		viAccumUs += (u32)(((u64)delta * 1000000) / 79800000);
 		while (viAccumUs >= 1000000) {
 			viTotalSecs++;
 			viAccumUs -= 1000000;

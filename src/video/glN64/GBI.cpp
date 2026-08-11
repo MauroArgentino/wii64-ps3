@@ -30,6 +30,8 @@
 #include "S2DEX2.h"
 #include "F3DDKR.h"
 #include "F3DWRUS.h"
+#include "F3DBETA.h"
+#include "F3DAM.h"
 #include "F3DPD.h"
 #include "F3DGOLDEN.h"
 #include "F3DEX3.h"
@@ -53,8 +55,9 @@ char uc_str[256];
 
 SpecialMicrocodeInfo specialMicrocodes[] =
 {
-	{ F3DWRUS,	FALSE,	0xd17906e2, (char*) "RSP SW Version: 2.0D, 04-01-96" },
-	{ F3DWRUS,	FALSE,	0x94c4c833, (char*) "RSP SW Version: 2.0D, 04-01-96" },
+	// F3DBETA: Star Wars Shadows of the Empire, Wave Race (U), etc.
+	{ F3DBETA,	FALSE,	0x94c4c833, (char*) "Star Wars Shadows of the Empire" },
+	{ F3DBETA,	FALSE,	0xd17906e2, (char*) "RSP SW Version: 2.0D, 04-01-96" },
 
 	{ S2DEX,	FALSE,	0x9df31081, (char*) "RSP Gfx ucode S2DEX  1.06 Yoshitaka Yasumoto Nintendo." },
 
@@ -83,6 +86,7 @@ SpecialMicrocodeInfo specialMicrocodes[] =
 };
 
 u32 G_RDPHALF_1, G_RDPHALF_2, G_RDPHALF_CONT;
+u32 G_PERSPNORM;
 u32 G_SPNOOP;
 u32 G_SETOTHERMODE_H, G_SETOTHERMODE_L;
 u32 G_DL, G_ENDDL, G_CULLDL, G_BRANCH_Z;
@@ -462,7 +466,9 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 			}
 			else if (strncmp( &uc_str[4], "Gfx", 3 ) == 0)
 			{
-				current->NoN = (strncmp( &uc_str[20], ".NoN", 4 ) == 0);
+				current->NoN = (strstr( &uc_str[4], ".NoN" ) != NULL) || (strstr( &uc_str[4], ".Rej" ) != NULL);
+				printf("[GBI-DBG] '%s'\n", uc_str);
+				printf("[GBI-DBG] uc_str[14]=%d[%c] [28]=%d[%c] [31]=%d[%c]\n", uc_str[14], (uc_str[14]>=32&&uc_str[14]<127)?uc_str[14]:'?', uc_str[28], (uc_str[28]>=32&&uc_str[28]<127)?uc_str[28]:'?', uc_str[31], (uc_str[31]>=32&&uc_str[31]<127)?uc_str[31]:'?');
 
 				if (strncmp( &uc_str[14], "F3D", 3 ) == 0)
 				{
@@ -470,6 +476,8 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 						type = F3DEX;
 					else if (uc_str[31] == '2')
 						type = F3DEX2;
+					else if (strncmp( &uc_str[14], "F3DAM", 5 ) == 0)
+						type = F3DAM;
 				}
 				else if (strncmp( &uc_str[14], "L3D", 3 ) == 0)
 				{
@@ -556,18 +564,6 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 
 		RDP_Init();
 
-		{
-			static const char *ucNames[] = {
-				"Fast3D", "F3DEX", "F3DEX2", "Line3D", "L3DEX", "L3DEX2",
-				"S2DEX", "S2DEX2", "Perfect Dark", "DKR/JFG", "Waverace US", "ZSort",
-				"F3DGOLDEN", "F3DEX3", "None"
-			};
-			const char *ucName = (current->type <= NONE) ? ucNames[current->type] : "UNKNOWN";
-#ifdef DEBUG_PROBES
-			printf("[GBI] ucode type=%d (%s)\n", current->type, ucName);
-#endif
-		}
-
 		switch (current->type)
 		{
 			case F3D:		F3D_Init();		break;
@@ -580,6 +576,8 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 			case S2DEX2:	S2DEX2_Init();	break;
 			case F3DDKR:	F3DDKR_Init();	break;
 			case F3DWRUS:	F3DWRUS_Init();	break;
+			case F3DBETA:	F3DBETA_Init();	break;
+			case F3DAM:		F3DAM_Init();	break;
 			case F3DPD:		F3DPD_Init();	break;
 			case F3DGOLDEN:	F3DGOLDEN_Init(); break;
 			case F3DEX3:	F3DEX3_Init();	break;

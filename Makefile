@@ -45,7 +45,7 @@ CONTENTID	:= UP0001-WII64PS3N_00-0000000000000000
 ifdef DEBUG
 CFLAGS		= -O0 -g3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ \
-			-DDEBUG_POLYGONS -DSHOW_DEBUG -DDEBUG \
+			-DDEBUG_POLYGONS -DSHOW_DEBUG -DDEBUG -DDEBUGON -DCACHED_DEBUG \
 			-include ../src/main/winlnxdefs.h \
 			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__ \
 			-DBYPASS_CIC_CHECKSUM
@@ -109,6 +109,9 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 # automatically build a list of object files for our project
 #---------------------------------------------------------------------------------
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+# pure_interp_ps3.c es la version reescrita (optimizada PPC) del interprete puro;
+# excluimos pure_interp.c para evitar el simbolo duplicado de pure_interpreter()
+CFILES		:=	$(filter-out pure_interp.c,$(CFILES))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 sFILES	:=	$(filter %.s,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s))))
 SFILES	:=	$(filter %.S,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S))))

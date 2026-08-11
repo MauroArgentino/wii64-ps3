@@ -43,7 +43,7 @@ u32 _DEFUN(gettick,(),
 	return result;
 }
 
-#define ticks_to_microsecs(ticks)	((((u64)(ticks)*8)/(u64)(TB_TIMER_CLOCK/125)))
+#define ticks_to_microsecs(ticks)	((((u64)(ticks)*(u64)1000000)/(u64)(TB_BUS_CLOCK)))
 #endif //!__GX__
 
 namespace menu {
