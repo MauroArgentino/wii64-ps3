@@ -35,6 +35,7 @@
 #include "timers.h"
 
 #include "winlnxdefs.h"
+#include "../debug.h"
 extern "C" {
 #include "main.h"
 #include "rom.h"
@@ -135,6 +136,7 @@ void udp_setup()
 	server.sin_port = htons(TESTPORT);
 }
 
+#ifdef DEBUG
 extern "C" {
 void dbg_printf(const char *fmt,...)
 {
@@ -149,6 +151,7 @@ void dbg_printf(const char *fmt,...)
 	sendto(s, str, len, 0, (struct sockaddr*)&server, sizeof(server));
 }
 }
+#endif
 
 static void Initialise (void){ }
 
@@ -257,15 +260,15 @@ static void autostart_test(void)
 	if (romFile_init)   romFile_init(romFile_topLevel);
 
 	n = romFile_readDir(romFile_topLevel, &dir);
-	printf("[AUTOSTART] dynacore=%d, rom dir entries=%d\n", dynacore, n);
+	DBG_LOG("[AUTOSTART] dynacore=%d, rom dir entries=%d\n", dynacore, n);
 	for (i = 0; i < n; i++) {
 		if (dir[i].attr == 0 && strstr(dir[i].name, "Mario Kart 64")) {
-			printf("[AUTOSTART] loading: %s (size=0x%x)\n", dir[i].name, dir[i].size);
+			DBG_LOG("[AUTOSTART] loading: %s (size=0x%x)\n", dir[i].name, dir[i].size);
 			if (!loadROM(&dir[i])) {
 				menuActive = 0;
-				printf("[AUTOSTART] ROM loaded OK, menuActive=0 -> go()\n");
+				DBG_LOG("[AUTOSTART] ROM loaded OK, menuActive=0 -> go()\n");
 			} else {
-				printf("[AUTOSTART] loadROM FAILED\n");
+				DBG_LOG("[AUTOSTART] loadROM FAILED\n");
 			}
 			break;
 		}
@@ -299,9 +302,9 @@ int main(int argc, char* argv[]){
 
 	/* Initialize SPU manager (Phase 0 skeleton) */
 	if (spu_manager_init() == 0) {
-		printf("[MAIN] SPU manager init OK\n");
+		DBG_LOG("[MAIN] SPU manager init OK\n");
 		if (spu_manager_start() == 0) {
-			printf("[MAIN] SPU manager started OK\n");
+			DBG_LOG("[MAIN] SPU manager started OK\n");
 			spu_send_command(SPU_CMD_PING, 0);
 		}
 	}

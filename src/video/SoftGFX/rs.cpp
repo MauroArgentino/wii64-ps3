@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 #include <math.h>
 
 #include "rs.h"
@@ -76,7 +77,7 @@ void RS::fillRect(float ux, float uy, float lx, float ly, RDP *rdp)
 	       }
 	  }
      }
-   else printf("rs:fillRect not fill mode ? %d\n", rdp->cycleType);
+   else DBG_GFX("rs:fillRect not fill mode ? %d\n", rdp->cycleType);
 }
 
 void RS::texRect(int tile, float ux, float uy, float lx, float ly, float s, float t, float dsdx, float dtdy, RDP *rdp)
@@ -128,7 +129,7 @@ void RS::texRect(int tile, float ux, float uy, float lx, float ly, float s, floa
 	  }
      }
    else
-     printf("RS:unknown cycle type in texRect:%d\n", rdp->cycleType);
+     DBG_GFX("RS:unknown cycle type in texRect:%d\n", rdp->cycleType);
 }
 
 void RS::tri_shade_txtr_zbuff(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,4>& v2, 
@@ -595,7 +596,7 @@ void RS::tri_shade_txtr_zbuff(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<f
 	  }
      }
    else
-     printf("RS:unknown cycle type in tri_shade_txtr_zbuff:%d\n", rdp->cycleType);
+     DBG_GFX("RS:unknown cycle type in tri_shade_txtr_zbuff:%d\n", rdp->cycleType);
 }
 
 void RS::tri_shade_zbuff(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,4>& v2, 
@@ -772,7 +773,7 @@ void RS::tri_shade_zbuff(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,
 	  }
      }
    else
-     printf("RS:unknown cycle type in tri_shade_zbuff:%d\n", rdp->cycleType);
+     DBG_GFX("RS:unknown cycle type in tri_shade_zbuff:%d\n", rdp->cycleType);
 }
 
 void RS::tri_shade_txtr(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,4>& v2, 
@@ -989,7 +990,7 @@ void RS::tri_shade_txtr(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,4
 	  }
      }
    else
-     printf("RS:unknown cycle type in tri_shade_txtr_zbuff:%d\n", rdp->cycleType);
+     DBG_GFX("RS:unknown cycle type in tri_shade_txtr_zbuff:%d\n", rdp->cycleType);
 }
 
 void RS::tri_shade(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,4>& v2, 
@@ -1145,7 +1146,7 @@ void RS::tri_shade(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,4>& v2
 	  }
      }
    else
-     printf("RS:unknown cycle type in tri_shade_txtr_zbuff:%d\n", rdp->cycleType);
+     DBG_GFX("RS:unknown cycle type in tri_shade_txtr_zbuff:%d\n", rdp->cycleType);
 }
 
 void RS::debug_tri(Vektor<float,4>& v0, Vektor<float,4>& v1, Vektor<float,4>& v2, RDP *rdp)

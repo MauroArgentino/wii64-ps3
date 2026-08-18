@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 #include <stdlib.h>
 #include <ppu-types.h>
 #include "bl.h"
@@ -82,7 +83,7 @@ void BL::setDepthSource(int value)
 
 void BL::setCImg(int f, int s, int w, void *c)
 {
-   if (f != 0 || s != 2) printf("bl: unknown framebuffer format\n");
+   if (f != 0 || s != 2) DBG_GFX("bl: unknown framebuffer format\n");
    format = f;
    size = s;
    width = w;
@@ -124,17 +125,17 @@ Color32* BL::getBlenderSource(int src, int pos, int cycle)
 	  return &one;
 	else if (pos == 2)
 	  return &shadeColor;
-	printf("bl: unknown blender source:%d,%d,%d\n", src, pos, cycle);
+	DBG_GFX("bl: unknown blender source:%d,%d,%d\n", src, pos, cycle);
 	break;
       case 3:
 	if (pos == 2 || pos == 4)
 	  return &zero;
 	else if (pos == 1)
 	  return &fogColor;
-	printf("bl: unknown blender source:%d,%d,%d\n", src, pos, cycle);
+	DBG_GFX("bl: unknown blender source:%d,%d,%d\n", src, pos, cycle);
 	break;
       default:
-	printf("bl: unknown blender source:%d,%d,%d\n", src, pos, cycle);
+	DBG_GFX("bl: unknown blender source:%d,%d,%d\n", src, pos, cycle);
      }
    return NULL;
 }
@@ -156,7 +157,7 @@ void BL::setBlender(int value)
    force_bl      = (value & 0x4000) != 0;
    renderMode = value & 0xffff;
    if (value & ~0xffff7ff8)
-     printf("bl: unknwown render mode:%x\n", value & ~0xffff7ff8);
+     DBG_GFX("bl: unknwown render mode:%x\n", value & ~0xffff7ff8);
    
    // blender modes
    if (oldBlenderMode == (value>>16)) return;
@@ -232,8 +233,8 @@ void BL::cycle1ModeDraw(int x, int y, Color32 c, float z, Color32 shade)
 		    {
 		       if(!pixelColor.getAlpha()) return;
 		    }
-		  else if(alphaCompare == 1) printf("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 1\n");
-		  else printf("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 2\n");
+		  else if(alphaCompare == 1) DBG_GFX("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 1\n");
+		  else DBG_GFX("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 2\n");
 	       }
 	     else
 	       {
@@ -242,8 +243,8 @@ void BL::cycle1ModeDraw(int x, int y, Color32 c, float z, Color32 shade)
 		    {
 		       if(!pixelColor.getAlpha()) return;
 		    }
-		  else if(alphaCompare == 1) printf("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 1\n");
-		  else printf("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 2\n");
+		  else if(alphaCompare == 1) DBG_GFX("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 1\n");
+		  else DBG_GFX("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 2\n");
 	       }
 	  }
 	//else printf("!alpha_cvg_sel\n");
@@ -252,7 +253,7 @@ void BL::cycle1ModeDraw(int x, int y, Color32 c, float z, Color32 shade)
    if (z_cmp)
      {
 	if (depthSource)
-	  printf("BL:depth_source:%d\n", depthSource);
+	  DBG_GFX("BL:depth_source:%d\n", depthSource);
 	
 	if(fz < 0) return;
 	if(fz >= 0x40000) return; // over this value it can't be encoded
@@ -317,8 +318,8 @@ void BL::cycle2ModeDraw(int x, int y, Color32 c, float z, Color32 shade)
 		    {
 		       if(!pixelColor.getAlpha()) return;
 		    }
-		  else if(alphaCompare == 1) printf("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 1\n");
-		  else printf("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 2\n");
+		  else if(alphaCompare == 1) DBG_GFX("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 1\n");
+		  else DBG_GFX("alpha_cvg_sel + cvg_x_alpha + alphaCompare = 2\n");
 	       }
 	     else
 	       {
@@ -327,8 +328,8 @@ void BL::cycle2ModeDraw(int x, int y, Color32 c, float z, Color32 shade)
 		    {
 		       if(!pixelColor.getAlpha()) return;
 		    }
-		  else if(alphaCompare == 1) printf("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 1\n");
-		  else printf("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 2\n");
+		  else if(alphaCompare == 1) DBG_GFX("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 1\n");
+		  else DBG_GFX("alpha_cvg_sel + !cvg_x_alpha + alphaCompare = 2\n");
 	       }
 	  }
 	//else printf("!alpha_cvg_sel\n");
@@ -337,7 +338,7 @@ void BL::cycle2ModeDraw(int x, int y, Color32 c, float z, Color32 shade)
    if (z_cmp)
      {
 	if (depthSource)
-	  printf("BL:depth_source:%d\n", depthSource);
+	  DBG_GFX("BL:depth_source:%d\n", depthSource);
 	
 	if(fz < 0) return;
 	if(fz >= 0x40000) return; // over this value it can't be encoded
@@ -386,7 +387,7 @@ void BL::cycle2ModeDraw(int x, int y, Color32 c, float z, Color32 shade)
 void BL::copyModeDraw(int x, int y, Color32 c)
 {
    short *p = (short*)cImg;
-   if (!alphaCompare || alphaCompare!=1) printf("alphacompare:%d\n", alphaCompare);
+   if (!alphaCompare || alphaCompare!=1) DBG_GFX("alphacompare:%d\n", alphaCompare);
    if (!c.getAlpha()) return;
    int colorValue = (int)c;
    colorValue = 

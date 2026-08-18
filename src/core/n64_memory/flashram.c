@@ -34,6 +34,7 @@
 #include "../r4300/r4300.h"
 #include "../../main/guifuncs.h"
 #include "../../ui/fileBrowser/fileBrowser.h"
+#include "../../debug.h"
 
 
 #include "Saves.h"
@@ -174,7 +175,7 @@ void flashram_command(u32 command)
 	   case STATUS_MODE:
 	     break;
 	   default:
-	     printf("unknown flashram command with mode:%x\n", (int)mode);
+	     DBG_LOG("unknown flashram command with mode:%x\n", (int)mode);
 	     r4300.stop=1;
 	  }
 	mode = NOPES_MODE;
@@ -188,7 +189,7 @@ void flashram_command(u32 command)
 	status = 0x11118004f0000000LL;
 	break;
       default:
-	printf("unknown flashram command:%x\n", (int)command);
+	DBG_LOG("unknown flashram command:%x\n", (int)command);
 	//r4300.stop=1;
      }
 }
@@ -210,7 +211,7 @@ void dma_read_flashram()
 	  flashram[(((pi_register.pi_cart_addr_reg-0x08000000)&0xFFFF)*2+i)^S8];
 	break;
       default:
-	printf("unknown dma_read_flashram:%x\n", mode);
+	DBG_LOG("unknown dma_read_flashram:%x\n", mode);
 	r4300.stop=1;
      }
 }
@@ -223,7 +224,7 @@ void dma_write_flashram()
 	write_pointer = pi_register.pi_dram_addr_reg;
 	break;
       default:
-	printf("unknown dma_read_flashram:%x\n", mode);
+	DBG_LOG("unknown dma_read_flashram:%x\n", mode);
 	r4300.stop=1;
      }
 }

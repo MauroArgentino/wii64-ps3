@@ -25,6 +25,7 @@
 #include <stdio.h>
 
 #include "../../main/winlnxdefs.h"
+#include "../../debug.h"
 #include "InputPlugin.h"
 #include "Controller_#1.1.h"
 #include "PakIO.h"
@@ -134,7 +135,7 @@ EXPORT void CALL DllAbout ( HWND hParent )
 
 #else
 	char s[] = "Input plugin for Mupen64 emulator for GC\n\tby Mike Slegeir\n";
-   	printf(s);
+   	DBG_INP(s);
 #endif
 }
 
@@ -258,7 +259,7 @@ EXPORT void CALL ReadController ( int Control, BYTE * Command )
 			if (rdgs_cnt < 6)
 			{
 				rdgs_cnt++;
-				printf("[RD_GETSTATUS] Control=%d RawData=%d Plugin=%d Present=%d\n",
+				DBG_INP("[RD_GETSTATUS] Control=%d RawData=%d Plugin=%d Present=%d\n",
 					Control, control_info.Controls[Control].RawData,
 					control_info.Controls[Control].Plugin,
 					control_info.Controls[Control].Present);
@@ -432,7 +433,7 @@ void auto_assign_controllers(void){
 
 #ifdef DEBUG_PROBES
 	for(i=0; i<4; ++i)
-		printf("[ASSIGN] vc%d control=%p number=%d present=%d\n",
+		DBG_INP("[ASSIGN] vc%d control=%p number=%d present=%d\n",
 			i, virtualControllers[i].control, virtualControllers[i].number,
 			control_info.Controls[i].Present);
 #endif

@@ -47,6 +47,7 @@
 
 #endif // __LINUX__
 #include <math.h>
+#include "../../debug.h"
 #include <stdio.h>
 #include "glN64.h"
 #include "OpenGL.h"
@@ -285,7 +286,7 @@ void OGL_InitStates()
 	OGL.fp_buffer = (u32*)rsxMemalign(64,OGL.fpsize);
 	if (!OGL.fp_buffer)
 	{
-		printf("[OGL] Fatal: rsxMemalign failed for fp_buffer (%d bytes)\n", OGL.fpsize);
+		DBG_GFX("[OGL] Fatal: rsxMemalign failed for fp_buffer (%d bytes)\n", OGL.fpsize);
 		return;
 	}
 	memcpy(OGL.fp_buffer,OGL.fp_ucode,OGL.fpsize);
@@ -517,18 +518,18 @@ bool OGL_Start()
 
 
 	/* Initialize SDL */
-	printf( "[glN64]: (II) Initializing SDL video subsystem...\n" );
+	DBG_GFX( "[glN64]: (II) Initializing SDL video subsystem...\n" );
 	if (SDL_InitSubSystem( SDL_INIT_VIDEO ) == -1)
 	{
-		printf( "[glN64]: (EE) Error initializing SDL video subsystem: %s\n", SDL_GetError() );
+		DBG_GFX( "[glN64]: (EE) Error initializing SDL video subsystem: %s\n", SDL_GetError() );
 		return FALSE;
 	}
 
 	/* Video Info */
-	printf( "[glN64]: (II) Getting video info...\n" );
+	DBG_GFX( "[glN64]: (II) Getting video info...\n" );
 	if (!(videoInfo = SDL_GetVideoInfo()))
 	{
-		printf( "[glN64]: (EE) Video query failed: %s\n", SDL_GetError() );
+		DBG_GFX( "[glN64]: (EE) Video query failed: %s\n", SDL_GetError() );
 		SDL_QuitSubSystem( SDL_INIT_VIDEO );
 		return FALSE;
 	}
@@ -550,10 +551,10 @@ bool OGL_Start()
 	SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 5 );*/
 	SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 16 );	// 32 bit z-buffer
 
-	printf( "[glN64]: (II) Setting video mode %dx%d...\n", (int)OGL.width, (int)OGL.height );
+	DBG_GFX( "[glN64]: (II) Setting video mode %dx%d...\n", (int)OGL.width, (int)OGL.height );
 	if (!(OGL.hScreen = SDL_SetVideoMode( OGL.width, OGL.height, 0, videoFlags )))
 	{
-		printf( "[glN64]: (EE) Error setting videomode %dx%d: %s\n", (int)OGL.width, (int)OGL.height, SDL_GetError() );
+		DBG_GFX( "[glN64]: (EE) Error setting videomode %dx%d: %s\n", (int)OGL.width, (int)OGL.height, SDL_GetError() );
 		SDL_QuitSubSystem( SDL_INIT_VIDEO );
 		return FALSE;
 	}
@@ -1579,7 +1580,7 @@ void OGL_DrawTriangles()
 					tex1 = cache.current[0]->rsxTextureBuffer[texW > 1 ? 1 : 0];
 				}
 			}
-			printf("[DRW-DBG] verts=%d tris=%d NDC x[%.2f,%.2f] y[%.2f,%.2f] z[%.2f,%.2f] w[%.2f,%.2f] inside=%d inZ=%d cull=%d zbuf=%d depthCmp=%d lit=%d colR[%.2f,%.2f] colG[%.2f,%.2f] colB[%.2f,%.2f] texFmt=%d size=%d %dx%d tex[%08x,%08x]\n",
+			DBG_GFX("[DRW-DBG] verts=%d tris=%d NDC x[%.2f,%.2f] y[%.2f,%.2f] z[%.2f,%.2f] w[%.2f,%.2f] inside=%d inZ=%d cull=%d zbuf=%d depthCmp=%d lit=%d colR[%.2f,%.2f] colG[%.2f,%.2f] colB[%.2f,%.2f] texFmt=%d size=%d %dx%d tex[%08x,%08x]\n",
 				OGL.numVertices, OGL.numTriangles, minNX, maxNX, minNY, maxNY, minNZ, maxNZ, minW, maxW, inside, insideZ,
 				cullBits, !!(gSP.geometryMode & G_ZBUFFER), gDP.otherMode.depthCompare,
 				!!(gSP.geometryMode & G_LIGHTING), minR, maxR, minG, maxG, minB, maxB,
@@ -1639,7 +1640,7 @@ void OGL_DrawTriangles()
 						sy[j] = ndcY * (-vp_h * 0.5f) + (vp_y + vp_h * 0.5f);
 					}
 					float area = fabsf((sx[1]-sx[0])*(sy[2]-sy[0]) - (sx[2]-sx[0])*(sy[1]-sy[0])) * 0.5f;
-					printf("[NEAR-TRI] w=[%.1f,%.1f,%.1f] clip=[(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)] screen=[(%.1f,%.1f)(%.1f,%.1f)(%.1f,%.1f)] area=%.2fpx col[%.2f,%.2f,%.2f] tex[%08x]\n",
+					DBG_GFX("[NEAR-TRI] w=[%.1f,%.1f,%.1f] clip=[(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)] screen=[(%.1f,%.1f)(%.1f,%.1f)(%.1f,%.1f)] area=%.2fpx col[%.2f,%.2f,%.2f] tex[%08x]\n",
 						v[0].w, v[1].w, v[2].w,
 						v[0].x, v[0].y, v[0].z, v[0].w,
 						v[1].x, v[1].y, v[1].z, v[1].w,
@@ -1670,7 +1671,7 @@ void OGL_DrawTriangles()
 						sy[j] = ndcY * (-vp_h * 0.5f) + (vp_y + vp_h * 0.5f);
 					}
 					float area = fabsf((sx[1]-sx[0])*(sy[2]-sy[0]) - (sx[2]-sx[0])*(sy[1]-sy[0])) * 0.5f;
-					printf("[FAR-TRI] w=[%.1f,%.1f,%.1f] clip=[(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)] screen=[(%.1f,%.1f)(%.1f,%.1f)(%.1f,%.1f)] area=%.2fpx\n",
+					DBG_GFX("[FAR-TRI] w=[%.1f,%.1f,%.1f] clip=[(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)(%.1f,%.1f,%.1f,%.1f)] screen=[(%.1f,%.1f)(%.1f,%.1f)(%.1f,%.1f)] area=%.2fpx\n",
 						v[0].w, v[1].w, v[2].w,
 						v[0].x, v[0].y, v[0].z, v[0].w,
 						v[1].x, v[1].y, v[1].z, v[1].w,
@@ -1690,7 +1691,7 @@ void OGL_DrawTriangles()
 				texH = cache.current[0]->realHeight;
 				if (cache.current[0]->rsxTextureBuffer) tex0 = cache.current[0]->rsxTextureBuffer[0];
 			}
-			printf("[FAR-STATE] tris=%d cull=%d zbuf=%d depthCmp=%d depthUpdate=%d cycle=%d texFmt=%d size=%d %dx%d tex[%08x] dclears=%u\n",
+			DBG_GFX("[FAR-STATE] tris=%d cull=%d zbuf=%d depthCmp=%d depthUpdate=%d cycle=%d texFmt=%d size=%d %dx%d tex[%08x] dclears=%u\n",
 				OGL.numTriangles, cullBits, !!(gSP.geometryMode & G_ZBUFFER), gDP.otherMode.depthCompare,
 				gDP.otherMode.depthUpdate, gDP.otherMode.cycleType,
 				texFmt, texSize, texW, texH, tex0, glN64_depthClearCount);
@@ -1706,7 +1707,7 @@ void OGL_DrawTriangles()
 				texH = cache.current[0]->realHeight;
 				if (cache.current[0]->rsxTextureBuffer) tex0 = cache.current[0]->rsxTextureBuffer[0];
 			}
-			printf("[NEAR-STATE] tris=%d cull=%d zbuf=%d depthCmp=%d depthUpdate=%d cycle=%d forceBlend=%d alphaCmp=%d cvgXAlpha=%d alphaMode=%.0f primA=%.2f texFmt=%d size=%d %dx%d tex[%08x] mode=%.0f\n",
+			DBG_GFX("[NEAR-STATE] tris=%d cull=%d zbuf=%d depthCmp=%d depthUpdate=%d cycle=%d forceBlend=%d alphaCmp=%d cvgXAlpha=%d alphaMode=%.0f primA=%.2f texFmt=%d size=%d %dx%d tex[%08x] mode=%.0f\n",
 				OGL.numTriangles, cullBits, !!(gSP.geometryMode & G_ZBUFFER), gDP.otherMode.depthCompare,
 				gDP.otherMode.depthUpdate, gDP.otherMode.cycleType, gDP.otherMode.forceBlender,
 				gDP.otherMode.alphaCompare, gDP.otherMode.alphaCvgSel, (double)OGL.shader_alpha_mode, gDP.primColor.a,
@@ -1716,20 +1717,20 @@ void OGL_DrawTriangles()
 			if (firstFarTri) {
 				float ndcZ = firstFarTri[0].z / firstFarTri[0].w;
 				float zWin = ndcZ * zScale + zOffset;
-				printf("[Z-DBG] FAR tri vp near=%.3f far=%.3f zScale=%.4f zOff=%.4f z/w=%.4f zWin=%.4f\n",
+				DBG_GFX("[Z-DBG] FAR tri vp near=%.3f far=%.3f zScale=%.4f zOff=%.4f z/w=%.4f zWin=%.4f\n",
 					(double)gSP.viewport.nearz, (double)gSP.viewport.farz,
 					(double)zScale, (double)zOffset, (double)ndcZ, (double)zWin);
 			}
 			if (firstNearTri) {
 				float ndcZ = firstNearTri[0].z / firstNearTri[0].w;
 				float zWin = ndcZ * zScale + zOffset;
-				printf("[Z-DBG] NEAR tri w=%.1f z/w=%.4f zWin=%.4f\n",
+				DBG_GFX("[Z-DBG] NEAR tri w=%.1f z/w=%.4f zWin=%.4f\n",
 					(double)firstNearTri[0].w, (double)ndcZ, (double)zWin);
 			}
 		}
 		totalFlushes++;
 		if ((frameIdx++ & 0x3FF) == 0) {
-			printf("BUCKETS flush=%d f3=%d f0=%d fp=%d near=%d mid=%d far=%d farTex null=%d black=%d color=%d vp %.0f,%.0f %.0fx%.0f sc %.0f,%.0f %.0fx%.0f\n",
+			DBG_GFX("BUCKETS flush=%d f3=%d f0=%d fp=%d near=%d mid=%d far=%d farTex null=%d black=%d color=%d vp %.0f,%.0f %.0fx%.0f sc %.0f,%.0f %.0fx%.0f\n",
 				totalFlushes, nFront3, nFront0, nPartial, nearCnt, midCnt, farCnt, farTexNull, farTexBlack, farTexColor,
 				vp_x, vp_y, vp_w, vp_h,
 				gDP.scissor.ulx * OGL.scaleX, gDP.scissor.uly * OGL.scaleY,
@@ -1763,7 +1764,7 @@ void OGL_DrawTriangles()
 			}
 			u32 texel0 = tc->rsxTextureBuffer ? tc->rsxTextureBuffer[0] : 0;
 			uvProbeCount++;
-			printf("[UVP] %u mode=%.0f uT0=%d uT1=%d lit=%d cycle=%d fmt=%d sz=%d %dx%d taddr=%08x texel0=%08x w[%.0f,%.0f] s0[%.3f,%.3f] t0[%.3f,%.3f] s1[%.3f,%.3f] t1[%.3f,%.3f] col[%.2f,%.2f,%.2f,%.2f] bl[%d,%d,%d,%d]\n",
+			DBG_GFX("[UVP] %u mode=%.0f uT0=%d uT1=%d lit=%d cycle=%d fmt=%d sz=%d %dx%d taddr=%08x texel0=%08x w[%.0f,%.0f] s0[%.3f,%.3f] t0[%.3f,%.3f] s1[%.3f,%.3f] t1[%.3f,%.3f] col[%.2f,%.2f,%.2f,%.2f] bl[%d,%d,%d,%d]\n",
 				uvProbeCount, (double)OGL.shader_mode, combiner.usesT0, combiner.usesT1,
 				!!(gSP.geometryMode & G_LIGHTING), (int)gDP.otherMode.cycleType,
 				(int)tc->format, (int)tc->size, tc->realWidth, tc->realHeight, tc->address, texel0,

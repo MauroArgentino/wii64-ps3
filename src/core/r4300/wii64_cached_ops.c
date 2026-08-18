@@ -9,6 +9,7 @@
 #include "../n64_memory/memory.h"
 #include "macros.h"
 #include "interrupt.h"
+#include "../../debug.h"
 
 extern u32 op;
 
@@ -698,7 +699,7 @@ void cached_interp_JR(void)
    u32 addr = rrs32;
    if (addr & 3)
    {
-      printf("misaligned jump target in JR: 0x%08x\n", addr);
+      DBG_LOG("misaligned jump target in JR: 0x%08x\n", addr);
       r4300.stop = 1;
       PC++;
       return;
@@ -718,7 +719,7 @@ void cached_interp_JALR(void)
    u32 addr = rrs32;
    if (addr & 3)
    {
-      printf("misaligned jump target in JALR: 0x%08x\n", addr);
+      DBG_LOG("misaligned jump target in JALR: 0x%08x\n", addr);
       r4300.stop = 1;
       PC++;
       return;
@@ -1232,14 +1233,14 @@ void cached_interp_SDC1(void)
 
 void cached_interp_LQ(void)
 {
-   printf("LQ not implemented\n");
+   DBG_LOG("LQ not implemented\n");
    r4300.stop = 1;
    PC++;
 }
 
 void cached_interp_SQ(void)
 {
-   printf("SQ not implemented\n");
+   DBG_LOG("SQ not implemented\n");
    r4300.stop = 1;
    PC++;
 }
@@ -1275,14 +1276,14 @@ void cached_interp_SC(void)
 
 void cached_interp_LLD(void)
 {
-   printf("LLD not implemented\n");
+   DBG_LOG("LLD not implemented\n");
    r4300.stop = 1;
    PC++;
 }
 
 void cached_interp_SCD(void)
 {
-   printf("SCD not implemented\n");
+   DBG_LOG("SCD not implemented\n");
    r4300.stop = 1;
    PC++;
 }
@@ -1339,7 +1340,7 @@ void cached_interp_MFC0(void)
    u32 reg = PC->f.r.nrd;
    if (reg == 1)
    {
-      printf("reading Random\n");
+      DBG_LOG("reading Random\n");
       r4300.stop = 1;
       PC++;
       return;
@@ -1359,7 +1360,7 @@ void cached_interp_MTC0(void)
          Index = val & 0x8000003F;
          if ((Index & 0x3F) > 31)
          {
-            printf("more than 32 TLB entries\n");
+            DBG_LOG("more than 32 TLB entries\n");
             r4300.stop = 1;
          }
          break;
@@ -1509,25 +1510,25 @@ void cached_interp_TLBP(void)
 
 void cached_interp_LWC2(void)
 {
-   printf("LWC2 not implemented\n");
+   DBG_LOG("LWC2 not implemented\n");
    PC++;
 }
 
 void cached_interp_SWC2(void)
 {
-   printf("SWC2 not implemented\n");
+   DBG_LOG("SWC2 not implemented\n");
    PC++;
 }
 
 void cached_interp_LDC2(void)
 {
-   printf("LDC2 not implemented\n");
+   DBG_LOG("LDC2 not implemented\n");
    PC++;
 }
 
 void cached_interp_SDC2(void)
 {
-   printf("SDC2 not implemented\n");
+   DBG_LOG("SDC2 not implemented\n");
    PC++;
 }
 
@@ -1603,7 +1604,7 @@ static void cached_fpu_op_s(u32 funct)
          *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_single[fs];
          set_rounding();
          break;
-      default: printf("unimplemented FPU S op funct=0x%02x\n", funct); r4300.stop = 1; break;
+      default: DBG_LOG("unimplemented FPU S op funct=0x%02x\n", funct); r4300.stop = 1; break;
    }
 }
 
@@ -1679,7 +1680,7 @@ static void cached_fpu_op_d(u32 funct)
          *((long long*)r4300.fpr_double[fd]) = *r4300.fpr_double[fs];
          set_rounding();
          break;
-      default: printf("unimplemented FPU D op funct=0x%02x\n", funct); r4300.stop = 1; break;
+      default: DBG_LOG("unimplemented FPU D op funct=0x%02x\n", funct); r4300.stop = 1; break;
    }
 }
 

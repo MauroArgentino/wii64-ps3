@@ -45,6 +45,7 @@
 #include "../r4300/Recomp-Cache.h"
 #include "flashram.h"
 #include "Saves.h"
+#include "../../debug.h"
 
 #ifdef USE_EXPANSION
 	#define MEMMASK 0x7FFFFF
@@ -321,16 +322,16 @@ void dma_si_write()
 	{
 	   int k;
 	   siw_cnt++;
-	   printf("[SIWRITE] pc=%08X dram=%08X cnt=%d srcRDRAM:",
+	   DBG_LOG("[SIWRITE] pc=%08X dram=%08X cnt=%d srcRDRAM:",
 		  (unsigned int)r4300.pc,
 		  (unsigned int)si_register.si_dram_addr,
 		  siw_cnt);
 	   for (k = 0; k < 16; k++)
 	     {
-		if ((k & 7) == 0) printf("\n   %02X:", k);
-		printf(" %02X", rdramb[si_register.si_dram_addr + k]);
+		if ((k & 7) == 0) DBG_LOG("\n   %02X:", k);
+		DBG_LOG(" %02X", rdramb[si_register.si_dram_addr + k]);
 	     }
-	   printf("\n");
+	   DBG_LOG("\n");
 	}
    }
 #endif
@@ -345,13 +346,13 @@ void dma_si_write()
 	{
 	   int k;
 	   siwa_cnt++;
-	   printf("[SIWRITE_A] cnt=%d after_pifw:", siwa_cnt);
+	   DBG_LOG("[SIWRITE_A] cnt=%d after_pifw:", siwa_cnt);
 	   for (k = 0; k < 16; k++)
 	     {
-		if ((k & 7) == 0) printf("\n   %02X:", k);
-		printf(" %02X", PIF_RAMb[k]);
+		if ((k & 7) == 0) DBG_LOG("\n   %02X:", k);
+		DBG_LOG(" %02X", PIF_RAMb[k]);
 	     }
-	   printf("\n");
+	   DBG_LOG("\n");
 	}
    }
 #endif
@@ -377,16 +378,16 @@ void dma_si_read()
 	{
 	   int k;
 	   sir_cnt++;
-	   printf("[SIREAD] pc=%08X dram=%08X cnt=%d pifram:",
+	   DBG_LOG("[SIREAD] pc=%08X dram=%08X cnt=%d pifram:",
 		  (unsigned int)r4300.pc,
 		  (unsigned int)si_register.si_dram_addr,
 		  sir_cnt);
 	   for (k = 0; k < 16; k++)
 	     {
-		if ((k & 7) == 0) printf("\n   %02X:", k);
-		printf(" %02X", PIF_RAMb[k]);
+		if ((k & 7) == 0) DBG_LOG("\n   %02X:", k);
+		DBG_LOG(" %02X", PIF_RAMb[k]);
 	     }
-	   printf("\n");
+	   DBG_LOG("\n");
 	}
    }
 #endif

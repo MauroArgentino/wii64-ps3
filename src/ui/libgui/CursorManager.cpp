@@ -28,17 +28,24 @@
 #endif //!__GX__
 #include "Image.h"
 #include "resources.h"
+#include "../MenuResources.h"
 #include "IPLFont.h"
 #include "Frame.h"
 #include "../../main/wii64config.h"
+#ifdef PS3
+#include <io/pad.h>
+#define PS3_BTN_CROSS (1<<6)
+extern u32 display_width;
+extern u32 display_height;
+#endif
 
 namespace menu {
 
 Cursor::Cursor()
 		: currentFrame(0),
 		  cursorList(0),
-		  cursorX(0.0f),
-		  cursorY(0.0f),
+		  cursorX((float)(::display_width ? ::display_width : 1920) * 0.5f),
+		  cursorY((float)(::display_height ? ::display_height : 1080) * 0.5f),
 		  cursorRot(0.0f),
 		  imageCenterX(12.0f),
 		  imageCenterY(4.0f),
@@ -124,6 +131,56 @@ void Cursor::updateCursor()
 		}
 	}
 #endif
+
+#ifdef PS3
+	// PS3: analog stick cursor control (Left stick moves cursor, Cross = click)
+	{
+		padData paddata;
+		int ret = ioPadGetData(0, &paddata);
+		if (ret == 0 && paddata.len > 0)
+		{
+			// Left stick: button[4]=LX, button[5]=LY (0-255, center=128)
+			s8 lx = (s8)(paddata.button[4] - 128);
+			s8 ly = (s8)(paddata.button[5] - 128);
+
+			// Dead zone
+			if (lx < -15 || lx > 15) cursorX += lx * 0.5f;
+			if (ly < -15 || ly > 15) cursorY -= ly * 0.5f; // Y inverted
+
+			// Clamp to screen
+			if (cursorX < 0) cursorX = 0;
+			if (cursorX > ::display_width) cursorX = ::display_width;
+			if (cursorY < 0) cursorY = 0;
+			if (cursorY > ::display_height) cursorY = ::display_height;
+
+			// Cross button = click (button[3] bit 6 = PS3_BTN_CROSS)
+			u16 btns = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
+			pressed = (btns & PS3_BTN_CROSS) ? true : false;
+			buttonsPressed = pressed ? 1 : 0;
+
+			Focus::getInstance().setFocusActive(false);
+			if (hoverOverComponent) 
+			{
+				hoverOverComponent->setFocus(false);
+				hoverOverComponent = NULL;
+			}
+			std::vector<CursorEntry>::iterator iteration;
+			for (iteration = cursorList.begin(); iteration != cursorList.end(); iteration++)
+			{
+				if(	currentFrame == (*iteration).frame &&
+					(cursorX > (*iteration).xRange[0]) && (cursorX < (*iteration).xRange[1]) &&
+					(cursorY > (*iteration).yRange[0]) && (cursorY < (*iteration).yRange[1]))
+				{
+					setCursorFocus((*iteration).comp);
+					if (frameSwitch) break;
+				}
+			}
+			if (!hoverOverComponent) setCursorFocus(currentFrame);
+			return;
+		}
+	}
+#endif
+
 	//if not: clear cursorX, cursorY, cursorRot, set focusActive
 	cursorX = cursorY = cursorRot = 0.0f;
 	setCursorFocus(NULL);
@@ -154,7 +211,6 @@ void Cursor::setCursorFocus(Component* component)
 void Cursor::drawCursor(Graphics& gfx)
 {
 	int width, height;
-	if(cursorX > 0.0f || cursorY > 0.0f)
 	{
 		gfx.enableBlending(true);
 		gfx.setTEV(GX_REPLACE);

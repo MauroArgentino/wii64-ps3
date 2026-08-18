@@ -46,8 +46,6 @@
 #include "../../main/debug/DEBUG.h"
 #endif
 
-extern "C" void dbg_printf(const char *fmt,...);
-
 #include <vectormath/cpp/vectormath_aos.h>
 using namespace Vectormath::Aos;
 

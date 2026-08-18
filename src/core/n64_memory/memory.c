@@ -49,6 +49,7 @@
 #include "../../main/ROM-Cache.h"
 #include <ppu-types.h>
 #include <assert.h>
+#include "../../debug.h"
 
 /* definitions of the rcp's structures and memory area */
 RDRAM_register rdram_register;
@@ -210,7 +211,6 @@ static int firstFrameBufferSetting;
 #ifdef DEBUG_PROBES
 static int wr26b80_cnt = 0;
 #endif
-extern void dbg_printf(const char *fmt,...);
 int init_memory()
 {
    int i;
@@ -658,7 +658,7 @@ int init_memory()
    frameBufferInfos[0].addr = 0;
    firstFrameBufferSetting = 1;
    
-   dbg_printf("memory initialized\n");
+   DBG_UDP("memory initialized\n");
    return 0;
 }
 
@@ -805,7 +805,7 @@ void update_SP()
       {
 	int save_pc = rsp_register.rsp_pc & ~0xFFF;
 #ifdef DEBUG_PROBES
-	printf("[RSPSTART] pc=%08X SP_DMEM[FC0]=%d\n", rsp_register.rsp_pc, SP_DMEM[0xFC0/4]);
+	DBG_LOG("[RSPSTART] pc=%08X SP_DMEM[FC0]=%d\n", rsp_register.rsp_pc, SP_DMEM[0xFC0/4]);
 #endif
 	if (SP_DMEM[0xFC0/4] == 1)
 	  {
@@ -813,15 +813,15 @@ void update_SP()
 	     if (rdram)
 	       {
 		  int pi;
-		  printf("[POOLSNP] Count=%08X flag=%08X c448=%08X c44C=%08X c450=%08X heads=",
+		  DBG_LOG("[POOLSNP] Count=%08X flag=%08X c448=%08X c44C=%08X c450=%08X heads=",
 		     (unsigned int)Count,
 		     (unsigned int)rdram[(0x801CA428 & MEMMASK)>>2],
 		     (unsigned int)rdram[(0x801CA448 & MEMMASK)>>2],
 		     (unsigned int)rdram[(0x801CA44C & MEMMASK)>>2],
 		     (unsigned int)rdram[(0x801CA450 & MEMMASK)>>2]);
 		  for(pi=0; pi<8; pi++)
-		    printf("%08X ", (unsigned int)rdram[((0x801CA8B0 + pi*16) & MEMMASK)>>2]);
-		  printf("\n");
+		    DBG_LOG("%08X ", (unsigned int)rdram[((0x801CA8B0 + pi*16) & MEMMASK)>>2]);
+		  DBG_LOG("\n");
 	       }
 #endif
 	     // unprotecting old frame buffers
@@ -1255,7 +1255,7 @@ void write_rdram()
    if ((address & MEMMASK) == 0x226B80 && wr26b80_cnt < 60)
    {
       wr26b80_cnt++;
-      printf("[WR26B80] pc=%08X old=%08X new=%08X\n", (unsigned int)r4300.pc,
+      DBG_LOG("[WR26B80] pc=%08X old=%08X new=%08X\n", (unsigned int)r4300.pc,
          (unsigned int)*(u32 *)(rdramb + (address & MEMMASK)), (unsigned int)word);
    }
 #endif
@@ -1273,7 +1273,7 @@ void write_rdram()
               iw = (u32)rdramb[iaddr] << 24 | (u32)rdramb[iaddr+1] << 16 |
                    (u32)rdramb[iaddr+2] << 8 | (u32)rdramb[iaddr+3];
             pif_wr_cnt++;
-            printf("[PIFBUF_WR] pc=%08X iw=%08X addr=%08X val=%08X off=%d\n",
+            DBG_LOG("[PIFBUF_WR] pc=%08X iw=%08X addr=%08X val=%08X off=%d\n",
                    (unsigned int)r4300.pc, iw, (unsigned int)address,
                    (unsigned int)word, (int)(pa - 0x367050));
          }
@@ -1287,7 +1287,7 @@ void write_rdram()
       if (wrobj_cnt < 5 || (wrobj_cnt < 200 && (wrobj_cnt++ % 5000) == 0))
 	{
 	   wrobj_cnt++;
-	   printf("[WROBJ] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
+	   DBG_LOG("[WROBJ] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
 		  (unsigned int)word, (unsigned int)Count);
 	}
    }
@@ -1299,7 +1299,7 @@ void write_rdram()
       if (wrname_cnt < 5 || (wrname_cnt < 200 && (wrname_cnt++ % 5000) == 0))
 	{
 	   wrname_cnt++;
-	   printf("[WRNAME] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
+	   DBG_LOG("[WRNAME] pc=%08X new=%08X Count=%08X\n", (unsigned int)r4300.pc,
 		  (unsigned int)word, (unsigned int)Count);
 	}
    }
@@ -1320,7 +1320,7 @@ void write_rdramb()
          if (pif_wrb_cnt < 80)
          {
             pif_wrb_cnt++;
-            printf("[PIFBUF_SB] pc=%08X addr=%08X val=%02X off=%d\n",
+            DBG_LOG("[PIFBUF_SB] pc=%08X addr=%08X val=%02X off=%d\n",
                    (unsigned int)r4300.pc, (unsigned int)address,
                    (unsigned char)byte, (int)(pa - 0x367050));
          }
@@ -3224,22 +3224,22 @@ void read_flashram_status()
 	use_flashram = 1;
      }
    else
-     printf("unknown read in read_flashram_status\n");
+     DBG_LOG("unknown read in read_flashram_status\n");
 }
 
 void read_flashram_statusb()
 {
-   printf("read_flashram_statusb\n");
+   DBG_LOG("read_flashram_statusb\n");
 }
 
 void read_flashram_statush()
 {
-   printf("read_flashram_statush\n");
+   DBG_LOG("read_flashram_statush\n");
 }
 
 void read_flashram_statusd()
 {
-   printf("read_flashram_statusd\n");
+   DBG_LOG("read_flashram_statusd\n");
 }
 
 void write_flashram_dummy()
@@ -3266,22 +3266,22 @@ void write_flashram_command()
 	use_flashram = 1;
      }
    else
-     printf("unknown write in write_flashram_command\n");
+     DBG_LOG("unknown write in write_flashram_command\n");
 }
 
 void write_flashram_commandb()
 {
-   printf("write_flashram_commandb\n");
+   DBG_LOG("write_flashram_commandb\n");
 }
 
 void write_flashram_commandh()
 {
-   printf("write_flashram_commandh\n");
+   DBG_LOG("write_flashram_commandh\n");
 }
 
 void write_flashram_commandd()
 {
-   printf("write_flashram_commandd\n");
+   DBG_LOG("write_flashram_commandd\n");
 }
 
 static u32 lastwrite = 0;
@@ -3335,7 +3335,7 @@ void read_pif()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in reading a word in PIF\n");
+	DBG_LOG("error in reading a word in PIF\n");
 	*rdword = 0;
 	return;
      }
@@ -3348,7 +3348,7 @@ void read_pifb()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in reading a byte in PIF\n");
+	DBG_LOG("error in reading a byte in PIF\n");
 	*rdword = 0;
 	return;
      }
@@ -3361,7 +3361,7 @@ void read_pifh()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in reading a hword in PIF\n");
+	DBG_LOG("error in reading a hword in PIF\n");
 	*rdword = 0;
 	return;
      }
@@ -3375,7 +3375,7 @@ void read_pifd()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in reading a double word in PIF\n");
+	DBG_LOG("error in reading a double word in PIF\n");
 	*rdword = 0;
 	return;
      }
@@ -3389,7 +3389,7 @@ void write_pif()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in writing a word in PIF\n");
+	DBG_LOG("error in writing a word in PIF\n");
 	return;
      }
 #endif
@@ -3412,7 +3412,7 @@ void write_pifb()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in writing a byte in PIF\n");
+	DBG_LOG("error in writing a byte in PIF\n");
 	return;
      }
 #endif
@@ -3435,7 +3435,7 @@ void write_pifh()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in writing a hword in PIF\n");
+	DBG_LOG("error in writing a hword in PIF\n");
 	return;
      }
 #endif
@@ -3459,7 +3459,7 @@ void write_pifd()
 #ifdef EMU64_DEBUG
    if ((*address_low > 0x7FF) || (*address_low < 0x7C0))
      {
-	printf("error in writing a double word in PIF\n");
+	DBG_LOG("error in writing a double word in PIF\n");
 	return;
      }
 #endif

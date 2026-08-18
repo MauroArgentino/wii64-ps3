@@ -13,6 +13,8 @@ extern "C" {
 #include "hle.h"
 }
 
+#include "../../debug.h"
+
 static void SPNOOP () {
 	/*char buff[0x100];
 	sprintf (buff, "Unknown/Unimplemented Audio Command %i in ABI 3", (int)(inst1 >> 24));

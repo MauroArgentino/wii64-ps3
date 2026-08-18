@@ -320,6 +320,52 @@ void Graphics::fillRect(int x, int y, int width, int height)
 	GX_End();
 }
 
+void Graphics::fillRoundedRect(int x, int y, int width, int height, int radius, int segments)
+{
+	if (radius <= 0 || segments <= 0) { fillRect(x, y, width, height); return; }
+	if (radius > width/2) radius = width/2;
+	if (radius > height/2) radius = height/2;
+
+	float cx = (float)x + (float)width * 0.5f;
+	float cy = (float)y + (float)height * 0.5f;
+	float fr = (float)radius;
+	int totalVerts = 1 + segments * 4;
+
+	GX_Begin(GX_TRIANGLEFAN, GX_VTXFMT0, totalVerts);
+
+	GX_Position3f32(cx, cy, depth);
+	GX_Color4u8(appliedColor[0].r, appliedColor[0].g, appliedColor[0].b, appliedColor[0].a);
+	GX_TexCoord2f32(0.0f, 0.0f);
+
+	for (int corner = 0; corner < 4; corner++)
+	{
+		float startAngle = PI * 0.5f * (2 - corner);
+		float endAngle   = PI * 0.5f * (1 - corner);
+
+		float arcCx, arcCy;
+		switch (corner) {
+			case 0: arcCx = (float)x + fr;               arcCy = (float)y + fr;               break;
+			case 1: arcCx = (float)x + (float)width - fr; arcCy = (float)y + fr;               break;
+			case 2: arcCx = (float)x + (float)width - fr; arcCy = (float)y + (float)height - fr; break;
+			default:arcCx = (float)x + fr;               arcCy = (float)y + (float)height - fr; break;
+		}
+
+		for (int i = 0; i <= segments; i++)
+		{
+			float t = (float)i / (float)segments;
+			float angle = startAngle + (endAngle - startAngle) * t;
+			float px = arcCx + fr * cosf(angle);
+			float py = arcCy + fr * sinf(angle);
+
+			GX_Position3f32(px, py, depth);
+			GX_Color4u8(appliedColor[0].r, appliedColor[0].g, appliedColor[0].b, appliedColor[0].a);
+			GX_TexCoord2f32(0.0f, 0.0f);
+		}
+	}
+
+	GX_End();
+}
+
 void Graphics::drawImage(int textureId, int x, int y, int width, int height, float s1, float s2, float t1, float t2)
 {
 	//Init texture here or in calling code?

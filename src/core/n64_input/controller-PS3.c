@@ -25,6 +25,7 @@
 
 #include <string.h>
 #include <io/pad.h>
+#include "../../debug.h"
 #include "controller.h"
 
 enum {
@@ -101,19 +102,20 @@ static u32 getButtons(u32 buttonsPS3, u32 analogPS3)
 	//0xRH-RV-LH-LV 0x00 = Left/Up, 0xFF = Right/Down
 	u32 b = buttonsPS3;
 	s8 LstickX      = (s8) ((int)((analogPS3>>8) & 0xFF) - 128);
-	s8 LstickY      = (s8) ((int)((analogPS3>>0) & 0xFF) - 128);
+	s8 LstickY      = (s8) -((int)((analogPS3>>0) & 0xFF) - 128);
 	s8 RstickX      = (s8) ((int)((analogPS3>>24) & 0xFF) - 128);
-	s8 RstickY      = (s8) ((int)((analogPS3>>16) & 0xFF) - 128);
+	s8 RstickY      = (s8) -((int)((analogPS3>>16) & 0xFF) - 128);
 	
-	if(LstickX    < -25) b |= L_STICK_L;
-	if(LstickX    >  25) b |= L_STICK_R;
-	if(LstickY    < -25) b |= L_STICK_U;
-	if(LstickY    >  25) b |= L_STICK_D;
+	int dz = 18;
+	if(LstickX    < -dz) b |= L_STICK_L;
+	if(LstickX    >  dz) b |= L_STICK_R;
+	if(LstickY    < -dz) b |= L_STICK_U;
+	if(LstickY    >  dz) b |= L_STICK_D;
 	
-	if(RstickX    < -25) b |= R_STICK_L;
-	if(RstickX    >  25) b |= R_STICK_R;
-	if(RstickY    < -25) b |= R_STICK_U;
-	if(RstickY    >  25) b |= R_STICK_D;
+	if(RstickX    < -dz) b |= R_STICK_L;
+	if(RstickX    >  dz) b |= R_STICK_R;
+	if(RstickY    < -dz) b |= R_STICK_U;
+	if(RstickY    >  dz) b |= R_STICK_D;
 	
 	return b;
 }
@@ -122,6 +124,14 @@ padInfo padinfo;
 
 static u32 previousButtonsPS3[4];
 static u32 previousAnalogPS3[4];
+static u32 edgeButtons[4];       /* buttons detected as rising-edge pressed */
+static int edgeHoldCount[4];     /* frames to keep edge-detected buttons held */
+
+/* Forward declaration */
+static void refreshAvailable(void);
+
+/* OSD pad status: visible from VI.cpp for on-screen debug */
+char osd_pad_status[64] = "pad: init";
 #ifdef DEBUG_PROBES
 static unsigned int input_probe_cnt;
 #endif
@@ -133,6 +143,11 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 	BUTTONS* c = Keys;
 	memset(c, 0, sizeof(BUTTONS));
 
+	/* Refresh pad availability every PIF read. The DualSense may connect
+	 * via BT AFTER init_controller_ts(); without this, available[0] stays
+	 * 0 and _GetKeys returns immediately — no buttons ever reach the game. */
+	refreshAvailable();
+
 	if (!controller_PS3.available[Control]) return 0;
 
 	ioPadGetData(Control, &paddata);
@@ -143,7 +158,7 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 		if (gk_cnt < 8 || (gk_cnt < 200 && (gk_skip++ % 500) == 0))
 		{
 			gk_cnt++;
-			printf("[GETKEYS] Control=%d len=%u\n", Control, paddata.len);
+			DBG_INP("[GETKEYS] Control=%d len=%u\n", Control, paddata.len);
 		}
 	}
 #endif
@@ -151,15 +166,21 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 	{
 		buttonsPS3 = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
 		analogPS3 = ((paddata.button[4]&0xFF)<<24) | ((paddata.button[5]&0xFF)<<16) | 
-					((paddata.button[6]&0xFF)<<8) | (paddata.button[7]&0xFF); 
+					((paddata.button[6]&0xFF)<<8) | ((paddata.button[7]&0xFF)&0xFF); 
 		//0xRH-RV-LH-LV 0x00 = Left/Up, 0xFF = Right/Down
 		previousButtonsPS3[Control] = buttonsPS3;
 		previousAnalogPS3[Control] = analogPS3;
+		/* Edge detection: latch any button that transitioned 0->1 for 4 reads
+		 * so a fast tap (e.g. Start) is never lost between len=0 gaps. */
+		u32 newlyPressed = buttonsPS3 & ~edgeButtons[Control];
+		edgeButtons[Control] = buttonsPS3;
+		if (newlyPressed)
+			edgeHoldCount[Control] = 4;
 #ifdef DEBUG_PROBES
 		if (input_probe_cnt < 24)
 		{
 			input_probe_cnt++;
-			printf("[PADGET#%u] Control=%d avail=%d len=%u buttons=%04X analog=%08X\n",
+			DBG_INP("[PADGET#%u] Control=%d avail=%d len=%u buttons=%04X analog=%08X\n",
 				input_probe_cnt, Control, controller_PS3.available[Control],
 				paddata.len, buttonsPS3, analogPS3);
 		}
@@ -169,6 +190,14 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 	{
 		buttonsPS3 = previousButtonsPS3[Control];
 		analogPS3 = previousAnalogPS3[Control];
+	}
+
+	/* Merge edge-detected buttons into live state so even when paddata.len==0
+	 * the N64 still sees the press for up to 4 reads after it happened. */
+	if (edgeHoldCount[Control] > 0)
+	{
+		buttonsPS3 |= edgeButtons[Control];
+		edgeHoldCount[Control]--;
 	}
 
 	u32 b = getButtons(buttonsPS3,analogPS3);
@@ -196,10 +225,10 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 
 	if(config->analog->mask == L_STICK_AS_ANALOG){
 		c->X_AXIS = (s8)  ((int)((analogPS3>>8) & 0xFF) - 128);
-		c->Y_AXIS = (s8) -((int)((analogPS3>>0) & 0xFF) - 127);
+		c->Y_AXIS = (s8) -((int)((analogPS3>>0) & 0xFF) - 128);
 	} else if(config->analog->mask == R_STICK_AS_ANALOG){
 		c->X_AXIS = (s8)  ((int)((analogPS3>>24) & 0xFF) - 128);
-		c->Y_AXIS = (s8) -((int)((analogPS3>>16) & 0xFF) - 127);
+		c->Y_AXIS = (s8) -((int)((analogPS3>>16) & 0xFF) - 128);
 	}
 	if(config->invertedY) c->Y_AXIS = -c->Y_AXIS;
 
@@ -229,8 +258,6 @@ static void assign(int p, int v){
 	// Nothing to do here
 }
 
-
-static void refreshAvailable(void);
 
 controller_t controller_PS3 =
 	{ 'P',
@@ -276,9 +303,37 @@ static void refreshAvailable(void){
 	for(i=0; i<4; ++i)
 		controller_PS3.available[i] = padinfo.status[i];
 #ifdef DEBUG_PROBES
-	printf("[PADINFO] status=%d%d%d%d avail=%d%d%d%d\n",
+	DBG_INP("[PADINFO] status=%d%d%d%d avail=%d%d%d%d\n",
 		padinfo.status[0], padinfo.status[1], padinfo.status[2], padinfo.status[3],
 		controller_PS3.available[0], controller_PS3.available[1],
 		controller_PS3.available[2], controller_PS3.available[3]);
 #endif
+}
+
+/* Poll del combo de salida directamente del pad (ioPadGetData), sin depender
+ * de que la ROM lea el PIF. Permite volver al menu aunque el juego no procese
+ * los controles (p.ej. DK64 atascado en el boot). Devuelve 1 si el combo
+ * configurado de salida (por defecto Square+Triangle) esta presionado. */
+int ps3_pad_exit_combo_pressed(void)
+{
+	int i;
+	padData paddata;
+	button_tp combo = &menu_combos[0];
+
+	if (virtualControllers[0].config && virtualControllers[0].config->exit)
+		combo = virtualControllers[0].config->exit;
+
+	for (i = 0; i < 4; i++)
+	{
+		u32 buttonsPS3;
+		if (!controller_PS3.available[i]) continue;
+
+		ioPadGetData(i, &paddata);
+		if (!paddata.len) continue;
+
+		buttonsPS3 = ((paddata.button[2] & 0xFF) << 8) | (paddata.button[3] & 0xFF);
+		if ((buttonsPS3 & combo->mask) == combo->mask)
+			return 1;
+	}
+	return 0;
 }

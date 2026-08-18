@@ -8,6 +8,7 @@
 #include "../n64_memory/memory.h"
 #include "macros.h"
 #include "interrupt.h"
+#include "../../debug.h"
 
 extern u32 op;
 extern tlb tlb_e[32];
@@ -15,6 +16,9 @@ extern u32 *tlb_LUT_r;
 
 extern int dbg_vi_count;
 extern void dbg_dump_queue(void);
+#ifdef PS3
+extern int ps3_pad_exit_combo_pressed(void);
+#endif
 
 #define RDRAM_WORDS 0x100000
 
@@ -901,10 +905,20 @@ void run_cached_interpreter(void)
    if (!ci.actual || !ci.actual->block) return;
    PC = ci.actual->block + ((r4300.pc - ci.actual->start) >> 2);
 
-   while (!r4300.stop)
-   {
-      Count += 2;
-      if (!PC) { r4300.stop = 1; break; }
+while (!r4300.stop)
+    {
+       Count += 2;
+#ifdef PS3
+       if ((Count & 0x1FFF) == 0 && ps3_pad_exit_combo_pressed())
+       {
+#ifdef DEBUG
+          printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
+#endif
+          r4300.stop = 1;
+          break;
+       }
+#endif
+       if (!PC) { r4300.stop = 1; break; }
       if (ci.actual && ci.actual->block)
       {
          u32 length = (ci.actual->end - ci.actual->start) / 4;
@@ -1619,7 +1633,7 @@ void cached_interp_TLB_REFILL(void)
    ci.actual = ci.blocks[r4300.pc >> 12];
    if (!ci.actual || !ci.actual->block)
    {
-      printf("TLB_REFILL stuck at 0x%08x (vector 0x%08x)\n", vaddr, r4300.pc);
+      DBG_LOG("TLB_REFILL stuck at 0x%08x (vector 0x%08x)\n", vaddr, r4300.pc);
       r4300.stop = 1;
       return;
    }
@@ -1634,7 +1648,7 @@ void cached_interp_FIN_BLOCK(void)
    generic_jump_to(addr);
    if (PC == old)
    {
-      printf("FIN_BLOCK stuck at 0x%08x\n", addr);
+      DBG_LOG("FIN_BLOCK stuck at 0x%08x\n", addr);
       r4300.stop = 1;
       return;
    }
@@ -1647,7 +1661,7 @@ void cached_interp_NOTCOMPILED(void)
    cached_interp_recompile_block(addr);
    if (PC->ops == cached_interp_NOTCOMPILED)
    {
-      printf("NOTCOMPILED stuck at 0x%08x\n", addr);
+      DBG_LOG("NOTCOMPILED stuck at 0x%08x\n", addr);
       r4300.stop = 1;
       return;
    }
@@ -1662,7 +1676,7 @@ void cached_interp_NOTCOMPILED2(void)
 void cached_interp_NI(void)
 {
    u32 iw = read_inst(PC->addr);
-   printf("NI at 0x%08x (iw=0x%08x op=%d rs=%d rt=%d rd=%d funct=0x%02x)\n",
+   DBG_LOG("NI at 0x%08x (iw=0x%08x op=%d rs=%d rt=%d rd=%d funct=0x%02x)\n",
           PC->addr, iw, (iw >> 26) & 0x3F, (iw >> 21) & 0x1F,
           (iw >> 16) & 0x1F, (iw >> 11) & 0x1F, iw & 0x3F);
    r4300.stop = 1;

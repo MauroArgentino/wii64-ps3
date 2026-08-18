@@ -15,6 +15,7 @@
 #endif // __GX__
 
 #include <stdio.h>
+#include "../../debug.h"
 #include "glN64.h"
 #include "GBI.h"
 #include "ZSort.h"
@@ -390,7 +391,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 	MicrocodeInfo *current;
 
 #ifdef DEBUG_PROBES
-	printf( "[GBI] DetectMicrocode called: uc_start=0x%08X uc_dstart=0x%08X uc_dsize=%d\n", uc_start, uc_dstart, uc_dsize );
+	DBG_GFX( "[GBI] DetectMicrocode called: uc_start=0x%08X uc_dstart=0x%08X uc_dsize=%d\n", uc_start, uc_dstart, uc_dsize );
 #endif
 
 	for (unsigned int i = 0; i < GBI.numMicrocodes; i++)
@@ -417,7 +418,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 	// See if we can identify it by CRC
 	uc_crc = CRC_Calculate( 0xFFFFFFFF, &RDRAM[uc_start & 0x1FFFFFFF], 4096 );
 #ifdef DEBUG_PROBES
-	printf( "[GBI] Detecting ucode: CRC=0x%08X uc_start=0x%08X\n", uc_crc, uc_start );
+	DBG_GFX( "[GBI] Detecting ucode: CRC=0x%08X uc_start=0x%08X\n", uc_crc, uc_start );
 #endif
 	for (u32 i = 0; i < sizeof( specialMicrocodes ) / sizeof( SpecialMicrocodeInfo ); i++)
 	{
@@ -425,7 +426,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 		{
 			current->type = specialMicrocodes[i].type;
 #ifdef DEBUG_PROBES
-			printf( "[GBI] Matched by CRC: %s (type=%d)\n", specialMicrocodes[i].text, current->type );
+			DBG_GFX( "[GBI] Matched by CRC: %s (type=%d)\n", specialMicrocodes[i].text, current->type );
 #endif
 			return current;
 		}
@@ -467,8 +468,8 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 			else if (strncmp( &uc_str[4], "Gfx", 3 ) == 0)
 			{
 				current->NoN = (strstr( &uc_str[4], ".NoN" ) != NULL) || (strstr( &uc_str[4], ".Rej" ) != NULL);
-				printf("[GBI-DBG] '%s'\n", uc_str);
-				printf("[GBI-DBG] uc_str[14]=%d[%c] [28]=%d[%c] [31]=%d[%c]\n", uc_str[14], (uc_str[14]>=32&&uc_str[14]<127)?uc_str[14]:'?', uc_str[28], (uc_str[28]>=32&&uc_str[28]<127)?uc_str[28]:'?', uc_str[31], (uc_str[31]>=32&&uc_str[31]<127)?uc_str[31]:'?');
+			DBG_GFX("[GBI-DBG] '%s'\n", uc_str);
+			DBG_GFX("[GBI-DBG] uc_str[14]=%d[%c] [28]=%d[%c] [31]=%d[%c]\n", uc_str[14], (uc_str[14]>=32&&uc_str[14]<127)?uc_str[14]:'?', uc_str[28], (uc_str[28]>=32&&uc_str[28]<127)?uc_str[28]:'?', uc_str[31], (uc_str[31]>=32&&uc_str[31]<127)?uc_str[31]:'?');
 
 				if (strncmp( &uc_str[14], "F3D", 3 ) == 0)
 				{
@@ -499,7 +500,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 			{
 				current->type = type;
 #ifdef DEBUG_PROBES
-				printf( "[GBI] Matched by string: '%s' -> type=%d\n", uc_str, current->type );
+				DBG_GFX( "[GBI] Matched by string: '%s' -> type=%d\n", uc_str, current->type );
 #endif
 				return current;
 			}
@@ -514,7 +515,7 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 		{
 			current->type = specialMicrocodes[i].type;
 #ifdef DEBUG_PROBES
-			printf( "[GBI] Matched by string: '%s' -> %s (type=%d)\n", uc_str, specialMicrocodes[i].text, current->type );
+			DBG_GFX( "[GBI] Matched by string: '%s' -> %s (type=%d)\n", uc_str, specialMicrocodes[i].text, current->type );
 #endif
 			return current;
 		}
@@ -525,9 +526,9 @@ MicrocodeInfo *GBI_DetectMicrocode( u32 uc_start, u32 uc_dstart, u16 uc_dsize )
 	current->type = DialogBox( hInstance, MAKEINTRESOURCE( IDD_MICROCODEDLG ), hWnd, MicrocodeDlgProc );
 #else // !__LINUX__
 #ifdef DEBUG_PROBES
-	printf( "[GBI] UNKNOWN ucode! uc_str='%s' CRC=0x%08X\n", uc_str, uc_crc );
+	DBG_GFX( "[GBI] UNKNOWN ucode! uc_str='%s' CRC=0x%08X\n", uc_str, uc_crc );
 #endif
-	printf( "glN64: Warning - unknown ucode!!!\n" );
+	DBG_GFX( "glN64: Warning - unknown ucode!!!\n" );
 # if !(defined(__GX__)||defined(PS3))
 	//TODO: Make sure having ucode = NONE is ok
 	current->type = MicrocodeDialog();

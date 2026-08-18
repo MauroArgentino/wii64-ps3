@@ -32,6 +32,7 @@
 #include "../r4300/exception.h"
 #include "../r4300/macros.h"
 #include "../../main/game_hacks.h"
+#include "../../debug.h"
 
 #ifdef USE_EXPANSION
 	#define MEMMASK 0x7FFFFF

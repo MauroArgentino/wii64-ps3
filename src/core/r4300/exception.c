@@ -33,13 +33,14 @@
 #include "macros.h"
 #include "exception.h"
 #include "../n64_memory/memory.h"
+#include "../../debug.h"
 #include <ppu-types.h>
 
 #define doBreak()
 
 void address_error_exception()
 {
-  printf("address_error_exception\n");
+  DBG_LOG("address_error_exception\n");
   r4300.stop=1;
   doBreak();     
 }
@@ -48,18 +49,18 @@ void TLB_invalid_exception()
 {
   if (r4300.delay_slot) {
     r4300.skip_jump = 1;
-    printf("delay slot\nTLB refill exception\n");
+    DBG_LOG("delay slot\nTLB refill exception\n");
     r4300.stop=1;
     doBreak();
   }
-  printf("TLB invalid exception\n");
+  DBG_LOG("TLB invalid exception\n");
   r4300.stop=1;
   doBreak();
 }
 
 void XTLB_refill_exception(unsigned long long int addresse)
 {
-  printf("XTLB refill exception\n");
+  DBG_LOG("XTLB refill exception\n");
   r4300.stop=1;
   doBreak();   
 }
@@ -139,7 +140,7 @@ static void exc_install_vectors(void)
                                     exc_read_word(EXC_VECTOR_TLBREF + 8),
                                     exc_read_word(EXC_VECTOR_TLBREF + 12), &t);
 
-   printf("[VECFIX] general@%08X=%08X %08X %08X %08X refill@%08X=%08X %08X %08X %08X valid=%d/%d\n",
+   DBG_LOG("[VECFIX] general@%08X=%08X %08X %08X %08X refill@%08X=%08X %08X %08X %08X valid=%d/%d\n",
       EXC_VECTOR_GENERAL,
       exc_read_word(EXC_VECTOR_GENERAL), exc_read_word(EXC_VECTOR_GENERAL + 4),
       exc_read_word(EXC_VECTOR_GENERAL + 8), exc_read_word(EXC_VECTOR_GENERAL + 12),
@@ -148,7 +149,7 @@ static void exc_install_vectors(void)
       exc_read_word(EXC_VECTOR_TLBREF + 8), exc_read_word(EXC_VECTOR_TLBREF + 12),
       general_valid, refill_valid);
 
-   if (general_valid && refill_valid) { printf("[VECFIX] both vectors already valid, skip\n"); return; }
+   if (general_valid && refill_valid) { DBG_LOG("[VECFIX] both vectors already valid, skip\n"); return; }
 
    have_general = general_valid;
    have_refill = refill_valid;
@@ -160,7 +161,7 @@ static void exc_install_vectors(void)
       u32 w3 = ((u32 *)rdramb)[i + 3];
       if (exc_is_trampoline(w0, w1, w2, w3, &t)) {
          u32 vaddr = 0x80000000 + i * 4;
-         printf("[VECFIX] found trampoline @%08X -> %08X\n", vaddr, t);
+         DBG_LOG("[VECFIX] found trampoline @%08X -> %08X\n", vaddr, t);
          if (!have_general) {
             gFound[0] = w0; gFound[1] = w1; gFound[2] = w2; gFound[3] = w3;
             gT = t; have_general = 1;
@@ -175,17 +176,17 @@ static void exc_install_vectors(void)
    if (!general_valid) {
       if (have_general && gT) {
          for (i = 0; i < 4; i++) exc_write_word(EXC_VECTOR_GENERAL + i * 4, gFound[i]);
-         printf("[VECFIX] installed general vector -> %08X\n", gT);
+         DBG_LOG("[VECFIX] installed general vector -> %08X\n", gT);
       } else {
-         printf("[VECFIX] WARNING: no trampoline found for general vector\n");
+         DBG_LOG("[VECFIX] WARNING: no trampoline found for general vector\n");
       }
    }
    if (!refill_valid) {
       if (have_refill && rT) {
          for (i = 0; i < 4; i++) exc_write_word(EXC_VECTOR_TLBREF + i * 4, rFound[i]);
-         printf("[VECFIX] installed refill vector -> %08X\n", rT);
+         DBG_LOG("[VECFIX] installed refill vector -> %08X\n", rT);
       } else {
-         printf("[VECFIX] WARNING: no distinct trampoline found for refill vector\n");
+         DBG_LOG("[VECFIX] WARNING: no distinct trampoline found for refill vector\n");
       }
    }
 }
@@ -196,11 +197,11 @@ void TLB_refill_exception(u32 address, int w)
   static unsigned int dbg_tlb_n = 0;
 
   if (dbg_tlb_n < 30) {
-    printf("[TLBREF] n=%u addr=%08X w=%d pc=%08X Status=%08X Cause=%08X delay=%d\n",
+    DBG_LOG("[TLBREF] n=%u addr=%08X w=%d pc=%08X Status=%08X Cause=%08X delay=%d\n",
            dbg_tlb_n, (unsigned int)address, w,
            (unsigned int)r4300.pc,
            (unsigned int)Status, (unsigned int)Cause, r4300.delay_slot);
-    printf("[TLBREF]    DMEM@pc: %08X %08X %08X %08X %08X | t9=%08X t8=%08X t7=%08X t6=%08X\n",
+    DBG_LOG("[TLBREF]    DMEM@pc: %08X %08X %08X %08X %08X | t9=%08X t8=%08X t7=%08X t6=%08X\n",
            SP_DMEM[(r4300.pc & 0xFFF) / 4],
            SP_DMEM[((r4300.pc & 0xFFF) / 4) + 1],
            SP_DMEM[((r4300.pc & 0xFFF) / 4) + 2],
@@ -281,21 +282,21 @@ void TLB_refill_exception(u32 address, int w)
 
 void TLB_mod_exception()
 {
-  printf("TLB mod exception\n");
+  DBG_LOG("TLB mod exception\n");
   r4300.stop=1;
   doBreak();
 }
 
 void integer_overflow_exception()
 {
-  printf("integer overflow exception\n");
+  DBG_LOG("integer overflow exception\n");
   r4300.stop=1;
   doBreak();
 }
 
 void coprocessor_unusable_exception()
 {
-  printf("coprocessor_unusable_exception\n");
+  DBG_LOG("coprocessor_unusable_exception\n");
   r4300.stop=1;
   doBreak();
 }
@@ -304,7 +305,7 @@ void exception_general()
 {
   static unsigned int dbg_gen_n = 0;
   if (dbg_gen_n < 30) {
-    printf("[GENEX] n=%u pc=%08X EPC=%08X Status=%08X Cause=%08X BadVAddr=%08X delay=%d\n",
+    DBG_LOG("[GENEX] n=%u pc=%08X EPC=%08X Status=%08X Cause=%08X BadVAddr=%08X delay=%d\n",
            dbg_gen_n, (unsigned int)r4300.pc, (unsigned int)EPC,
            (unsigned int)Status, (unsigned int)Cause, (unsigned int)BadVAddr, r4300.delay_slot);
     dbg_gen_n++;
@@ -329,7 +330,7 @@ void exception_general()
 		 pa = va & 0x1FFFFFFF;
 	       else
 		 pa = va;
-	       printf("[XCDUMP va=%08X pa=%08X ra=%08X sp=%08X a0=%08X a1=%08X v0=%08X v1=%08X]\n",
+	       DBG_LOG("[XCDUMP va=%08X pa=%08X ra=%08X sp=%08X a0=%08X a1=%08X v0=%08X v1=%08X]\n",
 		      va, pa,
 		      (u32)r4300.gpr[31], (u32)r4300.gpr[29],
 		      (u32)r4300.gpr[4], (u32)r4300.gpr[5],
@@ -339,7 +340,7 @@ void exception_general()
 		    for (k = -12; k < 40; k++)
 		      {
 			 u32 a = pa + k*4;
-			 printf("   %c%03X: %02X %02X %02X %02X\n", (k<0)?'-':'+', (k<0)?(-k*4):(k*4),
+			 DBG_LOG("   %c%03X: %02X %02X %02X %02X\n", (k<0)?'-':'+', (k<0)?(-k*4):(k*4),
 				rdramb[a + 0], rdramb[a + 1],
 				rdramb[a + 2], rdramb[a + 3]);
 		      }
@@ -352,7 +353,7 @@ void exception_general()
 #ifdef DEBUG_PROBES
   if (dbg_ex < 200)
   {
-     printf("[EXC] Status=%08X Cause=%08X pc=%08X\n", (u32)Status, (u32)Cause, (u32)r4300.pc);
+     DBG_LOG("[EXC] Status=%08X Cause=%08X pc=%08X\n", (u32)Status, (u32)Cause, (u32)r4300.pc);
      dbg_ex++;
   }
 #endif

@@ -68,10 +68,26 @@
    ControlWiimoteTexture_length:
    .long (ControlWiimoteTexture_length - ControlWiimoteTexture)
 
-   .globl N64ControllerTexture
-   .balign 32
-   N64ControllerTexture:
-   .incbin	"../src/ui/resources/n64Cntrl.tx"
-   .globl N64ControllerTexture_length
-   N64ControllerTexture_length:
-   .long (N64ControllerTexture_length - N64ControllerTexture)
+.globl N64ControllerTexture
+    .balign 32
+    N64ControllerTexture:
+    .incbin	"../src/ui/resources/n64Cntrl.tx"
+    .globl N64ControllerTexture_length
+    N64ControllerTexture_length:
+    .long (N64ControllerTexture_length - N64ControllerTexture)
+
+    .globl CursorPointTexture
+    .balign 32
+    CursorPointTexture:
+    .incbin	"../src/ui/libgui/resources/CursorPoint.tx"
+    .globl CursorPointTexture_length
+    CursorPointTexture_length:
+    .long (CursorPointTexture_length - CursorPointTexture)
+
+    .globl CursorGrabTexture
+    .balign 32
+    CursorGrabTexture:
+    .incbin	"../src/ui/libgui/resources/CursorGrab.tx"
+    .globl CursorGrabTexture_length
+    CursorGrabTexture_length:
+    .long (CursorGrabTexture_length - CursorGrabTexture)

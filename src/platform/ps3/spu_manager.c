@@ -15,6 +15,7 @@
 #include <sys/event_queue.h>
 
 #include "spu_manager.h"
+#include "../../debug.h"
 
 /* Symbols from bin2s: the SPU ELF binary embedded in our PPU ELF */
 extern const u8 spu_core_elf[];
@@ -40,7 +41,7 @@ int spu_manager_init(void)
         printf("[SPU] sysSpuInitialize failed: %08x\n", ret);
         return ret;
     }
-    printf("[SPU] sysSpuInitialize OK\n");
+    DBG_SPU("[SPU] sysSpuInitialize OK\n");
 
     /* Step 2: Create event queue for SPU->PPU events */
     sys_event_queue_attr_t eq_attr;
@@ -54,7 +55,7 @@ int spu_manager_init(void)
         printf("[SPU] sysEventQueueCreate failed: %08x\n", ret);
         return ret;
     }
-    printf("[SPU] Event queue created\n");
+    DBG_SPU("[SPU] Event queue created\n");
 
     /* Create event port to receive SPU events */
     ret = sysEventPortCreate(&g_spu_mgr.event_port, SYS_EVENT_PORT_LOCAL, 0);
@@ -68,7 +69,7 @@ int spu_manager_init(void)
         printf("[SPU] sysEventPortConnectLocal failed: %08x\n", ret);
         return ret;
     }
-    printf("[SPU] Event port connected\n");
+    DBG_SPU("[SPU] Event port connected\n");
 
     /* Step 3: Import the embedded SPU ELF image */
     sysSpuImage image;
@@ -78,7 +79,7 @@ int spu_manager_init(void)
                ret, (unsigned long)spu_core_elf, spu_core_elf_size);
         return ret;
     }
-    printf("[SPU] SPU image imported OK (size=%08x)\n", spu_core_elf_size);
+    DBG_SPU("[SPU] SPU image imported OK (size=%08x)\n", spu_core_elf_size);
 
     /* Step 4: Create thread group */
     sysSpuThreadGroupAttribute grpattr;
@@ -93,7 +94,7 @@ int spu_manager_init(void)
         printf("[SPU] sysSpuThreadGroupCreate failed: %08x\n", ret);
         return ret;
     }
-    printf("[SPU] Thread group created\n");
+    DBG_SPU("[SPU] Thread group created\n");
 
     /* Step 5: Initialize the SPU thread */
     sysSpuThreadAttribute thrattr;
@@ -111,7 +112,7 @@ int spu_manager_init(void)
         printf("[SPU] sysSpuThreadInitialize failed: %08x\n", ret);
         return ret;
     }
-    printf("[SPU] Thread initialized\n");
+    DBG_SPU("[SPU] Thread initialized\n");
 
     /* Step 6: Connect event queue to the SPU thread */
     ret = sysSpuThreadConnectEvent(g_spu_mgr.thread, g_spu_mgr.event_queue,
@@ -120,10 +121,10 @@ int spu_manager_init(void)
         printf("[SPU] sysSpuThreadConnectEvent failed: %08x\n", ret);
         return ret;
     }
-    printf("[SPU] Event queue connected to thread\n");
+    DBG_SPU("[SPU] Event queue connected to thread\n");
 
     g_spu_mgr.initialized = 1;
-    printf("[SPU] Manager initialized OK\n");
+    DBG_SPU("[SPU] Manager initialized OK\n");
 
     return 0;
 }
@@ -140,7 +141,7 @@ int spu_manager_start(void)
         printf("[SPU] sysSpuThreadGroupStart failed: %08x\n", ret);
         return ret;
     }
-    printf("[SPU] Thread group started\n");
+    DBG_SPU("[SPU] Thread group started\n");
 
     /* Wait for SPU to signal it's alive (the 0x12345678 event) */
     sys_event_t event;
@@ -149,7 +150,7 @@ int spu_manager_start(void)
         printf("[SPU] Timed out waiting for SPU alive signal\n");
         return ret;
     }
-    printf("[SPU] SPU alive! event data: %016lx %016lx\n",
+    DBG_SPU("[SPU] SPU alive! event data: %016lx %016lx\n",
            (unsigned long)event.data_2, (unsigned long)event.data_3);
 
     return 0;
@@ -178,7 +179,7 @@ int spu_dma_to_spu(uint32_t ls_offset, void *ea, uint32_t size)
     (void)ls_offset;
     (void)ea;
     (void)size;
-    printf("[SPU] spu_dma_to_spu: not implemented for managed threads\n");
+    DBG_SPU("[SPU] spu_dma_to_spu: not implemented for managed threads\n");
     return -1;
 }
 
@@ -189,7 +190,7 @@ int spu_dma_from_spu(void *ea, uint32_t ls_offset, uint32_t size)
     (void)ls_offset;
     (void)ea;
     (void)size;
-    printf("[SPU] spu_dma_from_spu: not implemented for managed threads\n");
+    DBG_SPU("[SPU] spu_dma_from_spu: not implemented for managed threads\n");
     return -1;
 }
 
@@ -229,7 +230,7 @@ void spu_manager_shutdown(void)
 {
     if (!g_spu_mgr.initialized) return;
 
-    printf("[SPU] Shutting down...\n");
+    DBG_SPU("[SPU] Shutting down...\n");
 
     /* Send stop command */
     spu_send_command(SPU_CMD_STOP, 0);
@@ -237,7 +238,7 @@ void spu_manager_shutdown(void)
     /* Wait for thread group to finish */
     u32 cause, status;
     sysSpuThreadGroupJoin(g_spu_mgr.group, &cause, &status);
-    printf("[SPU] Thread group joined (cause=%d status=%d)\n", cause, status);
+    DBG_SPU("[SPU] Thread group joined (cause=%d status=%d)\n", cause, status);
 
     /* Cleanup */
     sysSpuThreadDisconnectEvent(g_spu_mgr.thread, SPU_THREAD_EVENT_USER, SPU_EVENT_PORT);
@@ -246,5 +247,5 @@ void spu_manager_shutdown(void)
     sysEventQueueDestroy(g_spu_mgr.event_queue, 0);
 
     g_spu_mgr.initialized = 0;
-    printf("[SPU] Shutdown complete\n");
+    DBG_SPU("[SPU] Shutdown complete\n");
 }

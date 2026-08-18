@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 
 #include "tf.h"
 
@@ -102,6 +103,6 @@ Color32 TF::filter(Color32 nearestTexels[4], float nearestTexelsDistance[4])
 	return filtered;
      }
    else
-     printf("TF:textureFilter=%x\n", textureFilter);
+     DBG_GFX("TF:textureFilter=%x\n", textureFilter);
    return 0;
 }

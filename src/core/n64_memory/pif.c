@@ -43,6 +43,7 @@
 #include "../../main/rom.h"
 #include "../../ui/fileBrowser/fileBrowser.h"
 #include "Saves.h"
+#include "../../debug.h"
 
 static unsigned char eeprom[0x800] __attribute__((aligned(32)));
 static unsigned char mempack[4][0x8000] __attribute__((aligned(32)));
@@ -105,7 +106,7 @@ void print_pif()
    int i;
    for (i=0; i<(64/8); i++)
      printf("%x %x %x %x | %x %x %x %x\n",
-	    PIF_RAMb[i*8+0], PIF_RAMb[i*8+1],PIF_RAMb[i*8+2], PIF_RAMb[i*8+3],
+		      PIF_RAMb[i*8+0], PIF_RAMb[i*8+1],PIF_RAMb[i*8+2], PIF_RAMb[i*8+3],
 	    PIF_RAMb[i*8+4], PIF_RAMb[i*8+5],PIF_RAMb[i*8+6], PIF_RAMb[i*8+7]);
    getchar();
 }
@@ -397,7 +398,7 @@ void update_pif_write()
 	       }
 /*	     printf("unknown pif2 code:\n");
 	     for (i=(64-2*8)/8; i<(64/8); i++)
-	       printf("%x %x %x %x | %x %x %x %x\n",
+     DBG_LOG("%x %x %x %x | %x %x %x %x\n",
 		      PIF_RAMb[i*8+0], PIF_RAMb[i*8+1],PIF_RAMb[i*8+2], PIF_RAMb[i*8+3],
 		      PIF_RAMb[i*8+4], PIF_RAMb[i*8+5],PIF_RAMb[i*8+6], PIF_RAMb[i*8+7]);
 */	     break;

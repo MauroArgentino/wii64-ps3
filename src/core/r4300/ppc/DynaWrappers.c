@@ -34,8 +34,8 @@
 #include "../Recomp-Cache.h"
 #include "Recompile.h"
 #include "DynaWrappers.h"
+#include "../../../debug.h"
 
-extern void dbg_printf(const char *fmt,...);
 extern void RecompCache_Link(PowerPC_func* last_f, PowerPC_instr* branch, PowerPC_func* next_f, void* code);
 
 // Prototipos externos definidos en otros módulos
@@ -67,14 +67,14 @@ void dynarec(unsigned int address){
 		PowerPC_block* dst_block = blocks_get(address>>12);
 		u32 paddr = update_invalid_addr(address);
 
-		dbg_printf("trampolining to 0x%08x\n", address);
+		DBG_UDP("trampolining to 0x%08x\n", address);
 		if(!paddr){ 
 			address = paddr = update_invalid_addr(r4300.pc);
 			dst_block = blocks_get(address>>12); 
 		}
 		
 		if(!dst_block){
-			dbg_printf("block at %08x doesn't exist\n", address&~0xFFF);
+			DBG_UDP("block at %08x doesn't exist\n", address&~0xFFF);
 			dst_block = malloc(sizeof(PowerPC_block));
 			blocks_set(address>>12, dst_block);
 			//dst_block->code_addr     = NULL;
@@ -95,7 +95,7 @@ void dynarec(unsigned int address){
 		PowerPC_func* func = find_func(&dst_block->funcs, address);
 
 		if(!func || !func->code_addr[(address-func->start_addr)>>2]){
-			dbg_printf("code at %08x is not compiled\n", address);
+			DBG_UDP("code at %08x is not compiled\n", address);
 			if((paddr >= 0xb0000000 && paddr < 0xc0000000) ||
 			   (paddr >= 0x90000000 && paddr < 0xa0000000))
 				dst_block->mips_code =
@@ -120,7 +120,7 @@ void dynarec(unsigned int address){
 			RecompCache_Link(last_func, link_branch, func, code);
 		clear_freed_funcs();
 		
-		dbg_printf("calling dyna_run func %08X code %08X\n", func, code);
+		DBG_UDP("calling dyna_run func %08X code %08X\n", func, code);
 		r4300.pc = address = dyna_run(func, code);
 
 		if(!noCheckInterrupt){

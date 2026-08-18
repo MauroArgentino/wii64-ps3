@@ -38,14 +38,13 @@
 #include "../ui/fileBrowser/fileBrowser.h"
 #include "ROM-Cache.h"
 #include <ppu-types.h>
+#include "../debug.h"
 
 int rom_length;
 int ROM_byte_swap;
 rom_header* ROM_HEADER = NULL;
 rom_settings ROM_SETTINGS;
 static fileBrowser_file* rom_file;
-
-extern void dbg_printf(const char *fmt,...);
 
 int init_byte_swap(u32 magicWord){
 
@@ -202,7 +201,7 @@ int rom_read(fileBrowser_file* file){
 
   //Set VI limit based on ROM header
   InitTimer();
-	dbg_printf("Cargado: %s\r\n",&ROM_SETTINGS.goodname[0]);
+	DBG_UDP("Cargado: %s\r\n",&ROM_SETTINGS.goodname[0]);
    return ret;
 }
 

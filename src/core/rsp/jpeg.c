@@ -40,6 +40,7 @@
 #include <ppu-types.h>
 #include "Rsp_#1.1.h"
 #include "hle.h"
+#include "../../debug.h"
 
 static struct
 {

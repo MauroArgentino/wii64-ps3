@@ -25,6 +25,7 @@
 #include "texture_env.h"
 #include "../../main/game_hacks.h"
 #include <stdio.h>
+#include "../../debug.h"
 
 void Init_texture_env()
 {
@@ -245,7 +246,7 @@ void Set_texture_env( TexEnv *texEnv )
 					tFmt = (int)cache.current[0]->format; tSize = (int)cache.current[0]->size;
 					tPal = (int)cache.current[0]->palette; tMem = cache.current[0]->tMem;
 				}
-				printf("[TEXMODE] #%d mode=%d usesT0=%d usesT1=%d alphaMode=%.0f texDummy=%d addr=0x%08X fmt=%d size=%d pal=%d tmem=0x%03X %dx%d\n",
+				DBG_TEX("[TEXMODE] #%d mode=%d usesT0=%d usesT1=%d alphaMode=%.0f texDummy=%d addr=0x%08X fmt=%d size=%d pal=%d tmem=0x%03X %dx%d\n",
 					logCount, curMode, (int)combiner.usesT0, (int)combiner.usesT1,
 					(double)OGL.shader_alpha_mode,
 					(cache.current[0] && cache.current[0]->rsxTextureBuffer) ? 0 : 1,

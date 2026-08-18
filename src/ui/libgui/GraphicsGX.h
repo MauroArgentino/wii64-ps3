@@ -48,6 +48,7 @@ public:
 	void setColor(GXColor* color);
 	void drawRect(int x, int y, int width, int height);
 	void fillRect(int x, int y, int width, int height);
+	void fillRoundedRect(int x, int y, int width, int height, int radius, int segments);
 	void drawImage(int textureId, int x, int y, int width, int height, float s1, float s2, float t1, float t2);
 	void drawLine(int x1, int y1, int x2, int y2);
 	void drawCircle(int x, int y, int radius, int numSegments);

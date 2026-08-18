@@ -30,6 +30,7 @@
 */
 
 #include "../../main/winlnxdefs.h"
+#include "../../debug.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -92,7 +93,6 @@ static unsigned int drain_level = 0; // bytes to drain in threaded mode
 static unsigned int freq;
 static unsigned int real_freq;
 static float freq_ratio;
-extern void dbg_printf(const char *fmt,...);
 extern unsigned int usleep(unsigned int us);
 // Buffer sizes must be multiples of (AUDIO_BLOCK_SAMPLES * 4 = 1024) so that
 // play_buffer() drains every byte with no remainder.  Non-aligned sizes cause
@@ -155,7 +155,7 @@ AiDacrateChanged( int SystemType )
 	real_freq = 48000;
 	freq_ratio = (float)freq / (float)real_freq;
 
-	dbg_printf("Initializing frequency: %d (N64 freq %d, resampling ratio %f)\r\n", real_freq, freq, freq_ratio);
+	DBG_UDP("Initializing frequency: %d (N64 freq %d, resampling ratio %f)\r\n", real_freq, freq, freq_ratio);
 	buffer_size = (SystemType != SYSTEM_PAL) ?
 	               BUFFER_SIZE_48_60 : BUFFER_SIZE_48_50;
 }
@@ -255,9 +255,9 @@ s32 playOneBlock()
 #ifdef THREADED_AUDIO
 static void play_buffer(void);
 static void audio_thread_entry(void *arg){
-	printf("[AUDIO] Thread started\n");
+	DBG_AUD("[AUDIO] Thread started\n");
 	play_buffer();
-	printf("[AUDIO] Thread exiting\n");
+	DBG_AUD("[AUDIO] Thread exiting\n");
 	sysThreadExit(NULL);
 }
 #endif
@@ -308,7 +308,7 @@ static void play_buffer(void){
 		read_pos = 0;
 		sem_post(buffer_empty);
 	}
-	printf("[AUDIO] Thread leaving loop\n");
+	DBG_AUD("[AUDIO] Thread leaving loop\n");
 #endif
 }
 
@@ -483,7 +483,7 @@ InitiateAudio( AUDIO_INFO Audio_Info )
 	static int audio_initialized = 0;
 	if (!audio_initialized) {
 		s32 ret = audioInit();
-		dbg_printf("audioInit: %08x\n",ret);
+		DBG_UDP("audioInit: %08x\n",ret);
 		audio_initialized = 1;
 	}
 
@@ -492,34 +492,34 @@ InitiateAudio( AUDIO_INFO Audio_Info )
 	params.attrib = 0x1000;
 	params.level = 1.0f;
 	s32 ret = audioPortOpen(&params,&portNum);
-	dbg_printf("audioPortOpen: %08x\n",ret);
-	dbg_printf("      portNum: %d\n",portNum);
+	DBG_UDP("audioPortOpen: %08x\n",ret);
+	DBG_UDP("      portNum: %d\n",portNum);
 
 	ret = audioGetPortConfig(portNum,&config);
-	dbg_printf("audioGetPortConfig: %08x\n",ret);
-	dbg_printf("config.readIndex: %08x\n",config.readIndex);
-	dbg_printf("config.status: %d\n",config.status);
-	dbg_printf("config.channelCount: %ld\n",config.channelCount);
-	dbg_printf("config.numBlocks: %ld\n",config.numBlocks);
-	dbg_printf("config.portSize: %d\n",config.portSize);
-	dbg_printf("config.audioDataStart: %08x\n",config.audioDataStart);
+	DBG_UDP("audioGetPortConfig: %08x\n",ret);
+	DBG_UDP("config.readIndex: %08x\n",config.readIndex);
+	DBG_UDP("config.status: %d\n",config.status);
+	DBG_UDP("config.channelCount: %ld\n",config.channelCount);
+	DBG_UDP("config.numBlocks: %ld\n",config.numBlocks);
+	DBG_UDP("config.portSize: %d\n",config.portSize);
+	DBG_UDP("config.audioDataStart: %08x\n",config.audioDataStart);
 
 	// Debug log: port geometry
-	printf("[ADEBUG] PORT: numBlocks=%ld blockSamples=%d blockSize=%ld totalBytes=%d ch=%ld dataStart=%08x\n",
+	DBG_AUD("[ADEBUG] PORT: numBlocks=%ld blockSamples=%d blockSize=%ld totalBytes=%d ch=%ld dataStart=%08x\n",
 		config.numBlocks, AUDIO_BLOCK_SAMPLES,
 		(long)(config.channelCount * AUDIO_BLOCK_SAMPLES * sizeof(f32)),
 		config.portSize, config.channelCount, config.audioDataStart);
 
 	ret = audioCreateNotifyEventQueue(&snd_queue,&snd_key);
-	dbg_printf("audioCreateNotifyEventQueue: %08x\n",ret);
-	dbg_printf("snd_queue: %16lx\n",(long unsigned int)snd_queue);
-	dbg_printf("snd_key: %16lx\n",snd_key);
+	DBG_UDP("audioCreateNotifyEventQueue: %08x\n",ret);
+	DBG_UDP("snd_queue: %16lx\n",(long unsigned int)snd_queue);
+	DBG_UDP("snd_key: %16lx\n",snd_key);
 
 	ret = audioSetNotifyEventQueue(snd_key);
-	dbg_printf("audioSetNotifyEventQueue: %08x\n",ret);
+	DBG_UDP("audioSetNotifyEventQueue: %08x\n",ret);
 
 	ret = sysEventQueueDrain(snd_queue);
-	dbg_printf("sysEventQueueDrain: %08x\n",ret);
+	DBG_UDP("sysEventQueueDrain: %08x\n",ret);
 
 	ATLOG("InitiateAudio: freq=%u real_freq=%u ratio=%.3f", freq, real_freq, freq_ratio);
 	return TRUE;
@@ -531,9 +531,9 @@ EXPORT void CALL RomOpen()
 	sem_init(&buffer_full, 0, NUM_BUFFERS);
 	sem_init(&buffer_empty, NUM_BUFFERS, NUM_BUFFERS);
 	thread_running = 1;
-	printf("[AUDIO] RomOpen: creating audio thread\n");
+	DBG_AUD("[AUDIO] RomOpen: creating audio thread\n");
 	int ret = sysThreadCreate(&audio_thread, audio_thread_entry, NULL, AUDIO_PRIORITY, AUDIO_STACK_SIZE, THREAD_JOINABLE, "audio");
-	printf("[AUDIO] sysThreadCreate returned %d\n", ret);
+	DBG_AUD("[AUDIO] sysThreadCreate returned %d\n", ret);
 	thread_buffer = which_buffer = 0;
 	read_pos = 0;
 	drain_level = 0;
@@ -563,7 +563,7 @@ RomClosed( void )
 	drain_level = 0;
 
 	int ret = audioPortStop(portNum);
-	dbg_printf("audioPortStop: %08x\n",ret);
+	DBG_UDP("audioPortStop: %08x\n",ret);
 
 	// Remove event queue before closing port
 	audioRemoveNotifyEventQueue(snd_key);
@@ -571,7 +571,7 @@ RomClosed( void )
 
 	// Close the audio port to free the handle
 	ret = audioPortClose(portNum);
-	dbg_printf("audioPortClose: %08x\n",ret);
+	DBG_UDP("audioPortClose: %08x\n",ret);
 }
 
 EXPORT void CALL
@@ -584,7 +584,7 @@ void pauseAudio(void){
 	audio_paused = 1;
 #endif
 	int ret = audioPortStop(portNum);
-	dbg_printf("audioPortStop: %08x\n",ret);
+	DBG_UDP("audioPortStop: %08x\n",ret);
 }
 
 void resumeAudio(void){

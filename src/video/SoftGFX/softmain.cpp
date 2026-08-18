@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include "../../../debug.h"
 
 #include "SoftGFXPlugin.h"
 #include "../../main/winlnxdefs.h"

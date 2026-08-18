@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "../debug.h"
 
 /* Internal manager structure */
 struct GameHackManager {
@@ -180,7 +181,7 @@ int GameHackManager_LoadForROM(GameHackManager *mgr, const char *rom_id_4) {
             strncpy(mgr->current_rom_id, rom_id_4, 4);
             mgr->current_rom_id[4] = '\0';
         }
-        printf("[GameHackManager] Loaded hacks for ROM: %.4s\n", rom_id_4 ? rom_id_4 : "????");
+        DBG_LOG("[GameHackManager] Loaded hacks for ROM: %.4s\n", rom_id_4 ? rom_id_4 : "????");
     } else {
         /* Safe defaults */
         GameHacks def = {
@@ -201,7 +202,7 @@ int GameHackManager_LoadForROM(GameHackManager *mgr, const char *rom_id_4) {
             strncpy(mgr->current_rom_id, rom_id_4, 4);
             mgr->current_rom_id[4] = '\0';
         }
-        printf("[GameHackManager] Using default hacks for ROM: %.4s\n", rom_id_4 ? rom_id_4 : "????");
+        DBG_LOG("[GameHackManager] Using default hacks for ROM: %.4s\n", rom_id_4 ? rom_id_4 : "????");
     }
     return 0;
 }
@@ -222,7 +223,7 @@ int GameHackManager_LoadForCRC(GameHackManager *mgr, u32 crc1) {
 
     const GameCompatEntry *entry = Compat_Lookup(crc1);
     if (!entry || !entry->rom_id) {
-        printf("[GameHackManager] CRC 0x%08X not in compat DB\n", crc1);
+        DBG_LOG("[GameHackManager] CRC 0x%08X not in compat DB\n", crc1);
         return GameHackManager_LoadForROM(mgr, "????");
     }
 

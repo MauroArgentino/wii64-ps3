@@ -34,7 +34,7 @@
 //#include "../gui/DEBUG.h"
 //#include "../gui/GUI.h"
 #include "ROM-Cache.h"
-extern void dbg_printf(const char *fmt,...);
+#include "../debug.h"
 #define MAX_ROM_SIZE 64*1024*1024
 #define LOAD_SIZE   (32*1024)
 
@@ -73,13 +73,13 @@ fileBrowser_file *ROMFile;
 
 void ROMCache_init(fileBrowser_file* f){
 	if(!rom) {
-		dbg_printf("Allocating 0x%08X bytes for rom\r\n",MAX_ROM_SIZE);
+		DBG_UDP("Allocating 0x%08X bytes for rom\r\n",MAX_ROM_SIZE);
 		rom = malloc(MAX_ROM_SIZE);
 		if(rom) {
-			dbg_printf("Successfully allocated 0x%08X bytes for rom\r\n",MAX_ROM_SIZE);
+			DBG_UDP("Successfully allocated 0x%08X bytes for rom\r\n",MAX_ROM_SIZE);
 		}
 		else {
-			dbg_printf("Failed to allocate 0x%08X bytes for rom\r\n",MAX_ROM_SIZE);
+			DBG_UDP("Failed to allocate 0x%08X bytes for rom\r\n",MAX_ROM_SIZE);
 		}
 	}
 	readBefore = 0; //de-init byteswapping
@@ -100,7 +100,7 @@ void ROMCache_read(u8* dest, u32 offset, u32 length){
 }
 
 int ROMCache_load(fileBrowser_file* f){
-	dbg_printf("Loading ROM %s into RAM fully\r\n",f->name);
+	DBG_UDP("Loading ROM %s into RAM fully\r\n",f->name);
 	char txt[128];
 	sprintf(txt, "Loading ROM fully into RAM");
 

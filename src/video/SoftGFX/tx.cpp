@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 #include <math.h>
 
 #include "tx.h"
@@ -96,7 +97,7 @@ void TX::setTile(int f, int s, int l, int t, int tile, int p,
 	     unpackTexel[tile] = &TX::unpack_RGBA16;
 	     break;
 	   default:
-	     printf("TX:unknown setTile RGBA size : %d\n", descriptor[tile].size);
+	     DBG_GFX("TX:unknown setTile RGBA size : %d\n", descriptor[tile].size);
 	  }
 	break;
       case 2: // CI
@@ -106,10 +107,10 @@ void TX::setTile(int f, int s, int l, int t, int tile, int p,
 	     if (textureLUT == 2)
 	       unpackTexel[tile] = &TX::unpack_CI8_RGBA16;
 	     else
-	       printf("TX:unknoqn setTile CI8 LUT format:%d\n", textureLUT);
+	       DBG_GFX("TX:unknoqn setTile CI8 LUT format:%d\n", textureLUT);
 	     break;
 	   default:
-	     printf("TX:unknown setTile CI size : %d\n", descriptor[tile].size);
+	     DBG_GFX("TX:unknown setTile CI size : %d\n", descriptor[tile].size);
 	  }
 	break;
       case 3: // IA
@@ -125,24 +126,24 @@ void TX::setTile(int f, int s, int l, int t, int tile, int p,
 	     unpackTexel[tile] = &TX::unpack_IA16;
 	     break;
 	   default:
-	     printf("TX:unknown setTile IA size : %d\n", descriptor[tile].size);
+	     DBG_GFX("TX:unknown setTile IA size : %d\n", descriptor[tile].size);
 	  }
 	break;
       default:
-	printf("TX:unknown setTile format : %d\n", descriptor[tile].format);
+	DBG_GFX("TX:unknown setTile format : %d\n", descriptor[tile].format);
      }
 }
 
 void TX::loadBlock(float uls, float ult, int tile, float lrs, int dxt)
 {
-   if ((int)uls != 0 || (int)ult != 0) printf("tx:unknown loadBlock\n");
+   if ((int)uls != 0 || (int)ult != 0) DBG_GFX("tx:unknown loadBlock\n");
    for (int i=0; i<((int)lrs+1)*8; i++)
      tmem[descriptor[tile].tmem*8+i] = ((unsigned char*)tImg)[i];
 }
 
 void TX::loadTile(int tile, float uls, float ult, float lrs, float lrt)
 {
-   if (!size) printf("loadtile tries to load a 4 bit texture\n");
+   if (!size) DBG_GFX("loadtile tries to load a 4 bit texture\n");
    for (int i=(int)ult; i<=(int)lrt; i++)
 	{
 	   for (int j=(int)uls*size; j<=(int)lrs*size; j++)
@@ -221,10 +222,10 @@ Color32 TX::unpack_IA4(int tile, int s, int t)
 bool TX::translateCoordinates(int &s, int &t, int tile)
 {
    if (textureLOD || textureDetail)
-     printf("TX:getTexel:textureLUT=%d,textureLOD=%d,textureDetail=%d\n",
+     DBG_GFX("TX:getTexel:textureLUT=%d,textureLOD=%d,textureDetail=%d\n",
 	    textureLUT, textureLOD, textureDetail);
    if (descriptor[tile].shifts || descriptor[tile].shiftt)
-     printf("tx:getTexel:shifts=%d,shiftt=%d\n",
+     DBG_GFX("tx:getTexel:shifts=%d,shiftt=%d\n",
 	    descriptor[tile].shifts, descriptor[tile].shiftt);
    
    int w = (int)(descriptor[tile].lrs) - (int)(descriptor[tile].uls);
@@ -261,7 +262,7 @@ bool TX::translateCoordinates(int &s, int &t, int tile)
 Color32 TX::getTexel(float _s, float _t, int tile, TF* tf)
 {
    if (tf && tf->getTextureConvert() != 6)
-     printf("TX:textureConvert=%x\n", tf->getTextureConvert());
+     DBG_GFX("TX:textureConvert=%x\n", tf->getTextureConvert());
    float s = _s - descriptor[tile].uls;
    float t = _t - descriptor[tile].ult;
    

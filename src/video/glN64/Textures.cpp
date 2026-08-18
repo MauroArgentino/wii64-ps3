@@ -19,6 +19,7 @@
 
 #include "Debug.h"
 #include <stdio.h>
+#include "../../debug.h"
 #include "../../main/GameHackManager.h"
 extern GameHackManager *g_game_hack_mgr;
 
@@ -803,7 +804,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	#ifdef DEBUG
 	// DEBUG: Log texture format for invisible faces investigation
 	if (texDebugCount < 50) {
-		printf("TEX: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d\n",
+		DBG_TEX("TEX: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d\n",
 			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
 			texInfo->realWidth, texInfo->realHeight);
 		texDebugCount++;
@@ -1077,24 +1078,47 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 #endif // __GX__
 
 #ifdef PS3
-	//TODO: Implement 2xSaI
-	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
-	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
+	// 2xSaI texture scaling for PS3 RSX
+	// Byte-swap: texel functions produce 0xRRGGBBAA, RSX expects 0xAARRGGBB
 	// RSX linear textures require pitch aligned to 128 bytes.
-	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
-	u32 rsxBytes = rsxPitch * texInfo->realHeight;
+	// PS3 forces RGBA8 (32-bit) for all formats, so Interpolator8888 is always correct.
+
+	u32 uploadWidth = texInfo->realWidth;
+	u32 uploadHeight = texInfo->realHeight;
+	u32 *srcForUpload = dest;
+
+	if (cache.enable2xSaI)
+	{
+		Interpolator8888 interpolator;
+		u32 scaledW = texInfo->realWidth << 1;
+		u32 scaledH = texInfo->realHeight << 1;
+		u32 *scaledDest = (u32*)malloc(scaledW * scaledH * 4);
+		if (scaledDest)
+		{
+			_2xSaI(dest, scaledDest, texInfo->realWidth, texInfo->realHeight,
+			        texInfo->clampS, texInfo->clampT, &interpolator);
+			srcForUpload = scaledDest;
+			uploadWidth = scaledW;
+			uploadHeight = scaledH;
+			free(dest);
+			dest = scaledDest;
+		}
+	}
+
+	u32 rsxPitch = (uploadWidth * 4 + 127) & ~127u;
+	u32 rsxBytes = rsxPitch * uploadHeight;
 	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
 	if (texInfo->rsxTextureBuffer)
 	{
 		memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
 		{
-			u32 *src32 = dest;
+			u32 *src32 = srcForUpload;
 			u32 *dst32 = texInfo->rsxTextureBuffer;
-			for (u32 row = 0; row < texInfo->realHeight; row++)
+			for (u32 row = 0; row < uploadHeight; row++)
 			{
-				u32 *srcRow = src32 + row * texInfo->realWidth;
+				u32 *srcRow = src32 + row * uploadWidth;
 				u8 *dstRow = (u8*)dst32 + row * rsxPitch;
-				for (u32 col = 0; col < texInfo->realWidth; col++)
+				for (u32 col = 0; col < uploadWidth; col++)
 				{
 					u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
 					((u32*)dstRow)[col] = swapped;
@@ -1115,8 +1139,8 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
 								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
 								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-		texInfo->rsxTex.width		= texInfo->realWidth;
-		texInfo->rsxTex.height		= texInfo->realHeight;
+		texInfo->rsxTex.width		= uploadWidth;
+		texInfo->rsxTex.height		= uploadHeight;
 		texInfo->rsxTex.depth		= 1;
 		texInfo->rsxTex.location	= GCM_LOCATION_RSX;
 		texInfo->rsxTex.pitch		= rsxPitch;
@@ -1124,10 +1148,9 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
 	else
 	{
-		printf("[TEX] RSX OOM: failed to allocate %d bytes for background texture (w=%d h=%d)\n",
-			rsxBytes, texInfo->realWidth, texInfo->realHeight);
+		DBG_TEX("[TEX] RSX OOM: failed to allocate %d bytes for background texture (w=%d h=%d)\n",
+			rsxBytes, uploadWidth, uploadHeight);
 	}
-	free( swapped );
 	free( dest );
 #elif defined(__GX__)
 	//2xSaI textures will not be implemented for now.
@@ -1225,13 +1248,13 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 
 		if (GetTexel == GetNone) {
 			/* CRITICAL: This texture format is not handled - will render as black */
-			printf("[TEX] UNHANDLED: fmt=%s size=%s lut=%d tmem=0x%03X pal=%d w=%d h=%d line=%d\n",
+			DBG_TEX("[TEX] UNHANDLED: fmt=%s size=%s lut=%d tmem=0x%03X pal=%d w=%d h=%d line=%d\n",
 				fmtName, szName, gDP.otherMode.textureLUT,
 				texInfo->tMem, texInfo->palette,
 				texInfo->realWidth, texInfo->realHeight, texInfo->line);
 		}
 		else if (texLogCount < 100) {
-			printf("[TEX] load #%d: fmt=%s size=%s lut=%d tmem=0x%03X pal=%d w=%d h=%d line=%d addr=0x%08X\n",
+			DBG_TEX("[TEX] load #%d: fmt=%s size=%s lut=%d tmem=0x%03X pal=%d w=%d h=%d line=%d addr=0x%08X\n",
 				texLogCount, fmtName, szName, gDP.otherMode.textureLUT,
 				texInfo->tMem, texInfo->palette,
 				texInfo->realWidth, texInfo->realHeight, texInfo->line,
@@ -1287,7 +1310,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 #endif // PS3
 	dest = (u32*)malloc( texInfo->textureBytes );
 	if (!dest) {
-		printf("[TEX] Out of memory: failed to allocate %d bytes for texture dest\n", texInfo->textureBytes);
+		DBG_TEX("[TEX] Out of memory: failed to allocate %d bytes for texture dest\n", texInfo->textureBytes);
 		texInfo->rsxTextureBuffer = NULL;
 		return;
 	}
@@ -1643,24 +1666,47 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 #endif // !__GX__
 
 #ifdef PS3
-	//TODO: Implement 2xSaI
-	// Byte-swap each texel: big-endian texel functions produce 0xRRGGBBAA,
-	// but RSX A8R8G8B8 expects 0xAARRGGBB. Right-rotate each u32 by 8 bits.
+	// 2xSaI texture scaling for PS3 RSX
+	// Byte-swap: texel functions produce 0xRRGGBBAA, RSX expects 0xAARRGGBB
 	// RSX linear textures require pitch aligned to 128 bytes.
-	u32 rsxPitch = (texInfo->realWidth * 4 + 127) & ~127u;
-	u32 rsxBytes = rsxPitch * texInfo->realHeight;
+	// PS3 forces RGBA8 (32-bit) for all formats, so Interpolator8888 is always correct.
+
+	u32 uploadWidth = texInfo->realWidth;
+	u32 uploadHeight = texInfo->realHeight;
+	u32 *srcForUpload = dest;
+
+	if (cache.enable2xSaI)
+	{
+		Interpolator8888 interpolator;
+		u32 scaledW = texInfo->realWidth << 1;
+		u32 scaledH = texInfo->realHeight << 1;
+		u32 *scaledDest = (u32*)malloc(scaledW * scaledH * 4);
+		if (scaledDest)
+		{
+			_2xSaI(dest, scaledDest, texInfo->realWidth, texInfo->realHeight,
+			        texInfo->clampS, texInfo->clampT, &interpolator);
+			srcForUpload = scaledDest;
+			uploadWidth = scaledW;
+			uploadHeight = scaledH;
+			free(dest);
+			dest = scaledDest;
+		}
+	}
+
+	u32 rsxPitch = (uploadWidth * 4 + 127) & ~127u;
+	u32 rsxBytes = rsxPitch * uploadHeight;
 	texInfo->rsxTextureBuffer = (u32*)rsxMemalign(128, rsxBytes);
 	if (texInfo->rsxTextureBuffer)
 	{
 		memset(texInfo->rsxTextureBuffer, 0, rsxBytes);
 		{
-			u32 *src32 = dest;
+			u32 *src32 = srcForUpload;
 			u32 *dst32 = texInfo->rsxTextureBuffer;
-			for (u32 row = 0; row < texInfo->realHeight; row++)
+			for (u32 row = 0; row < uploadHeight; row++)
 			{
-				u32 *srcRow = src32 + row * texInfo->realWidth;
+				u32 *srcRow = src32 + row * uploadWidth;
 				u8 *dstRow = (u8*)dst32 + row * rsxPitch;
-				for (u32 col = 0; col < texInfo->realWidth; col++)
+				for (u32 col = 0; col < uploadWidth; col++)
 				{
 					u32 swapped = (srcRow[col] >> 8) | (srcRow[col] << 24);
 					((u32*)dstRow)[col] = swapped;
@@ -1681,8 +1727,8 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 								   (GCM_TEXTURE_REMAP_COLOR_G << GCM_TEXTURE_REMAP_COLOR_G_SHIFT) |
 								   (GCM_TEXTURE_REMAP_COLOR_R << GCM_TEXTURE_REMAP_COLOR_R_SHIFT) |
 								   (GCM_TEXTURE_REMAP_COLOR_A << GCM_TEXTURE_REMAP_COLOR_A_SHIFT));
-		texInfo->rsxTex.width		= texInfo->realWidth;
-		texInfo->rsxTex.height		= texInfo->realHeight;
+		texInfo->rsxTex.width		= uploadWidth;
+		texInfo->rsxTex.height		= uploadHeight;
 		texInfo->rsxTex.depth		= 1;
 		texInfo->rsxTex.location	= GCM_LOCATION_RSX;
 		texInfo->rsxTex.pitch		= rsxPitch;
@@ -1690,8 +1736,8 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	}
 	else
 	{
-		printf("[TEX] RSX OOM: failed to allocate %d bytes for texture (w=%d h=%d)\n",
-			rsxBytes, texInfo->realWidth, texInfo->realHeight);
+		DBG_TEX("[TEX] RSX OOM: failed to allocate %d bytes for texture (w=%d h=%d)\n",
+			rsxBytes, uploadWidth, uploadHeight);
 	}
 	free( dest );
 
@@ -1717,7 +1763,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 				else       t3 = texInfo->rsxTextureBuffer[(h - 1) * (pitch >> 2)];
 				tb = texInfo->rsxTextureBuffer[(h - 1) * (pitch >> 2)];
 			}
-			printf("[TEXLOAD] #%u fmt=%d size=%d lut=%d pal=%d tmem=0x%03X w=%d h=%d addr=0x%08X off=0x%X pitch=%d texel[tl=%08X tr=%08X mid=%08X bl=%08X br=%08X %08X]\n",
+			DBG_TEX("[TEXLOAD] #%u fmt=%d size=%d lut=%d pal=%d tmem=0x%03X w=%d h=%d addr=0x%08X off=0x%X pitch=%d texel[tl=%08X tr=%08X mid=%08X bl=%08X br=%08X %08X]\n",
 				texLoadCount, texInfo->format, texInfo->size, gDP.otherMode.textureLUT,
 				texInfo->palette, texInfo->tMem, texInfo->realWidth, texInfo->realHeight,
 				texInfo->address, texInfo->rsxTextureOffset, texInfo->rsxTex.pitch,
@@ -1729,7 +1775,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	#ifdef DEBUG
 	// DEBUG: Log texture info for Kirby 64 debugging
 	if (texDebugCount < 20) {
-		printf("TEX_DBG: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d rsxW=%d rsxH=%d pitch=%d offset=0x%x\n",
+		DBG_TEX("TEX_DBG: fmt=%d size=%d lut=%d GetTexel=%p w=%d h=%d rsxW=%d rsxH=%d pitch=%d offset=0x%x\n",
 			texInfo->format, texInfo->size, gDP.otherMode.textureLUT, GetTexel,
 			texInfo->realWidth, texInfo->realHeight,
 			texInfo->rsxTex.width, texInfo->rsxTex.height,

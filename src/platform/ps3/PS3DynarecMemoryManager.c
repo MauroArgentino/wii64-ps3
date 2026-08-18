@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ppu-asm.h>
 #include <stdio.h>
+#include "../../debug.h"
 
 // Reservamos 16MB para el cache de código generado por el DynaREC
 // Debe coincidir con RECOMP_CACHE_SIZE en Recomp-Cache.h
@@ -21,7 +22,7 @@ __attribute__((visibility("default"))) int init_dynarec_memory() {
         return 0;
     }
     
-    printf("[DYNAREC] Code cache allocated at %p, size=%d (0x%x)\n", 
+    DBG_LOG("[DYNAREC] Code cache allocated at %p, size=%d (0x%x)\n", 
            s_code_cache, DYNAREC_CACHE_SIZE, DYNAREC_CACHE_SIZE);
 
     memset(s_code_cache, 0, DYNAREC_CACHE_SIZE);
@@ -35,8 +36,8 @@ __attribute__((visibility("default"))) int init_dynarec_memory() {
     }
     *test_ptr = 0;
     
-    printf("[DYNAREC] Memory write test passed\n");
-    printf("[DYNAREC] To verify execution, test a small PPC snippet after flush\n");
+    DBG_LOG("[DYNAREC] Memory write test passed\n");
+    DBG_LOG("[DYNAREC] To verify execution, test a small PPC snippet after flush\n");
     
     return 1;
 }
@@ -67,7 +68,7 @@ __attribute__((visibility("default"))) void* get_code_cache_ptr() {
 
 __attribute__((visibility("default"))) void deinit_dynarec_memory() {
     if (s_code_cache) {
-        printf("[DYNAREC] Freeing code cache at %p\n", s_code_cache);
+        DBG_LOG("[DYNAREC] Freeing code cache at %p\n", s_code_cache);
         free(s_code_cache);
         s_code_cache = NULL;
     }

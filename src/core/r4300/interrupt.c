@@ -40,6 +40,7 @@
 #include "../../main/guifuncs.h"
 #include "../../main/savestates.h"
 #include "../n64_memory/memory.h"
+#include "../../debug.h"
 #include <ppu-types.h>
 
 static int SPECIAL_done = 0;
@@ -59,13 +60,13 @@ void clear_queue()
 void print_queue()
 {
   interrupt_queue *aux;
-  printf("------------------ %x\n", (unsigned int)Count);
+  DBG_LOG("------------------ %x\n", (unsigned int)Count);
   aux = q;
   while (aux != NULL) {
-    printf("Count:%x, %x\n", (unsigned int)aux->count, aux->type);
+    DBG_LOG("Count:%x, %x\n", (unsigned int)aux->count, aux->type);
     aux = aux->next;
   }
-  printf("------------------\n");
+  DBG_LOG("------------------\n");
 }
 
 int before_event(u32 evt1, u32 evt2, int type2)
@@ -327,12 +328,12 @@ int chk_status(int chk) {
 void dbg_dump_queue(void)
 {
    interrupt_queue *aux = q;
-   printf("[QUEUE]");
+   DBG_LOG("[QUEUE]");
    while (aux != NULL) {
-      printf(" (%d,%08X)", aux->type, (unsigned int)aux->count);
+      DBG_LOG(" (%d,%08X)", aux->type, (unsigned int)aux->count);
       aux = aux->next;
    }
-   printf(" Count=%08X next_vi=%08X\n", (unsigned int)Count, (unsigned int)next_vi);
+   DBG_LOG(" Count=%08X next_vi=%08X\n", (unsigned int)Count, (unsigned int)next_vi);
 }
 
 void gen_interrupt()

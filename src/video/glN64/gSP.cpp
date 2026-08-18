@@ -18,6 +18,7 @@
 #include <math.h>
 #include "glN64.h"
 #include "Debug.h"
+#include "../../debug.h"
 #include "Types.h"
 #include "RSP.h"
 #include "GBI.h"
@@ -997,7 +998,7 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 	static u32 dbg_total = 0, dbg_culled = 0, dbg_nonclip = 0, dbg_direct = 0;
 	if (++dbg_total >= 3000)
 	{
-		printf("[TRI-DBG] total=%d culled=%d NoNclip=%d direct=%d NoN=%d\n", dbg_total, dbg_culled, dbg_nonclip, dbg_direct, GBI.current->NoN);
+		DBG_GFX("[TRI-DBG] total=%d culled=%d NoNclip=%d direct=%d NoN=%d\n", dbg_total, dbg_culled, dbg_nonclip, dbg_direct, GBI.current->NoN);
 		dbg_total = dbg_culled = dbg_nonclip = dbg_direct = 0;
 	}
 	if ((v0 < 80) && (v1 < 80) && (v2 < 80))

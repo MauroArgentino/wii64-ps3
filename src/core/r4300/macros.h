@@ -30,6 +30,8 @@
 #ifndef MACROS_H
 #define MACROS_H
 
+#include "../../debug.h"
+
 #define sign_extended(a) a = (long long)((s32)a)
 #define sign_extendedb(a) a |= (a&0x80) ? 0xFFFFFFFFFFFFFF00ULL : 0
 #define sign_extendedh(a) a |= (a&0x8000) ? 0xFFFFFFFFFFFF0000ULL : 0
@@ -66,7 +68,7 @@
 #define check_PC \
 if (PC->addr == actual->fin) \
 { \
-printf("changement de block\n"); \
+DBG_LOG("changement de block\n"); \
 stop=1; \
 }
 

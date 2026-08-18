@@ -11,6 +11,7 @@
 
 #include "rsxutil.h"
 #include "../main/wii64config.h"
+#include "../debug.h"
 
 #define GCM_LABEL_INDEX		255
 
@@ -308,7 +309,7 @@ void RSX_ApplyConfigResolution() {
     color_pitch = display_width * sizeof(u32);
     depth_pitch = display_width * sizeof(u32);
 
-    printf("[RSX] ApplyConfigResolution: vidResolution=%d -> %ux%u (pitch=%u)\n",
+    DBG_LOG("[RSX] ApplyConfigResolution: vidResolution=%d -> %ux%u (pitch=%u)\n",
            (int)vidResolution, w, h, color_pitch);
 
     color_buffer[0] = (u32*)rsxMemalign(64, display_height * color_pitch);

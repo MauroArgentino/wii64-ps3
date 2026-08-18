@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 #include <math.h>
 #include <ppu-types.h>
 
@@ -136,14 +137,14 @@ void RSP::DL()
 	currentCommand = (u32*)(gfxInfo.RDRAM + addr) - 2;
 	break;
       default:
-	printf("unknown DL: push=%x\n", push);
+	DBG_GFX("unknown DL: push=%x\n", push);
 	error = true;
      }
 }
 
 void RSP::NI()
 {
-   printf("NI:%x\n", (int)(*currentCommand>>24));
+   DBG_GFX("NI:%x\n", (int)(*currentCommand>>24));
    //if (!error) getchar();
    error = true;
 }
@@ -201,7 +202,7 @@ void RSP::MTX()
 	modelView = matrix;
 	break;
       default:
-	printf("RSP: unknown MTX:%d\n", op);
+	DBG_GFX("RSP: unknown MTX:%d\n", op);
 	error = true;
      }
    MP = modelView * projection;
@@ -265,7 +266,7 @@ void RSP::MOVEMEM()
 	  }
 	break;
       default:
-	printf("unknown MOVEMEM:%x\n", dest);
+	DBG_GFX("unknown MOVEMEM:%x\n", dest);
 	error=true;
      }
 }
@@ -353,9 +354,9 @@ void RSP::SPRITE2D()
    float lrx = ulx + SubImageWidth - 1;
    
    if (SourceImageBitSize == 0)
-     printf("RSP:SPRITE2D image type=%d bitsize=%d\n", SourceImageType, SourceImageBitSize);
+      DBG_GFX("RSP:SPRITE2D image type=%d bitsize=%d\n", SourceImageType, SourceImageBitSize);
    if (FlipTextureX || FlipTextureY)
-     printf("RSP:SPRITE2D flip\n");
+      DBG_GFX("RSP:SPRITE2D flip\n");
    
    if (SourceImageType == 2)
      {
@@ -431,7 +432,7 @@ void RSP::SETGEOMETRYMODE()
    if (mode & 0x1) zbuffer = true;
    
    if (mode & ~0x72205)
-     printf("unknown SETGEOMETRYMODE:%x\n", mode & ~0x72205);
+     DBG_GFX("unknown SETGEOMETRYMODE:%x\n", mode & ~0x72205);
    geometryMode = 
      zbuffer                  | 
      shade              << 2  |
@@ -502,7 +503,7 @@ void RSP::MOVEWORD()
 	fo = (short)(*(currentCommand+1) & 0xFFFF);
 	break;
       default:
-	printf("unknown MOVEWORD:%x\n", index);
+	DBG_GFX("unknown MOVEWORD:%x\n", index);
 	error=true;
      }
 }
@@ -511,7 +512,7 @@ void RSP::POPMTX()
 {
    int type = *(currentCommand+1) & 0xFF;
    
-   if (type != 0) printf("POPMTX on projection matrix\n");
+   if (type != 0) DBG_GFX("POPMTX on projection matrix\n");
    modelView.pop();
 }
 
@@ -974,7 +975,7 @@ void RSP::TRI1()
 	       rdp->tri_shade_zbuff(vx0, vx1, vx2, cache[a].c, cache[b].c, cache[i].c, z0, z1, z2);
 	     break;
 	   default:
-	     printf("RSP:tri1 unknown geometry mode:%x\n", geometryMode);
+	     DBG_GFX("RSP:tri1 unknown geometry mode:%x\n", geometryMode);
 	     //getchar();
 	     rdp->debug_tri(vx0, vx1, vx2);
 	  }

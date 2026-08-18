@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 #include <math.h>
 #include <malloc.h>
 
@@ -124,7 +125,7 @@ void VI::statusChanged()
       case 3:
 	if (bpp != 32)
 	  {
-	     printf("VI:32bits\n");
+	     DBG_GFX("VI:32bits\n");
 	     bpp =32;
 	  }
 	break;

@@ -30,6 +30,8 @@
 #ifndef COLOR_H
 #define COLOR_H
 
+#include "../../../debug.h"
+
 class Color16
 {
    float r;
@@ -289,7 +291,7 @@ class Color32
    
    void display()
      {
-	printf("color:%d, %d, %d, %d\n", (int)r, (int)g, (int)b, (int)a);
+	DBG_GFX("color:%d, %d, %d, %d\n", (int)r, (int)g, (int)b, (int)a);
      }
    
    operator int()

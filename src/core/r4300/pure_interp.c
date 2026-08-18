@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Mupen64 - pure_interp.c
  * Copyright (C) 2002 Hacktarux
  *
@@ -36,6 +36,7 @@
 #include "../../main/ROM-Cache.h"
 #include "macros.h"
 #include "interrupt.h"
+#include "../../debug.h"
 #include <ppu-types.h>
 
 #ifdef PPC_DYNAREC
@@ -69,7 +70,7 @@ extern u32 next_vi;
 
 static void NI()
 {
-   printf("NI:%x\n", (unsigned int)op);
+   DBG_LOG("NI:%x\n", (unsigned int)op);
    r4300.stop=1; 
 #ifdef DEBUGON
   _break();
@@ -465,7 +466,7 @@ static void TEQ()
 {
    if (rrs == rrt)
      {
-	printf("trap exception in teq\n");
+	DBG_LOG("trap exception in teq\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -939,7 +940,7 @@ static void MFC0()
    switch(PC->f.r.nrd)
      {
       case 1:
-	printf("lecture de Random\n");
+	DBG_LOG("lecture de Random\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -959,7 +960,7 @@ static void MTC0()
 	Index = rrt & 0x8000003F;
 	if ((Index & 0x3F) > 31)
 	  {
-	     printf ("il y a plus de 32 TLB\n");
+	     DBG_LOG("il y a plus de 32 TLB\n");
 	     r4300.stop=1;
 #ifdef DEBUGON
        _break();
@@ -1020,7 +1021,7 @@ static void MTC0()
       case 13:   // Cause
 	if (rrt!=0)
 	  {
-	     printf("�criture dans Cause\n");
+	     DBG_LOG("ecriture dans Cause\n");
 	     r4300.stop = 1;
 #ifdef DEBUGON
        _break();
@@ -1051,7 +1052,7 @@ static void MTC0()
 	TagHi =0;
 	break;
       default:
-	printf("unknown mtc0 write : %d\n", PC->f.r.nrd);
+	DBG_LOG("unknown mtc0 write : %d\n", PC->f.r.nrd);
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1418,7 +1419,7 @@ static void C_SF_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1432,7 +1433,7 @@ static void C_NGLE_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1446,7 +1447,7 @@ static void C_SEQ_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1462,7 +1463,7 @@ static void C_NGL_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1478,7 +1479,7 @@ static void C_LT_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1494,7 +1495,7 @@ static void C_NGE_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1510,7 +1511,7 @@ static void C_LE_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1526,7 +1527,7 @@ static void C_NGT_S()
 {
    if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1768,7 +1769,7 @@ static void C_SF_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1782,7 +1783,7 @@ static void C_NGLE_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1796,7 +1797,7 @@ static void C_SEQ_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1812,7 +1813,7 @@ static void C_NGL_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1828,7 +1829,7 @@ static void C_LT_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1844,7 +1845,7 @@ static void C_NGE_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1860,7 +1861,7 @@ static void C_LE_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1876,7 +1877,7 @@ static void C_NGT_D()
 {
    if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
      {
-	printf("Invalid operation exception in C opcode\n");
+	DBG_LOG("Invalid operation exception in C opcode\n");
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -3116,7 +3117,7 @@ if ((r4300.pc >= 0x80000000) && (r4300.pc < 0xc0000000))
 	  }
 	else
 	  {
-	     printf("execution &#65533; l'addresse :%x\n", (int)r4300.pc);
+	     DBG_LOG("execution a l'addresse :%x\n", (int)r4300.pc);
 	     r4300.stop=1;
 #ifdef DEBUGON
        _break();
@@ -3140,7 +3141,6 @@ if ((r4300.pc >= 0x80000000) && (r4300.pc < 0xc0000000))
 	r4300.pc = addr;
      }
 }
-extern void dbg_printf(const char *fmt,...);
 
 #ifdef PS3
 extern volatile int debug_pause_cpu_halt;

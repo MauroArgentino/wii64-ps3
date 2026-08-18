@@ -13,6 +13,8 @@ extern "C" {
 #include "hle.h"
 }
 
+#include "../../debug.h"
+
 extern u8 BufferSpace[0x10000];
 
 static void SPNOOP () {

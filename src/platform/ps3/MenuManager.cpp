@@ -10,6 +10,7 @@
 #include "../../ui/libgui/GuiResources.h"
 #include "../../ui/libgui/Image.h"        // Asumiendo que Image es genérico
 #include "../../ui/MenuElementStyle.h"    // Renombrado
+#include "../../debug.h"
 
 #ifndef GX_TEXMAP0
 #define GX_TEXMAP0 0
@@ -338,7 +339,7 @@ void ChannelButton::drawComponent(menu::Graphics& gfx) { // Renombrado
     // Dibujamos el marco de selección solo si no estamos en transición avanzada
     if (getFocus() && transitionProgress < 0.5f) {
         gfx.pushDepth(0.4f);
-        drawSelectionFrame(gfx, finalCX, finalCY, finalW, finalH); // Renombrado
+        drawSelectionFrame(gfx, finalCX, finalCY, finalW, finalH, drawColor);
         gfx.popDepth();
     }
 
@@ -359,7 +360,7 @@ void ChannelButton::drawComponent(menu::Graphics& gfx) { // Renombrado
 void MenuManager::executeAction(const std::string& id) { // Renombrado
     if (id == "EMPTY") return;
     
-    dbg_printf("Ejecutando acción: %s\n", id.c_str());
+    DBG_UDP("Ejecutando acción: %s\n", id.c_str());
     
     if (id == "LOAD_ROM") Func_LoadROM();
     else if (id == "SETTINGS") Func_Settings();

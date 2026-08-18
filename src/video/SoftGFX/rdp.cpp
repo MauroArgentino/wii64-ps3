@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 
 #include "rdp.h"
 
@@ -63,7 +64,7 @@ void RDP::setOtherMode_l(int mode, int data)
 	bl->setBlender(data<<3);
 	break;
       default:
-	printf("RDP: unknown setOtherMode_l:%d\n", mode);
+	DBG_GFX("RDP: unknown setOtherMode_l:%d\n", mode);
      }
 }
 
@@ -105,7 +106,7 @@ void RDP::setOtherMode_h(int mode, int data)
 	// ignoring pipeline mode
 	break;
       default:
-	printf("RDP: unknown setOtherMode_h:%d\n", mode);
+	DBG_GFX("RDP: unknown setOtherMode_h:%d\n", mode);
      }
 }
 

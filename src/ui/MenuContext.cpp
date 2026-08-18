@@ -26,7 +26,6 @@
 
 MenuContext *pMenuContext;
 extern "C" char menuActive;
-extern "C" void dbg_printf(const char *fmt,...);
 extern "C" uint16_t PAD_ButtonsHeld(int);
 extern "C" void resumeAudio();
 

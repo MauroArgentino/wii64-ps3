@@ -21,6 +21,10 @@
 #include <math.h>
 #include "GraphicsRSX.h"
 #include "../../main/wii64config.h"
+
+#ifndef PI
+#define PI 3.14159f
+#endif
 #ifdef HW_RVL
 #include "../gc_memory/MEM2.h"
 #endif
@@ -195,6 +199,9 @@ void Graphics::drawInit()
 	//Load Vertex and Fragment Programs
 	rsxLoadVertexProgram(context,vpo,vp_ucode);
 	rsxSetVertexProgramParameter(context,vpo,projMatrix_id,(float*)&projMatrix);
+
+	// Reset modelview to identity every frame — drawCursor() leaves it dirty
+	modelViewMatrix = Matrix4::identity();
 	rsxSetVertexProgramParameter(context,vpo,modelViewMatrix_id,(float*)&modelViewMatrix);
 
 	rsxSetFragmentProgramParameter(context,fpo,mode_id,&shader_mode,fp_offset);
@@ -348,6 +355,76 @@ void Graphics::fillRect(int x, int y, int width, int height)
 	rsxDrawVertexEnd(context);
 }
 
+void Graphics::fillRoundedRect(int x, int y, int width, int height, int radius, int segments)
+{
+	if (radius <= 0 || segments <= 0) { fillRect(x, y, width, height); return; }
+	if (radius > width/2) radius = width/2;
+	if (radius > height/2) radius = height/2;
+
+	float fr = (float)radius;
+	float cr = (float)appliedColor[0].r/255.0f;
+	float cg = (float)appliedColor[0].g/255.0f;
+	float cb = (float)appliedColor[0].b/255.0f;
+	float ca = (float)appliedColor[0].a/255.0f;
+
+	// Rectangular body: center strip + left arm + right arm
+	fillRect(x + radius, y, width - radius*2, height);
+	fillRect(x, y + radius, radius, height - radius*2);
+	fillRect(x + width - radius, y + radius, radius, height - radius*2);
+
+	// 4 corner quarter-circles as triangle fans (GCM_TYPE_TRIANGLES, not FAN)
+	// Corner arc centers and angle sweeps:
+	//   TL: center=(x+r, y+r),   angles PI..PI*1.5
+	//   TR: center=(x+w-r, y+r), angles PI*1.5..PI*2
+	//   BR: center=(x+w-r, y+h-r), angles 0..PI*0.5
+	//   BL: center=(x+r, y+h-r), angles PI*0.5..PI
+	static const float cornerAngle[4][2] = {
+		{ PI,       PI*1.5f },  // TL
+		{ PI*1.5f,  PI*2.0f },  // TR
+		{ 0.0f,     PI*0.5f },  // BR
+		{ PI*0.5f,  PI       }   // BL
+	};
+	static const float cornerSign[4][2] = {
+		{ -1.0f, -1.0f },  // TL
+		{ +1.0f, -1.0f },  // TR
+		{ +1.0f, +1.0f },  // BR
+		{ -1.0f, +1.0f }   // BL
+	};
+
+	rsxDrawVertexBegin(context, GCM_TYPE_TRIANGLES);
+	for (int corner = 0; corner < 4; corner++)
+	{
+		float arcCx = (float)x + ((corner == 0 || corner == 3) ? fr : (float)width - fr);
+		float arcCy = (float)y + ((corner < 2) ? fr : (float)height - fr);
+		float sa = cornerAngle[corner][0];
+		float ea = cornerAngle[corner][1];
+
+		for (int i = 0; i < segments; i++)
+		{
+			float a1 = sa + (ea - sa) * (float)i / (float)segments;
+			float a2 = sa + (ea - sa) * (float)(i + 1) / (float)segments;
+			float px1 = arcCx + fr * cosf(a1);
+			float py1 = arcCy + fr * sinf(a1);
+			float px2 = arcCx + fr * cosf(a2);
+			float py2 = arcCy + fr * sinf(a2);
+
+			// Triangle: arc-center -> arc-point1 -> arc-point2
+			rsxDrawVertex4f(context, vertexColor0_id, cr, cg, cb, ca);
+			rsxDrawVertex2f(context, vertexTexcoord_id, 0.0f, 0.0f);
+			rsxDrawVertex4f(context, vertexPosition_id, arcCx, arcCy, depth, 1.0f);
+
+			rsxDrawVertex4f(context, vertexColor0_id, cr, cg, cb, ca);
+			rsxDrawVertex2f(context, vertexTexcoord_id, 0.0f, 0.0f);
+			rsxDrawVertex4f(context, vertexPosition_id, px1, py1, depth, 1.0f);
+
+			rsxDrawVertex4f(context, vertexColor0_id, cr, cg, cb, ca);
+			rsxDrawVertex2f(context, vertexTexcoord_id, 0.0f, 0.0f);
+			rsxDrawVertex4f(context, vertexPosition_id, px2, py2, depth, 1.0f);
+		}
+	}
+	rsxDrawVertexEnd(context);
+}
+
 void Graphics::drawImage(int textureId, int x, int y, int width, int height, float s1, float s2, float t1, float t2)
 {
 	//input position and tex coords are measured from top left of screen/texture
@@ -421,10 +498,6 @@ void Graphics::drawLine(int x1, int y1, int x2, int y2)
 		rsxDrawVertex4f(context, vertexPosition_id, (float) x2,(float) y2, depth, 1.0f);
 	rsxDrawVertexEnd(context);
 }
-
-#ifndef PI
-#define PI 3.14159f
-#endif
 
 void Graphics::drawCircle(int x, int y, int radius, int numSegments)
 {

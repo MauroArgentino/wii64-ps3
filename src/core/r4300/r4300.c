@@ -39,6 +39,7 @@
 #include "Invalid_Code.h"
 #include "ppc/Recompile.h"
 #include "../../platform/ps3/PS3DynarecMemoryManager.h"
+#include "../../debug.h"
 #include <malloc.h>
 #include <sysutil/sysutil.h>
 R4300 r4300;
@@ -195,7 +196,7 @@ void update_count()
 	r4300.last_pc = r4300.pc;
 	if ((Count - old_Count) > 0x1000000 && dbg_delta < 200)
 	{
-		printf("[CNTJUMP] +%08X pc=%08X last=%08X Count=%08X\n",
+		DBG_LOG("[CNTJUMP] +%08X pc=%08X last=%08X Count=%08X\n",
 			(unsigned int)(Count - old_Count), r4300.pc, old_last, (unsigned int)Count);
 		dbg_delta++;
 	}
@@ -208,7 +209,7 @@ void init_blocks()
       blocks = (PowerPC_block **)calloc(0x100000, sizeof(PowerPC_block *));
    }
    if (!blocks) {
-      printf("[R4300] Fatal: failed to allocate blocks array\n");
+      DBG_LOG("[R4300] Fatal: failed to allocate blocks array\n");
       return;
    }
    invalid_code_alloc();
@@ -244,52 +245,51 @@ void go()
 {
 	r4300.stop = 0;
 	
-	printf("[GO] go() called, dynacore=%d, pc=0x%08x, cpu_inited=%d\n", 
+	DBG_LOG("[GO] go() called, dynacore=%d, pc=0x%08x, cpu_inited=%d\n", 
 	       dynacore, r4300.pc, cpu_inited);
 	
 	if(dynacore == 2) {
 		dynacore = 0;
 		interpcore = 1;
-		printf("[GO] Starting pure interpreter\n");
+		DBG_LOG("[GO] Starting pure interpreter\n");
 		pure_interpreter();
 		dynacore = 2;
-		printf("[GO] Pure interpreter returned, stop=%d\n", r4300.stop);
+		DBG_LOG("[GO] Pure interpreter returned, stop=%d\n", r4300.stop);
 	} else if(dynacore == 3) {
 		dynacore = 0;
 		interpcore = 2;
-		printf("[GO] Starting cached interpreter\n");
+		DBG_LOG("[GO] Starting cached interpreter\n");
 		init_cached_blocks();
 		run_cached_interpreter();
 		free_cached_blocks();
 		PC = NULL;
 		dynacore = 3;
-		printf("[GO] Cached interpreter returned, stop=%d\n", r4300.stop);
+		DBG_LOG("[GO] Cached interpreter returned, stop=%d\n", r4300.stop);
 	} else {
 		interpcore = 0;
 		dynacore = 1;
 		if(cpu_inited) {
 			// Solo inicializamos el DynaREC si realmente se va a usar
 			#ifdef PPC_DYNAREC
-				printf("[GO] Initializing dynarec memory...\n");
+				DBG_LOG("[GO] Initializing dynarec memory...\n");
 				if (!init_dynarec_memory()) {
-					printf("[GO] Dynarec: Error crítico inicializando memoria ejecutable.\n");
+					DBG_LOG("[GO] Dynarec: Error crítico inicializando memoria ejecutable.\n");
 					return;
 				}
-				printf("[GO] Dynarec memory initialized OK\n");
+				DBG_LOG("[GO] Dynarec memory initialized OK\n");
 			#endif
 			RecompCache_Init();
-			printf("[GO] RecompCache_Init done\n");
+			DBG_LOG("[GO] RecompCache_Init done\n");
 			init_blocks();
-			printf("[GO] init_blocks done\n");
+			DBG_LOG("[GO] init_blocks done\n");
 			cpu_inited = 0;
 		}
-		printf("[GO] Starting dynarec at pc=0x%08x\n", r4300.pc);
+		DBG_LOG("[GO] Starting dynarec at pc=0x%08x\n", r4300.pc);
 		dynarec(r4300.pc);
-		printf("[GO] Dynarec returned, pc=0x%08x, stop=%d\n", r4300.pc, r4300.stop);
+		DBG_LOG("[GO] Dynarec returned, pc=0x%08x, stop=%d\n", r4300.pc, r4300.stop);
 	}
 	debug_count += Count;
 }
-extern void dbg_printf(const char *fmt,...);
 void cpu_init(void){
    long long CRC = 0;
    unsigned int j;

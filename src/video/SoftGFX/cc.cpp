@@ -28,6 +28,7 @@
 **/
 
 #include <stdio.h>
+#include "../../../debug.h"
 
 #include "global.h"
 #include "cc.h"
@@ -70,14 +71,13 @@ Color32* CC::getColorSource(int src, int var)
       case 7:
 	if (var == 4)
 	  return &zero;
-	printf("CC:unknown color combiner source:%d,%d\n", src, var);
-	return &combinedAlpha;
+	DBG_GFX("CC:unknown color combiner source:%d,%d\n", src, var);
 	break;
       case 8:
 	if (var == 3)
 	  return &texel0Alpha;
 	else
-	  printf("CC:unknown color combiner source:%d,%d\n", src, var);
+	  DBG_GFX("CC:unknown color combiner source:%d,%d\n", src, var);
 	break;
       case 9:
 	if (var == 3)
@@ -88,24 +88,24 @@ Color32* CC::getColorSource(int src, int var)
       case 12:
 	if (var == 2)
 	  return &zero;
-	printf("CC:unknown color combiner source:%d,%d\n", src, var);
+	DBG_GFX("CC:unknown color combiner source:%d,%d\n", src, var);
 	break;
       case 13:
 	if (var == 3)
 	  return &LODFraction;
 	else
-	  printf("CC:unknown color combiner source:%d,%d\n", src, var);
+	  DBG_GFX("CC:unknown color combiner source:%d,%d\n", src, var);
 	break;
       case 15:
 	if (var == 1 || var == 2)
 	  return &zero;
-	printf("CC:unknown color combiner source:%d,%d\n", src, var);
+	DBG_GFX("CC:unknown color combiner source:%d,%d\n", src, var);
 	break;
       case 31:
 	return &zero;
 	break;
       default:
-	printf("CC:unknown color combiner source:%d\n", src);
+	DBG_GFX("CC:unknown color combiner source:%d\n", src);
      }
    return &zero;
 }
@@ -138,7 +138,7 @@ float* CC::getAlphaSource(int src, int var)
 	return zero.getAlphap();
 	break;
       default:
-	printf("CC:unknown alpha combiner source:%d\n", src);
+	DBG_GFX("CC:unknown alpha combiner source:%d\n", src);
      }
    return zero.getAlphap();
 }

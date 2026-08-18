@@ -22,6 +22,7 @@
 #endif // !__GX__
 
 #include "../../main/winlnxdefs.h"
+#include "../../debug.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -550,7 +551,7 @@ void Config_LoadConfig()
 		}
 		else
 		{
-			printf( "Unknown config option: %s\n", line );
+			DBG_GFX( "Unknown config option: %s\n", line );
 		}
 	}
 

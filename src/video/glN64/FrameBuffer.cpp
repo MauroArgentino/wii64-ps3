@@ -28,6 +28,7 @@
 #include "Combiner.h"
 #include "Types.h"
 #include <cstdio>
+#include "../../debug.h"
 #include "../../main/game_hacks.h"
 
 FrameBufferInfo frameBuffer;
@@ -188,7 +189,7 @@ void FrameBuffer_Destroy()
 
 void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 {
-	printf("[FB-SAVE] addr=%08x size=%d %dx%d\n", address, size, width, height);
+	DBG_GFX("[FB-SAVE] addr=%08x size=%d %dx%d\n", address, size, width, height);
 	FrameBuffer *current = frameBuffer.top;
 
 	// Search through saved frame buffers
@@ -393,7 +394,7 @@ void FrameBuffer_SaveBuffer( u32 address, u16 size, u16 width, u16 height )
 	}
 	else
 	{
-		printf("[FB-SAVE] WARN: rsxMemalign failed for framebuffer texture %lu bytes (w=%lu h=%lu rw=%lu rh=%lu)\n",
+		DBG_GFX("[FB-SAVE] WARN: rsxMemalign failed for framebuffer texture %lu bytes (w=%lu h=%lu rw=%lu rh=%lu)\n",
 		       (unsigned long)current->texture->textureBytes,
 		       (unsigned long)current->texture->width,
 		       (unsigned long)current->texture->height,
@@ -594,7 +595,7 @@ void FrameBuffer_RenderBuffer( u32 address )
 
 void FrameBuffer_RestoreBuffer( u32 address, u16 size, u16 width )
 {
-	printf("[FB-RESTORE] addr=%08x size=%d %dx%d\n", address, size, width, width);
+	DBG_GFX("[FB-RESTORE] addr=%08x size=%d %dx%d\n", address, size, width, width);
 	FrameBuffer *current = frameBuffer.top;
 
 	while (current != NULL)

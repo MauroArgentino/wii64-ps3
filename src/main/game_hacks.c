@@ -12,6 +12,7 @@
 #include "rom.h"
 #include <string.h>
 #include <stdio.h>
+#include "../debug.h"
 
 /* Global legacy instance */
 GameHacks gameHacks;
@@ -421,6 +422,6 @@ void GameHacks_Detect(void)
 	}
 
 	if (zelda_subscreen_address) {
-		printf("[GameHacks] Zelda OoT subscreen fix at RDRAM 0x%06X\n", zelda_subscreen_address);
+		DBG_LOG("[GameHacks] Zelda OoT subscreen fix at RDRAM 0x%06X\n", zelda_subscreen_address);
 	}
 }

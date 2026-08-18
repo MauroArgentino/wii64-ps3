@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Mupen64 - pure_interp.c
  * Copyright (C) 2002 Hacktarux
  *
@@ -36,6 +36,7 @@
 #include "../../main/ROM-Cache.h"
 #include "macros.h"
 #include "interrupt.h"
+#include "../../debug.h"
 #include <ppu-types.h>
 
 #ifdef PPC_DYNAREC
@@ -97,7 +98,7 @@ extern u32 next_vi;
 
 static void NI()
 {
-   printf("NI:%x\n", (unsigned int)op);
+   DBG_LOG("NI:%x\n", (unsigned int)op);
    r4300.stop=1; 
 #ifdef DEBUGON
   _break();
@@ -988,18 +989,10 @@ static void (*interp_tlb[64])(void) =
 
 static void MFC0()
 {
-   switch(PC->f.r.nrd)
-     {
-      case 1:
-	printf("lecture de Random\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-      default:
-	rrt32 = r4300.reg_cop0[PC->f.r.nrd];
-	sign_extended(rrt);
-     }
+   /* COP0 register 1 (Random) is a valid readable register on MIPS R4300i.
+    * Many games read it for TLBWR setup. Do NOT halt on read. */
+   rrt32 = r4300.reg_cop0[PC->f.r.nrd];
+   sign_extended(rrt);
    r4300.pc+=4;
 }
 
@@ -1067,7 +1060,7 @@ static void MTC0()
       case 13:   // Cause
 	if (rrt!=0)
 	  {
-	     printf("�criture dans Cause\n");
+	     DBG_LOG("ecriture dans Cause\n");
 	     r4300.stop = 1;
 #ifdef DEBUGON
        _break();
@@ -1098,7 +1091,7 @@ static void MTC0()
 	TagHi =0;
 	break;
       default:
-	printf("unknown mtc0 write : %d\n", PC->f.r.nrd);
+	DBG_LOG("unknown mtc0 write : %d\n", PC->f.r.nrd);
 	r4300.stop=1;
 #ifdef DEBUGON
   _break();
@@ -1413,42 +1406,27 @@ static void C_ULE_S()
 
 static void C_SF_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    r4300.fcr31 &= ~0x800000;
    r4300.pc+=4;
 }
 
 static void C_NGLE_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    r4300.fcr31 &= ~0x800000;
    r4300.pc+=4;
 }
 
 static void C_SEQ_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_single[cffs] == *r4300.fpr_single[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1457,14 +1435,9 @@ static void C_SEQ_S()
 
 static void C_NGL_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_single[cffs] == *r4300.fpr_single[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1473,14 +1446,9 @@ static void C_NGL_S()
 
 static void C_LT_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_single[cffs] < *r4300.fpr_single[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1489,14 +1457,9 @@ static void C_LT_S()
 
 static void C_NGE_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_single[cffs] < *r4300.fpr_single[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1505,14 +1468,9 @@ static void C_NGE_S()
 
 static void C_LE_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_single[cffs] <= *r4300.fpr_single[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1521,14 +1479,9 @@ static void C_LE_S()
 
 static void C_NGT_S()
 {
-   if (isnan(*r4300.fpr_single[cffs]) || isnan(*r4300.fpr_single[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_single[cffs] <= *r4300.fpr_single[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1765,42 +1718,27 @@ static void C_ULE_D()
 
 static void C_SF_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    r4300.fcr31 &= ~0x800000;
    r4300.pc+=4;
 }
 
 static void C_NGLE_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    r4300.fcr31 &= ~0x800000;
    r4300.pc+=4;
 }
 
 static void C_SEQ_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_double[cffs] == *r4300.fpr_double[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1809,14 +1747,9 @@ static void C_SEQ_D()
 
 static void C_NGL_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_double[cffs] == *r4300.fpr_double[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1825,14 +1758,9 @@ static void C_NGL_D()
 
 static void C_LT_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_double[cffs] < *r4300.fpr_double[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1841,14 +1769,9 @@ static void C_LT_D()
 
 static void C_NGE_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_double[cffs] < *r4300.fpr_double[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1857,14 +1780,9 @@ static void C_NGE_D()
 
 static void C_LE_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_double[cffs] <= *r4300.fpr_double[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -1873,14 +1791,9 @@ static void C_LE_D()
 
 static void C_NGT_D()
 {
-   if (isnan(*r4300.fpr_double[cffs]) || isnan(*r4300.fpr_double[cfft]))
-     {
-	printf("Invalid operation exception in C opcode\n");
-	r4300.stop=1;
-#ifdef DEBUGON
-  _break();
-#endif     
-     }
+   /* Signaling compares: on real R4300i, NaN inputs clear the condition bit
+    * and optionally set Cause.CE. Do NOT halt the emulator. NaN comparisons
+    * in C naturally return false, so the bit will be cleared correctly. */
    if (*r4300.fpr_double[cffs] <= *r4300.fpr_double[cfft])
      r4300.fcr31 |= 0x800000;
    else r4300.fcr31 &= ~0x800000;
@@ -2994,7 +2907,7 @@ if ((r4300.pc >= 0x80000000) && (r4300.pc < 0xc0000000))
 	  }
 	else
 	  {
-	     printf("execution &#65533; l'addresse :%x\n", (int)r4300.pc);
+	     DBG_LOG("execution a l'addresse :%x\n", (int)r4300.pc);
 	     r4300.stop=1;
 #ifdef DEBUGON
        _break();
@@ -3018,9 +2931,9 @@ if ((r4300.pc >= 0x80000000) && (r4300.pc < 0xc0000000))
 	r4300.pc = addr;
      }
 }
-extern void dbg_printf(const char *fmt,...);
 
 #ifdef PS3
+extern int ps3_pad_exit_combo_pressed(void);
 extern volatile int debug_pause_cpu_halt;
 extern void debug_pause_poll_halt(void);
 #include <sys/thread.h>
@@ -3044,10 +2957,24 @@ void pure_interpreter()
 	}
 #endif
 	prefetch();
+	/* Sync last_pc so update_count() sees delta==0. The main loop already
+	 * advances Count += 2 per instruction, so update_count() (called from
+	 * DMA handlers etc.) must not add extra counts from stale last_pc. */
+	r4300.last_pc = r4300.pc;
 #ifdef COMPARE_CORE
 	compare_core();
 #endif
 	Count += 2;   /* PS3: Count avanzado por el main loop (no update_count) */
+#ifdef PS3
+      if ((Count & 0x1FFF) == 0 && ps3_pad_exit_combo_pressed())
+      {
+#ifdef DEBUG
+         printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
+#endif
+         r4300.stop = 1;
+         break;
+      }
+#endif
 #ifdef DEBUGON
 	if ((dbg_icount++ & 0x1FFFFF) == 0) {
 		printf("[PC] icount=%llu pc=%08X sp=%08X ra=%08X\n",

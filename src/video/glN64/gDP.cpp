@@ -21,6 +21,7 @@
 #include <string.h>
 #endif // PS3
 
+#include "../../debug.h"
 #include "glN64.h"
 #include "N64.h"
 #include "GBI.h"
@@ -802,7 +803,7 @@ void gDPLoadTLUT( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 	u16 pal = (gDP.tiles[tile].tmem - 256) >> 4;
 
 #ifdef DEBUG_PROBES
-	printf("[TLUT] Load: tile=%d tmem=0x%03X palette_field=%d pal_idx=%d count=%d fmt=%d size=%d\n",
+	DBG_GFX("[TLUT] Load: tile=%d tmem=0x%03X palette_field=%d pal_idx=%d count=%d fmt=%d size=%d\n",
 		tile, gDP.tiles[tile].tmem, gDP.tiles[tile].palette, pal, count, gDP.tiles[tile].format, gDP.tiles[tile].size);
 #endif
 
@@ -839,7 +840,7 @@ void gDPLoadTLUT( u32 tile, u32 uls, u32 ult, u32 lrs, u32 lrt )
 		static u32 tlutLogCount = 0;
 		if (tlutLogCount < 30) {
 #ifdef DEBUG_PROBES
-			printf("[TLUT] tile=%d tmem=0x%03X count=%d palCRC=0x%08X\n",
+			DBG_GFX("[TLUT] tile=%d tmem=0x%03X count=%d palCRC=0x%08X\n",
 				tile, gDP.tiles[tile].tmem, count, gDP.paletteCRC256);
 #endif
 			tlutLogCount++;
@@ -894,7 +895,7 @@ void gDPFillRectangle( s32 ulx, s32 uly, s32 lrx, s32 lry )
 		if ((ulx == 0) && (uly == 0) && ((unsigned int)lrx == VI.width) && ((unsigned int)lry == VI.height))
 		{
 #ifdef DEBUG_PROBES
-			printf("[FILL-CLR] fullscreen clear (%d,%d,%d,%d) cycle=FILL addr=%08x\n", ulx, uly, lrx, lry, gDP.colorImage.address);
+			DBG_GFX("[FILL-CLR] fullscreen clear (%d,%d,%d,%d) cycle=FILL addr=%08x\n", ulx, uly, lrx, lry, gDP.colorImage.address);
 #endif
 			OGL_ClearColorBuffer( &gDP.fillColor.r );
 			return;
@@ -902,7 +903,7 @@ void gDPFillRectangle( s32 ulx, s32 uly, s32 lrx, s32 lry )
 	}
 
 #ifdef DEBUG_PROBES
-	printf("[FILL-RECT] (%d,%d,%d,%d) cycle=%d addr=%08x\n", ulx, uly, lrx, lry, gDP.otherMode.cycleType, gDP.colorImage.address);
+	DBG_GFX("[FILL-RECT] (%d,%d,%d,%d) cycle=%d addr=%08x\n", ulx, uly, lrx, lry, gDP.otherMode.cycleType, gDP.colorImage.address);
 #endif
 	OGL_DrawRect( ulx, uly, lrx, lry, &gDP.fillColor.r );
 	
