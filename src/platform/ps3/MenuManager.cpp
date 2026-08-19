@@ -171,11 +171,8 @@ void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa direc
     uint32_t buttonsDown = (currentInput ^ lastInput) & currentInput;
     lastInput = currentInput;
 
-    // Enviar comandos de dirección al gestor de foco
-    if (buttonsDown & PS3_BTN_UP)    menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_UP);
-    if (buttonsDown & PS3_BTN_DOWN)  menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_DOWN);
-    if (buttonsDown & PS3_BTN_LEFT)  menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_LEFT);
-    if (buttonsDown & PS3_BTN_RIGHT) menu::Focus::getInstance().moveFocus(menu::Focus::DIRECTION_RIGHT);
+    // NOTE: D-pad navigation is handled by FocusManager::updateFocus() in Gui::draw().
+    // Do NOT duplicate moveFocus() calls here or focus moves twice per press.
 
     // Ejecutar acción si se presiona EQUIS
     if (buttonsDown & PS3_BTN_CROSS) {
