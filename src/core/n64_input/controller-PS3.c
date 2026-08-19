@@ -102,9 +102,11 @@ static u32 getButtons(u32 buttonsPS3, u32 analogPS3)
 	//0xRH-RV-LH-LV 0x00 = Left/Up, 0xFF = Right/Down
 	u32 b = buttonsPS3;
 	s8 LstickX      = (s8) ((int)((analogPS3>>8) & 0xFF) - 128);
-	s8 LstickY      = (s8) -((int)((analogPS3>>0) & 0xFF) - 128);
+	int rawLY        = (int)((analogPS3>>0) & 0xFF) - 128;
+	s8 LstickY       = rawLY == -128 ? (s8)127 : (s8)(-rawLY);
 	s8 RstickX      = (s8) ((int)((analogPS3>>24) & 0xFF) - 128);
-	s8 RstickY      = (s8) -((int)((analogPS3>>16) & 0xFF) - 128);
+	int rawRY        = (int)((analogPS3>>16) & 0xFF) - 128;
+	s8 RstickY       = rawRY == -128 ? (s8)127 : (s8)(-rawRY);
 	
 	int dz = 18;
 	if(LstickX    < -dz) b |= L_STICK_L;
@@ -301,10 +303,12 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 
 	if(config->analog->mask == L_STICK_AS_ANALOG){
 		c->X_AXIS = (s8)  ((int)((analogPS3>>8) & 0xFF) - 128);
-		c->Y_AXIS = (s8) -((int)((analogPS3>>0) & 0xFF) - 128);
+		int rawY = (int)((analogPS3>>0) & 0xFF) - 128;
+		c->Y_AXIS = rawY == -128 ? (s8)127 : (s8)(-rawY);
 	} else if(config->analog->mask == R_STICK_AS_ANALOG){
 		c->X_AXIS = (s8)  ((int)((analogPS3>>24) & 0xFF) - 128);
-		c->Y_AXIS = (s8) -((int)((analogPS3>>16) & 0xFF) - 128);
+		int rawY = (int)((analogPS3>>16) & 0xFF) - 128;
+		c->Y_AXIS = rawY == -128 ? (s8)127 : (s8)(-rawY);
 	}
 	if(config->invertedY) c->Y_AXIS = -c->Y_AXIS;
 
