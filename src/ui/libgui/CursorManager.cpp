@@ -134,14 +134,15 @@ void Cursor::updateCursor()
 
 #ifdef PS3
 	// PS3: analog stick cursor control (Left stick moves cursor, Cross = click)
+	// Use pad data already read by Input::refreshInput() to avoid consuming
+	// pad data a second time (ioPadGetData is one-shot on RPCS3).
 	{
-		padData paddata;
-		int ret = ioPadGetData(0, &paddata);
-		if (ret == 0 && paddata.len > 0)
+		const padData* paddata = Input::getInstance().getPS3PadData();
+		if (paddata && paddata->len > 0)
 		{
 			// Left stick: button[4]=LX, button[5]=LY (0-255, center=128)
-			s8 lx = (s8)(paddata.button[4] - 128);
-			s8 ly = (s8)(paddata.button[5] - 128);
+			s8 lx = (s8)(paddata->button[4] - 128);
+			s8 ly = (s8)(paddata->button[5] - 128);
 
 			// Dead zone
 			if (lx < -15 || lx > 15) cursorX += lx * 0.5f;
@@ -154,7 +155,7 @@ void Cursor::updateCursor()
 			if (cursorY > ::display_height) cursorY = ::display_height;
 
 			// Cross button = click (button[3] bit 6 = PS3_BTN_CROSS)
-			u16 btns = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
+			u16 btns = ((paddata->button[2]&0xFF)<<8) | (paddata->button[3]&0xFF);
 			pressed = (btns & PS3_BTN_CROSS) ? true : false;
 			buttonsPressed = pressed ? 1 : 0;
 

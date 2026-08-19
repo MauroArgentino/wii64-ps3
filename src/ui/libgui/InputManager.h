@@ -24,6 +24,7 @@
 #include "GuiTypes.h"
 #ifdef PS3
 #include <ppu-types.h>
+#include <io/pad.h>
 #define PS3_MAX_PADS 7
 #endif
 
@@ -42,6 +43,7 @@ public:
 	void clearInputData();
 #ifdef PS3
 	u16* getPS3Buttons() { return ps3Buttons; }
+	const padData* getPS3PadData() const { return ps3PadData; }
 #endif
 	static Input& getInstance()
 	{
@@ -60,6 +62,7 @@ private:
 #endif
 #ifdef PS3
 	u16 ps3Buttons[PS3_MAX_PADS];
+	padData ps3PadData[PS3_MAX_PADS];
 #endif
 
 };

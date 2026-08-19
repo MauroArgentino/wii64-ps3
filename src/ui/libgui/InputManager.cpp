@@ -76,11 +76,15 @@ void Input::refreshInput()
 			if (padInfo.port_status[i] & 1) {
 				padData paddata;
 				if (ioPadGetData(i, &paddata) == 0) {
+					memcpy(&ps3PadData[i], &paddata, sizeof(padData));
 					if (paddata.len)
 						ps3Buttons[i] = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
+				} else {
+					ps3PadData[i].len = 0;
 				}
 			} else {
 				ps3Buttons[i] = 0;
+				ps3PadData[i].len = 0;
 			}
 		}
 	}

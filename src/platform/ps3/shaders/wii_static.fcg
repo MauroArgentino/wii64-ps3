@@ -9,29 +9,25 @@ void main
 	out float4 oColor
 )
 {
-	// Normalize screen coords to 0..1 range (screen is 640x480 logical)
-	float2 uv = position.xy / float2(640.0, 480.0);
+	// position.xy = screen-space pixel coords (0..640, 0..480)
+	float2 p = position.xy;
 
-	// --- NOISE: hash-based per-pixel random ---
-	float h = fract(sin(dot(floor(uv * 320.0), float2(12.9898, 78.233))) * 43758.5453);
-	// Scale up so the grain is visible (not too fine, not too coarse)
-	float noise = h;
+	// Animate: shift seed every ~12 fps for flickering TV static
+	float seed = floor(time * 12.0);
 
-	// --- SCROLLING HORIZONTAL BANDS (V-Sync roll) ---
-	// Multiple layered sine waves for organic CRT look
-	float band1 = 0.65 + 0.35 * sin(uv.y * 60.0 - time * 4.0);
-	float band2 = 0.80 + 0.20 * sin(uv.y * 18.0 - time * 1.5 + 1.0);
-	float bands = band1 * band2;
+	// --- SIN-FREE HASH (Dave Hoskins method) ---
+	// Produces well-distributed pseudo-random per-pixel values
+	float2 q = p + float2(seed * 17.31, seed * 43.17);
+	float3 p3 = frac(float3(q.xyx) * float3(0.1031, 0.1030, 0.0973));
+	p3 += dot(p3, p3.yzx + 33.33);
+	float noise = frac((p3.x + p3.y) * p3.z);
 
-	// --- HORIZONTAL TEARING LINE that drifts down ---
-	float tearPos = fract(time * 0.15);
-	float tear = 1.0 - 0.4 * exp(-400.0 * (uv.y - tearPos) * (uv.y - tearPos));
+	// Boost contrast: push toward black or white for crisp static
+	float grain = (noise < 0.5) ? noise * 0.5 : noise * 1.8;
+	grain = clamp(grain, 0.0, 1.0);
 
-	// Combine: bright noise * scrolling bands * subtle tear
-	float gray = noise * bands * tear;
+	// Subtle vertical scanline pattern (CRT phosphor lines)
+	float scanline = 0.88 + 0.12 * step(0.5, frac(p.y * 0.5));
 
-	// Boost brightness so it's clearly visible (not black)
-	gray = clamp(gray * 1.2, 0.05, 1.0);
-
-	oColor = float4(gray, gray, gray, color0.a);
+	oColor = float4(grain * scanline, grain * scanline, grain * scanline, color0.a);
 }

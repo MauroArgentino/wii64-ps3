@@ -128,18 +128,89 @@ static u32 edgeButtons[4];       /* buttons detected as rising-edge pressed */
 static int edgeHoldCount[4];     /* frames to keep edge-detected buttons held */
 static int refreshCounter;       /* throttle refreshAvailable() calls */
 
-/* Forward declaration */
+/* Shared pad cache: polled once per cycle from the interpreter loop.
+ * Both _GetKeys and ps3_pad_exit_combo_pressed read from here.
+ * This avoids the RPCS3 ioPadGetData consumption bug where the exit combo
+ * steals pad data before _GetKeys can read it. */
+static padData shared_pad[4];
+static u32 shared_buttons[4];
+static u32 shared_analog[4];
+
+/* Forward declarations */
 static void refreshAvailable(void);
 
 /* OSD pad status: visible from VI.cpp for on-screen debug */
-char osd_pad_status[64] = "pad: init";
+char osd_pad_status[128] = "pad: init";
+
+/* Lazy controller reassignment: when a new pad is detected, trigger
+ * auto_assign_controllers() so that Controls[].Present and virtualControllers
+ * get set even if the controller wasn't available at ROM load time. */
+static void poll_pad_reassign_if_needed(void)
+{
+	static u8 prev_avail[4] = {0,0,0,0};
+	int i, need_reassign = 0;
+	u8 cur_avail[4];
+
+	refreshAvailable();
+
+	for (i = 0; i < 4; i++) {
+		cur_avail[i] = controller_PS3.available[i];
+		if (cur_avail[i] && !prev_avail[i])
+			need_reassign = 1;
+	}
+
+	if (need_reassign)
+		auto_assign_controllers();
+
+	for (i = 0; i < 4; i++)
+		prev_avail[i] = cur_avail[i];
+}
+
+/* Poll all available pads once. Called from the interpreter loop.
+ * Both _GetKeys and ps3_pad_exit_combo_pressed read from here.
+ *
+ * CRITICAL: Only update shared_buttons/shared_analog when len > 0.
+ * On RPCS3, ioPadGetData() "consumes" pad data — the first call returns
+ * len > 0 with valid button[], but subsequent calls return len = 0.
+ * If we overwrite shared_buttons with the zeroed button[] from a len=0
+ * read, the button press is lost before _GetKeys can consume it. */
+void controller_PS3_poll_pad(void)
+{
+	int i;
+
+	/* Periodically check for new controllers and reassign.
+	 * Every 64 poll cycles (~0.5s at 0x1FFF poll rate). */
+	static int reassign_divider = 0;
+	reassign_divider++;
+	if ((reassign_divider & 0x3F) == 0)
+		poll_pad_reassign_if_needed();
+
+	for (i = 0; i < 4; i++)
+	{
+		if (!controller_PS3.available[i])
+		{
+			shared_pad[i].len = 0;
+			continue;
+		}
+		memset(&shared_pad[i], 0, sizeof(padData));
+		ioPadGetData(i, &shared_pad[i]);
+		/* Only overwrite when pad reports new data (len > 0).
+		 * This preserves the last known button/analog state so
+		 * _GetKeys always has valid data even between events. */
+		if (shared_pad[i].len > 0) {
+			shared_buttons[i] = ((shared_pad[i].button[2]&0xFF)<<8) | (shared_pad[i].button[3]&0xFF);
+			shared_analog[i] = ((shared_pad[i].button[4]&0xFF)<<24) | ((shared_pad[i].button[5]&0xFF)<<16) |
+			                   ((shared_pad[i].button[6]&0xFF)<<8)  | ((shared_pad[i].button[7]&0xFF)&0xFF);
+		}
+	}
+}
+
 #ifdef DEBUG_PROBES
 static unsigned int input_probe_cnt;
 #endif
 
 static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 {
-	padData paddata;
 	u32 buttonsPS3, analogPS3;
 	BUTTONS* c = Keys;
 	memset(c, 0, sizeof(BUTTONS));
@@ -155,24 +226,22 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 
 	if (!controller_PS3.available[Control]) return 0;
 
-	ioPadGetData(Control, &paddata);
-
-	/* Update OSD pad status for on-screen debug (visible from VI.cpp) */
+	/* OSD diagnostic: shows pad state and why _GetKeys might fail */
 	{
 		static unsigned int osd_cnt = 0;
 		osd_cnt++;
-		if ((osd_cnt & 0x3) == 0) { /* Update every 4th read to avoid flicker */
+		if ((osd_cnt & 0x3) == 0) {
+			padData *sp = &shared_pad[Control];
 			snprintf(osd_pad_status, sizeof(osd_pad_status),
-				"PAD: len=%u btn=%04X raw=[%02X %02X %02X %02X %02X %02X %02X %02X] edge=%04X(hold=%d)",
-				paddata.len,
-				((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF),
-				paddata.button[0], paddata.button[1],
-				paddata.button[2], paddata.button[3],
-				paddata.button[4], paddata.button[5],
-				paddata.button[6], paddata.button[7],
-				edgeButtons[Control], edgeHoldCount[Control]);
+				"P%d: btn=%04X raw=%02X%02X%02X%02X%02X%02X",
+				Control,
+				shared_buttons[Control],
+				sp->button[2], sp->button[3],
+				sp->button[4], sp->button[5],
+				sp->button[6], sp->button[7]);
 		}
 	}
+
 #ifdef DEBUG_PROBES
 	{
 		static int gk_cnt = 0;
@@ -180,33 +249,27 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 		if (gk_cnt < 8 || (gk_cnt < 200 && (gk_skip++ % 500) == 0))
 		{
 			gk_cnt++;
-			DBG_INP("[GETKEYS] Control=%d len=%u\n", Control, paddata.len);
+			DBG_INP("[GETKEYS] Control=%d len=%u\n", Control, shared_pad[Control].len);
 		}
 	}
 #endif
-	/* RPCS3 DualSense: paddata.len is always 0 — the cellPad emulation
-	 * doesn't fill this field. Read button+analog data directly.
-	 * button[2-3] = digital buttons (0 when nothing pressed, even with len=0).
-	 * button[4-7] = analog sticks. */
+
+	buttonsPS3 = shared_buttons[Control];
+	analogPS3 = shared_analog[Control];
+
+	/* Edge detection: latch rising-edge presses only when pad reports
+	 * a state change (len > 0). This prevents re-latching on every
+	 * poll cycle. */
+	if (shared_pad[Control].len > 0)
 	{
-		u16 freshBtn = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
-		u32 freshAnalog = ((paddata.button[4]&0xFF)<<24) | ((paddata.button[5]&0xFF)<<16) |
-						 ((paddata.button[6]&0xFF)<<8)  | ((paddata.button[7]&0xFF)&0xFF);
-
-		buttonsPS3 = freshBtn;
-		analogPS3 = freshAnalog;
-		previousButtonsPS3[Control] = freshBtn;
-		previousAnalogPS3[Control] = freshAnalog;
-
-		/* Edge detection: latch rising-edge presses for 8 PIF reads */
-		u32 newlyPressed = freshBtn & ~edgeButtons[Control];
-		edgeButtons[Control] = freshBtn;
+		u32 newlyPressed = shared_buttons[Control] & ~edgeButtons[Control];
+		edgeButtons[Control] = shared_buttons[Control];
 		if (newlyPressed)
 			edgeHoldCount[Control] = 8;
 	}
 
 	/* Merge edge-detected buttons into live state so even when paddata.len==0
-	 * the N64 still sees the press for up to 4 reads after it happened. */
+	 * the N64 still sees the press for up to 8 reads after it happened. */
 	if (edgeHoldCount[Control] > 0)
 	{
 		buttonsPS3 |= edgeButtons[Control];
@@ -313,8 +376,15 @@ static void refreshAvailable(void){
 	ioPadGetInfo(&padinfo);
 	
 	int i;
-	for(i=0; i<4; ++i)
+	for(i=0; i<4; ++i) {
+		u8 was_available = controller_PS3.available[i];
 		controller_PS3.available[i] = padinfo.status[i];
+		/* Enable PRESS_ON exactly once per controller connection.
+		 * Calling ioPadSetPortSetting repeatedly floods RPCS3 with
+		 * DualSense send_output_report errors → eventual crash. */
+		if (padinfo.status[i] && !was_available)
+			ioPadSetPortSetting(i, 0x02);
+	}
 #ifdef DEBUG_PROBES
 	DBG_INP("[PADINFO] status=%d%d%d%d avail=%d%d%d%d\n",
 		padinfo.status[0], padinfo.status[1], padinfo.status[2], padinfo.status[3],
@@ -330,7 +400,6 @@ static void refreshAvailable(void){
 int ps3_pad_exit_combo_pressed(void)
 {
 	int i;
-	padData paddata;
 	button_tp combo = &menu_combos[0];
 
 	if (virtualControllers[0].config && virtualControllers[0].config->exit)
@@ -338,14 +407,8 @@ int ps3_pad_exit_combo_pressed(void)
 
 	for (i = 0; i < 4; i++)
 	{
-		u32 buttonsPS3;
 		if (!controller_PS3.available[i]) continue;
-
-		ioPadGetData(i, &paddata);
-		if (!paddata.len) continue;
-
-		buttonsPS3 = ((paddata.button[2] & 0xFF) << 8) | (paddata.button[3] & 0xFF);
-		if ((buttonsPS3 & combo->mask) == combo->mask)
+		if ((shared_buttons[i] & combo->mask) == combo->mask)
 			return 1;
 	}
 	return 0;

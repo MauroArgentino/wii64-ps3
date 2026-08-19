@@ -117,6 +117,11 @@ bool MenuContext::isRunning()
         return false; // Salimos del bucle del menú para dejar paso al juego
     }
 
+    // Refresh pad data ONCE at the top, so all consumers (MenuManager,
+    // Cursor, Focus) read from the same cached snapshot instead of
+    // each calling ioPadGetData and consuming the data for the next reader.
+    menu::Input::getInstance().refreshInput();
+
     // Si estamos en el menú principal y no hay mensajes, el foco debe ser del WiiMenu
     if (currentActiveFrame == mainFrame && !msgVisible) { // 'mainFrame' es el frame base, no el menú de canales
         if (!g_mainMenuInited) { // Renombrado

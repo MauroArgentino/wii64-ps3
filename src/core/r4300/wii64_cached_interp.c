@@ -18,6 +18,7 @@ extern int dbg_vi_count;
 extern void dbg_dump_queue(void);
 #ifdef PS3
 extern int ps3_pad_exit_combo_pressed(void);
+extern void controller_PS3_poll_pad(void);
 #endif
 
 #define RDRAM_WORDS 0x100000
@@ -909,13 +910,19 @@ while (!r4300.stop)
     {
        Count += 2;
 #ifdef PS3
-       if ((Count & 0x1FFF) == 0 && ps3_pad_exit_combo_pressed())
+       if ((Count & 0x1FFF) == 0)
        {
+          /* Poll pads periodically. Low frequency avoids draining
+           * pad data before _GetKeys reads from the shared cache. */
+          controller_PS3_poll_pad();
+          if (ps3_pad_exit_combo_pressed())
+          {
 #ifdef DEBUG
-          printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
+             printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
 #endif
-          r4300.stop = 1;
-          break;
+             r4300.stop = 1;
+             break;
+          }
        }
 #endif
        if (!PC) { r4300.stop = 1; break; }

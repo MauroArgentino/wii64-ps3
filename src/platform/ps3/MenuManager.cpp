@@ -1,11 +1,13 @@
 #include "../../ui/MenuManager.h" // Renombrado
 #include <ppu-types.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 #include "../../video/glN64/OpenGL.h" // Imaginando la nueva ruta limpia
 #include "../../ui/libgui/GraphicsRSX.h" // Incluir GraphicsRSX directamente para PS3
 #include "../../ui/Language.h"           // Necesario para menu::Language
 #include "../../ui/libgui/FocusManager.h" // Se añade para la definición completa de menu::Focus
+#include "../../ui/libgui/InputManager.h" // For Input::getPS3PadData()
 #include "../../ui/libgui/IPLFont.h"      // Necesario para menu::IPLFont
 #include "../../ui/libgui/GuiResources.h"
 #include "../../ui/libgui/Image.h"        // Asumiendo que Image es genérico
@@ -157,15 +159,13 @@ void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa direc
     if (pulse > 6.28f) pulse = 0.0f; // Resetear ciclo de 2*PI
     g_tvStaticTime += 0.033f;
 
-    // Leer entrada del pad para PS3 directamente (para detectar la pulsación de la 'X')
+    // Leer entrada del pad usando datos cacheados por Input::refreshInput()
     uint32_t currentInput = 0;
-    padInfo padinfo;
-    padData paddata;
-    ioPadGetInfo(&padinfo);
+    const padData* paddata = menu::Input::getInstance().getPS3PadData();
+    u16* ps3Buttons = menu::Input::getInstance().getPS3Buttons();
     for(int i=0; i<7; i++){
-        if(padinfo.status[i]){
-            ioPadGetData(i, &paddata);
-            currentInput |= ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
+        if(paddata && ps3Buttons[i]){
+            currentInput |= ps3Buttons[i];
         }
     }
     uint32_t buttonsDown = (currentInput ^ lastInput) & currentInput;

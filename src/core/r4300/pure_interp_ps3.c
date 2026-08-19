@@ -2934,6 +2934,7 @@ if ((r4300.pc >= 0x80000000) && (r4300.pc < 0xc0000000))
 
 #ifdef PS3
 extern int ps3_pad_exit_combo_pressed(void);
+extern void controller_PS3_poll_pad(void);
 extern volatile int debug_pause_cpu_halt;
 extern void debug_pause_poll_halt(void);
 #include <sys/thread.h>
@@ -2966,13 +2967,20 @@ void pure_interpreter()
 #endif
 	Count += 2;   /* PS3: Count avanzado por el main loop (no update_count) */
 #ifdef PS3
-      if ((Count & 0x1FFF) == 0 && ps3_pad_exit_combo_pressed())
+      if ((Count & 0x1FFF) == 0)
       {
+         /* Poll pads periodically. This calls ioPadGetData which consumes
+          * pad events on RPCS3 — keeping a low frequency avoids draining
+          * data before _GetKeys reads from the shared cache. */
+         controller_PS3_poll_pad();
+         if (ps3_pad_exit_combo_pressed())
+         {
 #ifdef DEBUG
-         printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
+            printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
 #endif
-         r4300.stop = 1;
-         break;
+            r4300.stop = 1;
+            break;
+         }
       }
 #endif
 #ifdef DEBUGON
