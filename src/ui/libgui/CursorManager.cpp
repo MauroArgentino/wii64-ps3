@@ -165,12 +165,16 @@ void Cursor::updateCursor()
 				hoverOverComponent->setFocus(false);
 				hoverOverComponent = NULL;
 			}
+			// Map cursor screen coords to 640x480 logical space for hit-testing
+			// (ChannelButton positions are in 640x480)
+			float hitX = cursorX * 640.0f / ::display_width;
+			float hitY = cursorY * 480.0f / ::display_height;
 			std::vector<CursorEntry>::iterator iteration;
 			for (iteration = cursorList.begin(); iteration != cursorList.end(); iteration++)
 			{
 				if(	currentFrame == (*iteration).frame &&
-					(cursorX > (*iteration).xRange[0]) && (cursorX < (*iteration).xRange[1]) &&
-					(cursorY > (*iteration).yRange[0]) && (cursorY < (*iteration).yRange[1]))
+					(hitX > (*iteration).xRange[0]) && (hitX < (*iteration).xRange[1]) &&
+					(hitY > (*iteration).yRange[0]) && (hitY < (*iteration).yRange[1]))
 				{
 					setCursorFocus((*iteration).comp);
 					if (frameSwitch) break;
@@ -198,6 +202,9 @@ void Cursor::setCursorFocus(Component* component)
 #ifdef HW_RVL
 	if (buttonsPressed & WPAD_BUTTON_A) buttonsDown |= Focus::ACTION_SELECT;
 	if (buttonsPressed & WPAD_BUTTON_B) buttonsDown |= Focus::ACTION_BACK;
+#endif
+#ifdef PS3
+	if (pressed) buttonsDown |= Focus::ACTION_SELECT;
 #endif
 	if (freezeAction) buttonsDown = 0;
 	if (component) newHoverOverComponent = component->updateFocus(focusDirection,buttonsDown);

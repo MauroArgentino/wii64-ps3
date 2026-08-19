@@ -12,6 +12,7 @@
 #include "../../ui/libgui/GuiResources.h"
 #include "../../ui/libgui/Image.h"        // Asumiendo que Image es genérico
 #include "../../ui/MenuElementStyle.h"    // Renombrado
+#include "../../ui/libgui/CursorManager.h" // Para Cursor::addComponent()
 #include "../../debug.h"
 
 #ifndef GX_TEXMAP0
@@ -110,6 +111,11 @@ void MenuManager::init() {
 
         add(btn);
         buttonComponents.push_back(btn);
+
+        // Registrar con el cursor para hit-test Wii-style
+        if (channels[i].visible) {
+            menu::Cursor::getInstance().addComponent(this, btn, x, x + chW, y, y + chH);
+        }
     }
 
     // Configurar navegación entre botones (Focus neighbors)

@@ -131,6 +131,7 @@ bool MenuContext::isRunning()
         if (menu::Focus::getInstance().getCurrentFrame() != g_mainMenu) { // Renombrado
             menu::Focus::getInstance().clearPrimaryFocus();
             menu::Focus::getInstance().setCurrentFrame(g_mainMenu); // Renombrado
+            menu::Cursor::getInstance().setCurrentFrame(g_mainMenu); // Sincronizar cursor con el menú de canales
             g_mainMenu->reset(); // <--- IMPORTANTE: Limpia el estado al recuperar el foco
             // Ya no forzamos setDefaultFocus aquí; g_mainMenu lo gestiona internamente
             // en su función update() para recordar el último botón tocado.
