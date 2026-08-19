@@ -361,6 +361,7 @@ void exception_general()
   Status |= 2;
    
   EPC = r4300.pc;
+  r4300.llbit = 0;  /* Real R4300i clears llbit on every exception */
 
   if(r4300.delay_slot==1 || r4300.delay_slot==3) {
     Cause |= 0x80000000;

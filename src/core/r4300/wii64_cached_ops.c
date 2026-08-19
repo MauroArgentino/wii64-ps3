@@ -1338,13 +1338,8 @@ void cached_interp_ERET(void)
 void cached_interp_MFC0(void)
 {
    u32 reg = PC->f.r.nrd;
-   if (reg == 1)
-   {
-      DBG_LOG("reading Random\n");
-      r4300.stop = 1;
-      PC++;
-      return;
-   }
+   /* COP0 register 1 (Random) is a valid readable register.
+    * Do NOT halt on read. */
    irt32 = r4300.reg_cop0[reg];
    sign_extended(irt);
    PC++;

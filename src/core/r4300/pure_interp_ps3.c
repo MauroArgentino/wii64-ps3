@@ -1058,15 +1058,9 @@ static void MTC0()
 	r4300.pc-=4;
 	break;
       case 13:   // Cause
-	if (rrt!=0)
-	  {
-	     DBG_LOG("ecriture dans Cause\n");
-	     r4300.stop = 1;
-#ifdef DEBUGON
-       _break();
-#endif     
-	  }
-	else Cause = rrt;
+	/* Allow writes to Cause (games may set IP0/IP1 software interrupts).
+	 * Only the writable bits are affected; hardware bits are read-only. */
+	Cause = (Cause & ~0xFC00) | (rrt & 0xFC00);
 	break;
       case 14:   // EPC
 	EPC = rrt;
@@ -2256,8 +2250,8 @@ static void DADDIU()
 
 static void LDL()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int word = 0;
-   r4300.pc+=4;
    switch ((iimmediate + irs32) & 7)
      {
       case 0:
@@ -2308,10 +2302,12 @@ static void LDL()
 	irt = (irt & 0xFFFFFFFFFFFFFFLL) | (word << 56);
 	break;
      }
+   PS3_MEM_ADVANCE();
 }
 
 static void LDR()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int word = 0;
    r4300.pc+=4;
    switch ((iimmediate + irs32) & 7)
@@ -2364,6 +2360,7 @@ static void LDR()
 	read_dword_in_memory();
 	break;
      }
+   PS3_MEM_ADVANCE();
 }
 
 static void LB()
@@ -2389,8 +2386,8 @@ static void LH()
 
 static void LWL()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int word = 0;
-   r4300.pc+=4;
    switch ((iimmediate + irs32) & 3)
      {
       case 0:
@@ -2417,6 +2414,7 @@ static void LWL()
 	irt = (irt & 0xFFFFFF) | (word << 24);
 	break;
      }
+   PS3_MEM_ADVANCE();
    sign_extended(irt);
 }
 
@@ -2450,8 +2448,8 @@ static void LHU()
 
 static void LWR()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int word = 0;
-   r4300.pc+=4;
    switch ((iimmediate + irs32) & 3)
      {
       case 0:
@@ -2478,6 +2476,7 @@ static void LWR()
 	read_word_in_memory();
 	sign_extended(irt);
      }
+   PS3_MEM_ADVANCE();
 }
 
 static void LWU()
@@ -2510,8 +2509,8 @@ static void SH()
 }
 static void SWL()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int old_word = 0;
-   r4300.pc+=4;
    switch ((iimmediate + irs32) & 3)
      {
       case 0:
@@ -2543,6 +2542,7 @@ static void SWL()
 	check_memory();
 	break;
      }
+   PS3_MEM_ADVANCE();
 }
 
 static void SW()
@@ -2557,8 +2557,8 @@ static void SW()
 
 static void SDL()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int old_word = 0;
-   r4300.pc+=4;
    switch ((iimmediate + irs32) & 7)
      {
       case 0:
@@ -2624,12 +2624,13 @@ static void SDL()
 	check_memory();
 	break;
      }
+   PS3_MEM_ADVANCE();
 }
 
 static void SDR()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int old_word = 0;
-   r4300.pc+=4;
    switch ((iimmediate + irs32) & 7)
      {
       case 0:
@@ -2695,12 +2696,13 @@ static void SDR()
 	check_memory();
 	break;
      }
+   PS3_MEM_ADVANCE();
 }
 
 static void SWR()
 {
+   u32 ipc = r4300.pc;
    unsigned long long int old_word = 0;
-   r4300.pc+=4;
    switch ((iimmediate + irs32) & 3)
      {
       case 0:
@@ -2734,6 +2736,7 @@ static void SWR()
 	check_memory();
 	break;
      }
+   PS3_MEM_ADVANCE();
 }
 
 static void CACHE()
@@ -2743,10 +2746,11 @@ static void CACHE()
 
 static void LL()
 {
+   u32 ipc = r4300.pc;
    address = iimmediate + irs32;
    rdword = &irt;
-   r4300.pc+=4;
    read_word_in_memory();
+   PS3_MEM_ADVANCE();
    sign_extended(irt);
    r4300.llbit = 1;
 }
@@ -2755,20 +2759,22 @@ static void LWC1()
 {
    unsigned long long int temp;
    if (check_cop1_unusable()) return;
-   r4300.pc+=4;
+   u32 ipc = r4300.pc;
    address = lfoffset+r4300.gpr[lfbase];
    rdword = &temp;
    read_word_in_memory();
+   PS3_MEM_ADVANCE();
    *((s32*)r4300.fpr_single[lfft]) = *rdword;
 }
 
 static void LDC1()
 {
    if (check_cop1_unusable()) return;
-   r4300.pc+=4;
+   u32 ipc = r4300.pc;
    address = lfoffset+r4300.gpr[lfbase];
    rdword = (long long*)r4300.fpr_double[lfft];
    read_dword_in_memory();
+   PS3_MEM_ADVANCE();
 }
 
 static void LD()
@@ -2782,18 +2788,20 @@ static void LD()
 
 static void SC()
 {
-   r4300.pc+=4;
+   u32 ipc = r4300.pc;
    if(r4300.llbit)
      {
 	address = iimmediate + irs32;
 	word = (u32)(irt & 0xFFFFFFFF);
 	write_word_in_memory();
+	PS3_MEM_ADVANCE();
 	check_memory();
 	r4300.llbit = 0;
 	irt = 1;
      }
    else
      {
+	PS3_MEM_ADVANCE();
 	irt = 0;
      }
 }
@@ -2801,20 +2809,22 @@ static void SC()
 static void SWC1()
 {
    if (check_cop1_unusable()) return;
-   r4300.pc+=4;
+   u32 ipc = r4300.pc;
    address = lfoffset+r4300.gpr[lfbase];
    word = *((s32*)r4300.fpr_single[lfft]);
    write_word_in_memory();
+   PS3_MEM_ADVANCE();
    check_memory();
 }
 
 static void SDC1()
 {
    if (check_cop1_unusable()) return;
-   r4300.pc+=4;
+   u32 ipc = r4300.pc;
    address = lfoffset+r4300.gpr[lfbase];
    dword = *((unsigned long long*)r4300.fpr_double[lfft]);
    write_dword_in_memory();
+   PS3_MEM_ADVANCE();
    check_memory();
 }
 
