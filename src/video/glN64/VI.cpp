@@ -555,6 +555,15 @@ void VI_RSX_showFPS(){
 	}
 #endif
 
+	// Pad OSD: always visible during gameplay for input debug
+	if (ROM_HEADER)
+	{
+		extern char osd_pad_status[];
+		GXColor padColor = {255, 255, 0, 255};
+		menu::IplFont::getInstance().drawInit(padColor);
+		menu::IplFont::getInstance().drawString(10, 210, osd_pad_status, 0.40, false);
+	}
+
 }
 void VI_RSX_resetGameInfo(void)
 {

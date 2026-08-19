@@ -138,6 +138,7 @@ void MenuManager::reset() {
 }
 
 static float pulse = 0.0f;
+static float g_tvStaticTime = 0.0f;
 void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa directamente
     if (isTransitioning) {
         transitionProgress += 0.04f; // Velocidad de la transición
@@ -154,6 +155,7 @@ void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa direc
 
     pulse += 0.05f; // Más lento para mayor fluidez
     if (pulse > 6.28f) pulse = 0.0f; // Resetear ciclo de 2*PI
+    g_tvStaticTime += 0.033f;
 
     // Leer entrada del pad para PS3 directamente (para detectar la pulsación de la 'X')
     uint32_t currentInput = 0;
@@ -163,9 +165,7 @@ void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa direc
     for(int i=0; i<7; i++){
         if(padinfo.status[i]){
             ioPadGetData(i, &paddata);
-            if (paddata.len > 0) {
-                currentInput |= ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
-            }
+            currentInput |= ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
         }
     }
     uint32_t buttonsDown = (currentInput ^ lastInput) & currentInput;
@@ -333,7 +333,11 @@ void ChannelButton::drawComponent(menu::Graphics& gfx) { // Renombrado
 
     // Dibujamos el fondo del canal (Profundidad base)
     gfx.pushDepth(0.5f);
-    drawChannelBackground(gfx, finalCX, finalCY, finalW, finalH, drawColor); // Renombrado
+    if (channelData.id == "EMPTY") {
+        drawChannelStatic(gfx, finalCX, finalCY, finalW, finalH, g_tvStaticTime);
+    } else {
+        drawChannelBackground(gfx, finalCX, finalCY, finalW, finalH, drawColor); // Renombrado
+    }
     gfx.popDepth();
 
     // Dibujamos el marco de selección solo si no estamos en transición avanzada

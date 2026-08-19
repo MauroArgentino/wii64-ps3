@@ -593,5 +593,9 @@ void resumeAudio(void){
 		audio_paused = 0;
 	}
 #endif
+	// Don't call audioPortStart here — it may fail if called before the
+	// interpreter is running. Instead, reset the lazy-start flag so
+	// play_buffer() will call audioPortStart on the first audio drain.
+	port_started = 0;
 }
 

@@ -10,6 +10,7 @@
 #endif
 
 void drawChannelBackground(menu::Graphics& gfx, float posX, float posY, float drawW, float drawH, uint32_t color); // Renombrado
+void drawChannelStatic(menu::Graphics& gfx, float posX, float posY, float drawW, float drawH, float time);
 void drawSelectionFrame(menu::Graphics& gfx, float posX, float posY, float drawW, float drawH, uint32_t cardColor);
 
 #endif // MENUELEMENTSTYLE_H

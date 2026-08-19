@@ -1,0 +1,37 @@
+void main
+(
+	float4 color0 : COLOR0,
+	float4 position : TEXCOORD0,
+	float2 texcoord : TEXCOORD1,
+
+	uniform float time,
+
+	out float4 oColor
+)
+{
+	// Normalize screen coords to 0..1 range (screen is 640x480 logical)
+	float2 uv = position.xy / float2(640.0, 480.0);
+
+	// --- NOISE: hash-based per-pixel random ---
+	float h = fract(sin(dot(floor(uv * 320.0), float2(12.9898, 78.233))) * 43758.5453);
+	// Scale up so the grain is visible (not too fine, not too coarse)
+	float noise = h;
+
+	// --- SCROLLING HORIZONTAL BANDS (V-Sync roll) ---
+	// Multiple layered sine waves for organic CRT look
+	float band1 = 0.65 + 0.35 * sin(uv.y * 60.0 - time * 4.0);
+	float band2 = 0.80 + 0.20 * sin(uv.y * 18.0 - time * 1.5 + 1.0);
+	float bands = band1 * band2;
+
+	// --- HORIZONTAL TEARING LINE that drifts down ---
+	float tearPos = fract(time * 0.15);
+	float tear = 1.0 - 0.4 * exp(-400.0 * (uv.y - tearPos) * (uv.y - tearPos));
+
+	// Combine: bright noise * scrolling bands * subtle tear
+	float gray = noise * bands * tear;
+
+	// Boost brightness so it's clearly visible (not black)
+	gray = clamp(gray * 1.2, 0.05, 1.0);
+
+	oColor = float4(gray, gray, gray, color0.a);
+}

@@ -31,6 +31,7 @@ using namespace Vectormath::Aos;
 
 #include "combined_shader_vpo.h"
 #include "combined_shader_fpo.h"
+#include "wii_static_fpo.h"
 
 namespace menu {
 
@@ -69,6 +70,8 @@ public:
 	void disableScissor();
 	void enableBlending(bool blend);
 	void setTEV(int tev_op);
+	void enableStaticShader(float time);
+	void disableStaticShader();
 	void pushTransparency(float f);
 	void popTransparency();
 	void setTransparency(float f);
@@ -118,6 +121,14 @@ private:
 	rsxVertexProgram *vpo;
 	void *fp_ucode;
 	rsxFragmentProgram *fpo;
+
+	// Wii static (TV no-signal) shader
+	rsxFragmentProgram *static_fpo;
+	void *static_fp_ucode;
+	u32 static_fp_size;
+	u32 static_fp_offset;
+	u32 *static_fp_buffer;
+	s32 static_time_id;
 
 	Matrix4 projMatrix, modelViewMatrix;
 

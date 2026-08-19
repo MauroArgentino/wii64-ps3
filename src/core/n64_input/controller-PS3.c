@@ -123,9 +123,10 @@ static u32 getButtons(u32 buttonsPS3, u32 analogPS3)
 padInfo padinfo;
 
 static u32 previousButtonsPS3[4];
-static u32 previousAnalogPS3[4];
+static u32 previousAnalogPS3[4] = {0x80808080, 0x80808080, 0x80808080, 0x80808080};
 static u32 edgeButtons[4];       /* buttons detected as rising-edge pressed */
 static int edgeHoldCount[4];     /* frames to keep edge-detected buttons held */
+static int refreshCounter;       /* throttle refreshAvailable() calls */
 
 /* Forward declaration */
 static void refreshAvailable(void);
@@ -143,14 +144,35 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 	BUTTONS* c = Keys;
 	memset(c, 0, sizeof(BUTTONS));
 
-	/* Refresh pad availability every PIF read. The DualSense may connect
-	 * via BT AFTER init_controller_ts(); without this, available[0] stays
-	 * 0 and _GetKeys returns immediately — no buttons ever reach the game. */
-	refreshAvailable();
+	/* Throttled pad availability check: every 30 PIF reads instead of every
+	 * one. Calling ioPadGetInfo() every frame can interfere with RPCS3's
+	 * DualSense pad handler, causing analog drift and phantom inputs. */
+	refreshCounter++;
+	if (refreshCounter >= 30 || !controller_PS3.available[Control]) {
+		refreshAvailable();
+		refreshCounter = 0;
+	}
 
 	if (!controller_PS3.available[Control]) return 0;
 
 	ioPadGetData(Control, &paddata);
+
+	/* Update OSD pad status for on-screen debug (visible from VI.cpp) */
+	{
+		static unsigned int osd_cnt = 0;
+		osd_cnt++;
+		if ((osd_cnt & 0x3) == 0) { /* Update every 4th read to avoid flicker */
+			snprintf(osd_pad_status, sizeof(osd_pad_status),
+				"PAD: len=%u btn=%04X raw=[%02X %02X %02X %02X %02X %02X %02X %02X] edge=%04X(hold=%d)",
+				paddata.len,
+				((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF),
+				paddata.button[0], paddata.button[1],
+				paddata.button[2], paddata.button[3],
+				paddata.button[4], paddata.button[5],
+				paddata.button[6], paddata.button[7],
+				edgeButtons[Control], edgeHoldCount[Control]);
+		}
+	}
 #ifdef DEBUG_PROBES
 	{
 		static int gk_cnt = 0;
@@ -162,34 +184,25 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 		}
 	}
 #endif
-	if (paddata.len)
+	/* RPCS3 DualSense: paddata.len is always 0 — the cellPad emulation
+	 * doesn't fill this field. Read button+analog data directly.
+	 * button[2-3] = digital buttons (0 when nothing pressed, even with len=0).
+	 * button[4-7] = analog sticks. */
 	{
-		buttonsPS3 = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
-		analogPS3 = ((paddata.button[4]&0xFF)<<24) | ((paddata.button[5]&0xFF)<<16) | 
-					((paddata.button[6]&0xFF)<<8) | ((paddata.button[7]&0xFF)&0xFF); 
-		//0xRH-RV-LH-LV 0x00 = Left/Up, 0xFF = Right/Down
-		previousButtonsPS3[Control] = buttonsPS3;
-		previousAnalogPS3[Control] = analogPS3;
-		/* Edge detection: latch any button that transitioned 0->1 for 4 reads
-		 * so a fast tap (e.g. Start) is never lost between len=0 gaps. */
-		u32 newlyPressed = buttonsPS3 & ~edgeButtons[Control];
-		edgeButtons[Control] = buttonsPS3;
+		u16 freshBtn = ((paddata.button[2]&0xFF)<<8) | (paddata.button[3]&0xFF);
+		u32 freshAnalog = ((paddata.button[4]&0xFF)<<24) | ((paddata.button[5]&0xFF)<<16) |
+						 ((paddata.button[6]&0xFF)<<8)  | ((paddata.button[7]&0xFF)&0xFF);
+
+		buttonsPS3 = freshBtn;
+		analogPS3 = freshAnalog;
+		previousButtonsPS3[Control] = freshBtn;
+		previousAnalogPS3[Control] = freshAnalog;
+
+		/* Edge detection: latch rising-edge presses for 8 PIF reads */
+		u32 newlyPressed = freshBtn & ~edgeButtons[Control];
+		edgeButtons[Control] = freshBtn;
 		if (newlyPressed)
-			edgeHoldCount[Control] = 4;
-#ifdef DEBUG_PROBES
-		if (input_probe_cnt < 24)
-		{
-			input_probe_cnt++;
-			DBG_INP("[PADGET#%u] Control=%d avail=%d len=%u buttons=%04X analog=%08X\n",
-				input_probe_cnt, Control, controller_PS3.available[Control],
-				paddata.len, buttonsPS3, analogPS3);
-		}
-#endif
-	}
-	else
-	{
-		buttonsPS3 = previousButtonsPS3[Control];
-		analogPS3 = previousAnalogPS3[Control];
+			edgeHoldCount[Control] = 8;
 	}
 
 	/* Merge edge-detected buttons into live state so even when paddata.len==0

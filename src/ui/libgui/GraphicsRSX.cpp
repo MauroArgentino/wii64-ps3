@@ -59,6 +59,7 @@ Graphics::Graphics(GXRModeObj *rmode)
 //	printf("Graphics constructor\n");
 
 	fp_buffer = NULL;
+	static_fp_buffer = NULL;
 	shader_mode = SHADER_PASSCOLOR;
 	shader_alpha_mode = 0.0f;
 
@@ -70,6 +71,8 @@ Graphics::~Graphics()
 {
 	if (fp_buffer)
 		rsxFree(fp_buffer);
+	if (static_fp_buffer)
+		rsxFree(static_fp_buffer);
 }
 
 void Graphics::init()
@@ -120,6 +123,14 @@ void Graphics::init()
 	shader_alpha_mode = 0.0f;
 	textureUnit_id = rsxFragmentProgramGetAttrib(fpo,"texture");
 	globalTextureUnit_id = textureUnit_id;
+
+	// Init Wii static (TV no-signal) fragment shader
+	static_fpo = (rsxFragmentProgram*)wii_static_fpo;
+	static_fp_ucode = rsxFragmentProgramGetUCode(static_fpo, &static_fp_size);
+	static_fp_buffer = (u32*)rsxMemalign(64, static_fp_size);
+	memcpy(static_fp_buffer, static_fp_ucode, static_fp_size);
+	rsxAddressToOffset(static_fp_buffer, &static_fp_offset);
+	static_time_id = rsxFragmentProgramGetConst(static_fpo, "time");
 }
 
 void Graphics::drawInit()
@@ -606,6 +617,21 @@ void Graphics::setTEV(int tev_op)
 	rsxSetFragmentProgramParameter(context,fpo,mode_id,&shader_mode,fp_offset);
 	rsxSetFragmentProgramParameter(context,fpo,alpha_mode_id,&shader_alpha_mode,fp_offset);
 	rsxLoadFragmentProgramLocation(context,fpo,fp_offset,GCM_LOCATION_RSX);
+}
+
+void Graphics::enableStaticShader(float time)
+{
+	// Bind the TV static fragment program with time uniform
+	rsxSetFragmentProgramParameter(context, static_fpo, static_time_id, &time, static_fp_offset);
+	rsxLoadFragmentProgramLocation(context, static_fpo, static_fp_offset, GCM_LOCATION_RSX);
+}
+
+void Graphics::disableStaticShader()
+{
+	// Restore the normal fragment program
+	rsxSetFragmentProgramParameter(context, fpo, mode_id, &shader_mode, fp_offset);
+	rsxSetFragmentProgramParameter(context, fpo, alpha_mode_id, &shader_alpha_mode, fp_offset);
+	rsxLoadFragmentProgramLocation(context, fpo, fp_offset, GCM_LOCATION_RSX);
 }
 
 void Graphics::pushTransparency(float f)

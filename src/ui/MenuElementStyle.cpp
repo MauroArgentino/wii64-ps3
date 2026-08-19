@@ -17,6 +17,23 @@ void drawChannelBackground(menu::Graphics& gfx, float posX, float posY, float dr
     gfx.fillRoundedRect(x, y, (int)drawW, (int)drawH, r, 8);
 }
 
+void drawChannelStatic(menu::Graphics& gfx, float posX, float posY, float drawW, float drawH, float time) {
+    gfx.enableStaticShader(time);
+    gfx.enableBlending(true);
+
+    int r = 6;
+    if (drawW < r * 2.5f) r = (int)(drawW * 0.3f);
+    if (r < 1) r = 1;
+
+    gfx.setColor((GXColor){255, 255, 255, 255});
+
+    int x = (int)(posX - drawW / 2.0f);
+    int y = (int)(posY - drawH / 2.0f);
+    gfx.fillRoundedRect(x, y, (int)drawW, (int)drawH, r, 8);
+
+    gfx.disableStaticShader();
+}
+
 void drawSelectionFrame(menu::Graphics& gfx, float posX, float posY, float drawW, float drawH, uint32_t cardColor) {
     gfx.setTEV(GX_PASSCLR);
     gfx.enableBlending(true);
