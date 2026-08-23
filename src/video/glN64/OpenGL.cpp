@@ -72,7 +72,7 @@ extern "C" { void _break(); }
 
 #if defined(__GX__) || defined(PS3)
 extern char glN64_useFrameBufferTextures;
-extern char glN64_use2xSaiTextures;
+extern u32 glN64_textureFilter;
 #endif // __GX__ PS3
 
 #ifdef PS3
@@ -2448,7 +2448,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 
 	if (combiner.usesT0 && cache.current[0]->GXtexture != NULL) 
 	{
-		if (cache.enable2xSaI && !cache.current[0]->frameBufferTexture)
+		if (cache.textureFilter && !cache.current[0]->frameBufferTexture)
 			GX_InitTexObj(&cache.current[0]->GXtex, cache.current[0]->GXtexture, (u16) cache.current[0]->realWidth << 1, 
 				(u16) cache.current[0]->realHeight << 1, cache.current[0]->GXtexfmt, 
 				(cache.current[0]->clampS || OGL.GXforceClampS0) ? GX_CLAMP : GX_REPEAT, 
@@ -2464,7 +2464,7 @@ void OGL_DrawTexturedRect( float ulx, float uly, float lrx, float lry, float uls
 
 	if (combiner.usesT1 && OGL.ARB_multitexture && cache.current[1]->GXtexture != NULL)
 	{
-		if (cache.enable2xSaI && !cache.current[1]->frameBufferTexture)
+		if (cache.textureFilter && !cache.current[1]->frameBufferTexture)
 			GX_InitTexObj(&cache.current[1]->GXtex, cache.current[1]->GXtexture, (u16) cache.current[1]->realWidth << 1, 
 				(u16) cache.current[1]->realHeight << 1, cache.current[1]->GXtexfmt, 
 				(cache.current[1]->clampS || OGL.GXforceClampS1) ? GX_CLAMP : GX_REPEAT, 
@@ -2919,7 +2919,7 @@ void OGL_RSXinitDlist()
 	// Sync render settings from menu
 	OGL.frameBufferTextures = glN64_useFrameBufferTextures;
 	if (gameHacks.mm_fbtex) OGL.frameBufferTextures = 1;
-	OGL.enable2xSaI = glN64_use2xSaiTextures;
+	OGL.textureFilter = glN64_textureFilter;
 
 	//Turn off Blending
 	rsxSetBlendEnable(context, GCM_FALSE);
@@ -2990,7 +2990,7 @@ void OGL_GXinitDlist()
 //		VIDEO_WaitVSync();
 
 	OGL.frameBufferTextures = glN64_useFrameBufferTextures;
-	OGL.enable2xSaI = glN64_use2xSaiTextures;
+	OGL.textureFilter = glN64_textureFilter;
 
 	// init primeDepthZtex, Ztexture, AlphaCompare, and Texture Clamping
 	TextureCache_UpdatePrimDepthZtex( 1.0f );

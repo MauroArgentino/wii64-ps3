@@ -167,11 +167,14 @@ enum glN64_useFrameBufferTextures
 	GLN64_FBTEX_ENABLE
 };
 
-extern char glN64_use2xSaiTextures;
-enum glN64_use2xSaiTextures
+extern u32 glN64_textureFilter;
+enum glN64_textureFilter
 {
-	GLN64_2XSAI_DISABLE=0,
-	GLN64_2XSAI_ENABLE
+	GLN64_FILTER_OFF=0,
+	GLN64_FILTER_2XSAI,
+	GLN64_FILTER_XBRZ,
+	GLN64_FILTER_HQ4X,
+	GLN64_FILTER_COUNT
 };
 
 extern char renderCpuFramebuffer;

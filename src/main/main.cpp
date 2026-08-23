@@ -178,7 +178,7 @@ char printToScreen;
 char showFPSonScreen;
 char printToSD;
 char glN64_useFrameBufferTextures;
-char glN64_use2xSaiTextures;
+u32 glN64_textureFilter;
 char renderCpuFramebuffer;
 extern timers Timers;
 char menuActive;
@@ -212,7 +212,7 @@ static struct {
   { "FPS", &showFPSonScreen, FPS_HIDE, FPS_SHOW },
 //  { "Debug", &printToScreen, DEBUG_HIDE, DEBUG_SHOW },
   { "FBTex", &glN64_useFrameBufferTextures, GLN64_FBTEX_DISABLE, GLN64_FBTEX_ENABLE },
-  { "2xSaI", &glN64_use2xSaiTextures, GLN64_2XSAI_DISABLE, GLN64_2XSAI_ENABLE },
+  { "TexFilter", ((char*)&glN64_textureFilter)+3, GLN64_FILTER_OFF, GLN64_FILTER_HQ4X },
   { "ScreenMode", &screenMode, SCREENMODE_4x3, SCREENMODE_16x9_PILLARBOX },
   { "Resolution", &vidResolution, RESOLUTION_320X240, RESOLUTION_1080P },
   { "Core", ((char*)&dynacore)+3, DYNACORE_INTERPRETER, DYNACORE_CACHED_INTERP },
@@ -341,7 +341,7 @@ int main(int argc, char* argv[]){
 #ifdef GLN64_GX
 // glN64 specific  settings
  	glN64_useFrameBufferTextures = 0; // Disable FrameBuffer textures
-	glN64_use2xSaiTextures = 0;	// Disable 2xSai textures
+	glN64_textureFilter = GLN64_FILTER_OFF;	// Disable texture scaling
 	renderCpuFramebuffer = 0; // Disable CPU Framebuffer Rendering
 #endif //GLN64_GX
 	menuActive = 1;
@@ -356,6 +356,25 @@ int main(int argc, char* argv[]){
 		if(f) {        //open ok, read it
 			readConfig(f);
 			fclose(f);
+		}
+		// Auto-add missing "TexFilter" key to settings.cfg
+		{
+			char line[256];
+			int hasTexFilter = 0;
+			f = fopen("/dev_usb000/wii64/settings.cfg", "r");
+			if(f) {
+				while(fgets(line, 256, f)) {
+					if(strstr(line, "TexFilter")) { hasTexFilter = 1; break; }
+				}
+				fclose(f);
+			}
+			if(!hasTexFilter) {
+				f = fopen("/dev_usb000/wii64/settings.cfg", "a");
+				if(f) {
+					fprintf(f, "TexFilter = %d\n", glN64_textureFilter);
+					fclose(f);
+				}
+			}
 		}
 		f = fopen( "/dev_usb000/wii64/controlP.cfg", "r" );  //attempt to open file
 		if(f) {

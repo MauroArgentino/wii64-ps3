@@ -53,6 +53,8 @@ static int texDebugCount = 0;
 #include "CRC.h"
 #include "convert.h"
 #include "2xSAI.h"
+#include "xbrz.h"
+#include "hq4x.h"
 #include "FrameBuffer.h"
 #include "../../main/game_hacks.h"
 
@@ -416,7 +418,7 @@ void TextureCache_Init()
 	cache.bottom = NULL;
 	cache.numCached = 0;
 	cache.cachedBytes = 0;
-	cache.enable2xSaI = OGL.enable2xSaI;
+	cache.textureFilter = OGL.textureFilter;
 	cache.bitDepth = OGL.textureBitDepth;
 
 #ifdef __GX__
@@ -947,7 +949,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	clampSClamp = texInfo->width - 1;
 	clampTClamp = texInfo->height - 1;
 
-	if (!cache.enable2xSaI)
+	if (!cache.textureFilter)
 	{
 		texInfo->GXtexture = (u16*) dest;
 
@@ -1018,7 +1020,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
       break;
 		}
 	}
-	else //	!cache.enable2xSaI
+	else //	!cache.textureFilter
 	{
 		j = 0;
 		for (y = 0; y < texInfo->realHeight; y++)
@@ -1074,34 +1076,55 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 		texInfo->GXtexture = (u16*) scaledDest;
 		__lwp_heap_free(GXtexCache, dest);
 
-	}	//	cache.enable2xSaI
+	}	//	cache.textureFilter
 #endif // __GX__
 
 #ifdef PS3
-	// 2xSaI texture scaling for PS3 RSX
-	// Byte-swap: texel functions produce 0xRRGGBBAA, RSX expects 0xAARRGGBB
+	// Texture scaling filters for PS3 RSX
+	// Texel functions produce 0xRRGGBBAA, RSX expects 0xAARRGGBB
 	// RSX linear textures require pitch aligned to 128 bytes.
-	// PS3 forces RGBA8 (32-bit) for all formats, so Interpolator8888 is always correct.
+	// PS3 forces RGBA8 (32-bit) for all formats.
 
 	u32 uploadWidth = texInfo->realWidth;
 	u32 uploadHeight = texInfo->realHeight;
 	u32 *srcForUpload = dest;
 
-	if (cache.enable2xSaI)
+	if (cache.textureFilter && !texInfo->frameBufferTexture)
 	{
-		Interpolator8888 interpolator;
-		u32 scaledW = texInfo->realWidth << 1;
-		u32 scaledH = texInfo->realHeight << 1;
+		u32 filterScale = (cache.textureFilter == 3) ? 4 : 2;
+		u32 scaledW = texInfo->realWidth * filterScale;
+		u32 scaledH = texInfo->realHeight * filterScale;
 		u32 *scaledDest = (u32*)malloc(scaledW * scaledH * 4);
 		if (scaledDest)
 		{
-			_2xSaI(dest, scaledDest, texInfo->realWidth, texInfo->realHeight,
-			        texInfo->clampS, texInfo->clampT, &interpolator);
-			srcForUpload = scaledDest;
-			uploadWidth = scaledW;
-			uploadHeight = scaledH;
-			free(dest);
-			dest = scaledDest;
+			switch (cache.textureFilter)
+			{
+			case 1: /* 2xSaI */
+			{
+				Interpolator8888 interpolator;
+				_2xSaI(dest, scaledDest, texInfo->realWidth, texInfo->realHeight,
+				        texInfo->clampS, texInfo->clampT, &interpolator);
+				break;
+			}
+			case 2: /* xBRZ 2x */
+				xbrz_scale2x((const u32*)dest, scaledDest, texInfo->realWidth, texInfo->realHeight);
+				break;
+			case 3: /* HQ4x */
+				hq4x_scale4x((const u32*)dest, scaledDest, texInfo->realWidth, texInfo->realHeight);
+				break;
+			default:
+				free(scaledDest);
+				scaledDest = NULL;
+				break;
+			}
+			if (scaledDest)
+			{
+				srcForUpload = scaledDest;
+				uploadWidth = scaledW;
+				uploadHeight = scaledH;
+				free(dest);
+				dest = scaledDest;
+			}
 		}
 	}
 
@@ -1156,7 +1179,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	//2xSaI textures will not be implemented for now.
 	DCFlushRange(texInfo->GXtexture, texInfo->textureBytes);
 #else // __GX__
-	if (cache.enable2xSaI)
+	if (cache.textureFilter)
 	{
 		static Interpolator8888 i8888;
 		static Interpolator4444 i4444;
@@ -1407,7 +1430,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 #ifdef __GX__
 	texInfo->GXtexture = (u16*) dest;
 
-	if (!cache.enable2xSaI)
+	if (!cache.textureFilter)
 	{
 		j = 0;
 		switch(GXsize)
@@ -1491,7 +1514,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 			break;
 		}
 	}
-	else if (texInfo->textureBytes > 0) //	!cache.enable2xSaI
+	else if (texInfo->textureBytes > 0) //	!cache.textureFilter
 	{
 		j = 0;
 		for (y = 0; y < texInfo->realHeight; y++)
@@ -1555,7 +1578,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 		texInfo->GXtexture = (u16*) scaledDest;
 		__lwp_heap_free(GXtexCache, dest);
 
-	} 	//	cache.enable2xSaI
+	} 	//	cache.textureFilter
 #else // __GX__
 #if 0 /* DISABLED for testing - 32-bit interleaved read may cause green squares on title screens */
 	if (texInfo->size == G_IM_SIZ_32b)
@@ -1666,30 +1689,51 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 #endif // !__GX__
 
 #ifdef PS3
-	// 2xSaI texture scaling for PS3 RSX
-	// Byte-swap: texel functions produce 0xRRGGBBAA, RSX expects 0xAARRGGBB
+	// Texture scaling filters for PS3 RSX
+	// Texel functions produce 0xRRGGBBAA, RSX expects 0xAARRGGBB
 	// RSX linear textures require pitch aligned to 128 bytes.
-	// PS3 forces RGBA8 (32-bit) for all formats, so Interpolator8888 is always correct.
+	// PS3 forces RGBA8 (32-bit) for all formats.
 
 	u32 uploadWidth = texInfo->realWidth;
 	u32 uploadHeight = texInfo->realHeight;
 	u32 *srcForUpload = dest;
 
-	if (cache.enable2xSaI)
+	if (cache.textureFilter && !texInfo->frameBufferTexture)
 	{
-		Interpolator8888 interpolator;
-		u32 scaledW = texInfo->realWidth << 1;
-		u32 scaledH = texInfo->realHeight << 1;
+		u32 filterScale = (cache.textureFilter == 3) ? 4 : 2;
+		u32 scaledW = texInfo->realWidth * filterScale;
+		u32 scaledH = texInfo->realHeight * filterScale;
 		u32 *scaledDest = (u32*)malloc(scaledW * scaledH * 4);
 		if (scaledDest)
 		{
-			_2xSaI(dest, scaledDest, texInfo->realWidth, texInfo->realHeight,
-			        texInfo->clampS, texInfo->clampT, &interpolator);
-			srcForUpload = scaledDest;
-			uploadWidth = scaledW;
-			uploadHeight = scaledH;
-			free(dest);
-			dest = scaledDest;
+			switch (cache.textureFilter)
+			{
+			case 1: /* 2xSaI */
+			{
+				Interpolator8888 interpolator;
+				_2xSaI(dest, scaledDest, texInfo->realWidth, texInfo->realHeight,
+				        texInfo->clampS, texInfo->clampT, &interpolator);
+				break;
+			}
+			case 2: /* xBRZ 2x */
+				xbrz_scale2x((const u32*)dest, scaledDest, texInfo->realWidth, texInfo->realHeight);
+				break;
+			case 3: /* HQ4x */
+				hq4x_scale4x((const u32*)dest, scaledDest, texInfo->realWidth, texInfo->realHeight);
+				break;
+			default:
+				free(scaledDest);
+				scaledDest = NULL;
+				break;
+			}
+			if (scaledDest)
+			{
+				srcForUpload = scaledDest;
+				uploadWidth = scaledW;
+				uploadHeight = scaledH;
+				free(dest);
+				dest = scaledDest;
+			}
 		}
 	}
 
@@ -1788,7 +1832,7 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 	if(texInfo->GXtexture != NULL)
 		DCFlushRange(texInfo->GXtexture, texInfo->textureBytes);
 #else // __GX__
-	if (cache.enable2xSaI)
+	if (cache.textureFilter)
 	{
 		static Interpolator8888 i8888;
 		static Interpolator4444 i4444;
@@ -1900,7 +1944,7 @@ void TextureCache_ActivateTexture( u32 t, CachedTexture *texture )
 
 	if (texture->GXtexture != NULL && !OGL.GXrenderTexRect) 
 	{
-		if (cache.enable2xSaI && !texture->frameBufferTexture)
+		if (cache.textureFilter && !texture->frameBufferTexture)
 			GX_InitTexObj(&texture->GXtex, texture->GXtexture, (u16) texture->realWidth << 1, (u16) texture->realHeight << 1, texture->GXtexfmt, 
 				texture->clampS ? GX_CLAMP : GX_REPEAT, 
 				texture->clampT ? GX_CLAMP : GX_REPEAT, GX_FALSE); 
@@ -2079,7 +2123,7 @@ void TextureCache_Update( u32 t )
 	u32 tileWidth, maskWidth, loadWidth, lineWidth, clampWidth, height;
 	u32 tileHeight, maskHeight, loadHeight, lineHeight, clampHeight, width;
 
-	if (cache.enable2xSaI != OGL.enable2xSaI)
+	if (cache.textureFilter != OGL.textureFilter)
 	{
 		TextureCache_Destroy();
 		TextureCache_Init();
@@ -2338,8 +2382,11 @@ void TextureCache_Update( u32 t )
 	cache.current[t]->shiftScaleS = 1.0f;
 	cache.current[t]->shiftScaleT = 1.0f;
 
-	cache.current[t]->offsetS = OGL.enable2xSaI ? 0.25f : 0.5f;
-	cache.current[t]->offsetT = OGL.enable2xSaI ? 0.25f : 0.5f;
+	{
+		float filterScale = (cache.textureFilter == 3) ? 4.0f : (cache.textureFilter ? 2.0f : 1.0f);
+		cache.current[t]->offsetS = 0.5f / filterScale;
+		cache.current[t]->offsetT = 0.5f / filterScale;
+	}
 
 	if (gSP.textureTile[t]->shifts > 10)
 		cache.current[t]->shiftScaleS = (f32)(1 << (16 - gSP.textureTile[t]->shifts));

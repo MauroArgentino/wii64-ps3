@@ -84,7 +84,7 @@ struct TextureCache
 	GLuint			glNoiseNames[32];
 	//GLuint			glDummyName;
 	CachedTexture	*dummy;
-	u32				enable2xSaI, bitDepth;
+	u32				textureFilter, bitDepth;
 #ifdef __GX__
 	int				VIcount;
 	CachedTexture	*(GXprimDepthZ[2]);

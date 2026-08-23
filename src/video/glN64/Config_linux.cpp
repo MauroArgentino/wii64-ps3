@@ -9,8 +9,14 @@
  *
 **/
 
-#ifdef PS3
-#elif defined(__GX__)
+#if defined(PS3)
+/* PS3: this file is not used. Config is handled via settings.cfg in main.cpp;
+ * OpenGL.cpp syncs OGL.* from the glN64_* globals. glN64.cpp still imports
+ * these two entry points, so provide no-op definitions for the link. */
+void Config_LoadConfig() {}
+void Config_DoConfig() {}
+#else
+#if defined(__GX__)
 #include <gccore.h>
 #else //__GX__
 #include <features.h>
@@ -34,7 +40,7 @@
 
 #if defined(__GX__) || defined(PS3)
 extern char glN64_useFrameBufferTextures;
-extern char glN64_use2xSaiTextures;
+extern u32 glN64_textureFilter;
 #endif // __GX__ PS3
 
 #if !(defined(__GX__)||defined(PS3)) // this eliminates several functions
@@ -132,7 +138,7 @@ static void okButton_clicked( GtkWidget *widget, void *data )
 	OGL.fullscreenHeight = OGL.windowedHeight = i2;
 
 	OGL.forceBilinear = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(forceBilinearCheck) );
-	OGL.enable2xSaI = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(enable2xSAICheck) );
+	OGL.textureFilter = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(enable2xSAICheck) );
 	OGL.fog = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(enableFogCheck) );
 	OGL.frameBufferTextures = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(enableHardwareFBCheck) );
 	OGL.usePolygonStipple = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(enablePolygonStippleCheck) );
@@ -167,7 +173,7 @@ static void okButton_clicked( GtkWidget *widget, void *data )
 /*	fprintf( f, "width=%d\n",                 OGL.width );
 	fprintf( f, "height=%d\n",                OGL.height );*/
 	fprintf( f, "force bilinear=%d\n",        OGL.forceBilinear );
-	fprintf( f, "enable 2xSAI=%d\n",          OGL.enable2xSaI );
+	fprintf( f, "enable 2xSAI=%d\n",          OGL.textureFilter );
 	fprintf( f, "enable fog=%d\n",            OGL.fog );
 	fprintf( f, "enable HardwareFB=%d\n",     OGL.frameBufferTextures );
 	fprintf( f, "enable dithered alpha=%d\n", OGL.usePolygonStipple );
@@ -205,7 +211,7 @@ static void configWindow_show( GtkWidget *widget, void *data )
 	sprintf( text, "%d x %d", (int)OGL.windowedWidth, (int)OGL.windowedHeight );
 	gtk_entry_set_text( GTK_ENTRY(GTK_COMBO(resolutionCombo)->entry), text );
 
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(enable2xSAICheck),          (OGL.enable2xSaI) );
+	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(enable2xSAICheck),          (OGL.textureFilter) );
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(forceBilinearCheck),        (OGL.forceBilinear) );
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(enableFogCheck),            (OGL.fog) );
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(enablePolygonStippleCheck), (OGL.usePolygonStipple) );
@@ -427,7 +433,7 @@ void Config_LoadConfig()
 	OGL.windowedWidth = 640;
 	OGL.windowedHeight = 480;
 	OGL.forceBilinear = 0;
-	OGL.enable2xSaI = glN64_use2xSaiTextures;
+	OGL.textureFilter = glN64_textureFilter;
 	OGL.fog = 1;
 	OGL.textureBitDepth = 2; // 32-bit only (best for 2xSaI)
 	OGL.frameBufferTextures = glN64_useFrameBufferTextures;
@@ -440,7 +446,7 @@ void Config_LoadConfig()
 	OGL.windowedWidth = display_width;
 	OGL.windowedHeight = display_height;
 	OGL.forceBilinear = 0;
-	OGL.enable2xSaI = glN64_use2xSaiTextures;
+	OGL.textureFilter = glN64_textureFilter;
 	OGL.fog = 1;
 	OGL.textureBitDepth = 1; // normal (16 & 32 bits)
 	OGL.frameBufferTextures = glN64_useFrameBufferTextures;
@@ -458,7 +464,7 @@ void Config_LoadConfig()
 	OGL.windowedHeight = 480;
 //	OGL.windowedBits = 0;
 	OGL.forceBilinear = 0;
-	OGL.enable2xSaI = 0;
+	OGL.textureFilter = 0;
 	OGL.fog = 1;
 	OGL.textureBitDepth = 1; // normal (16 & 32 bits)
 	OGL.frameBufferTextures = 0;
@@ -527,7 +533,7 @@ void Config_LoadConfig()
 		}
 		else if (!strcasecmp( line, "enable 2xSAI" ))
 		{
-			OGL.enable2xSaI = atoi( val );
+			OGL.textureFilter = atoi( val );
 		}
 		else if (!strcasecmp( line, "enable fog" ))
 		{
@@ -570,3 +576,4 @@ void Config_DoConfig()
 	gtk_widget_show_all( configWindow );
 #endif // !__GX__ !PS3
 }
+#endif /* !PS3 */

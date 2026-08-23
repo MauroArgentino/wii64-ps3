@@ -67,8 +67,10 @@ void Func_ScreenMode16_9();
 void Func_ScreenForce16_9();
 void Func_CpuFramebufferOn();
 void Func_CpuFramebufferOff();
-void Func_2xSaiTexturesOn();
-void Func_2xSaiTexturesOff();
+void Func_TexFilterOff();
+void Func_TexFilter2xSaI();
+void Func_TexFilterXBRZ();
+void Func_TexFilterHQ4X();
 void Func_FbTexturesOn();
 void Func_FbTexturesOff();
 
@@ -94,14 +96,14 @@ void Func_DeleteSaves();
 void Func_ReturnFromSettingsFrame();
 
 
-#define NUM_FRAME_BUTTONS 42
+#define NUM_FRAME_BUTTONS 44
 #define NUM_TAB_BUTTONS 5
 #define FRAME_BUTTONS settingsFrameButtons
 #define FRAME_STRINGS settingsFrameStrings
 #define NUM_FRAME_TEXTBOXES 14
 #define FRAME_TEXTBOXES settingsFrameTextBoxes
 
-static char FRAME_STRINGS[42][23] =
+static char FRAME_STRINGS[45][23] =
 	{ "General",
 	  "Video",
 	  "Input",
@@ -122,7 +124,7 @@ static char FRAME_STRINGS[42][23] =
 	  "Show FPS",
 	  "Screen Mode",
 	  "CPU Framebuffer",
-	  "2xSaI Tex",
+	  "Tex Filter",
 	  "FB Textures",
 	  "On",
 	  "Off",
@@ -149,7 +151,11 @@ static char FRAME_STRINGS[42][23] =
 	  "320x240",
 	  "640x480",
 	  "720p",
-	  "1080p"};
+	  "1080p",
+	//Strings for Tex Filter [42]
+	  "2xSAI",
+	  "xBRZ",
+	  "HQ4x"};
 
 struct ButtonInfo
 {
@@ -191,32 +197,34 @@ struct ButtonInfo
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[22],	230.0,	170.0,	 75.0,	56.0,	15,	20,	19,	18,	Func_ScreenMode4_3,		Func_ReturnFromSettingsFrame }, // ScreenMode: 4:3
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[23],	325.0,	170.0,	 75.0,	56.0,	15,	20,	17,	19,	Func_ScreenMode16_9,	Func_ReturnFromSettingsFrame }, // ScreenMode: 16:9
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[24],	420.0,	170.0,	155.0,	56.0,	16,	21,	18,	17,	Func_ScreenForce16_9,	Func_ReturnFromSettingsFrame }, // ScreenMode: Force 16:9 in-game
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	240.0,	 75.0,	56.0,	18,	22,	21,	21,	Func_CpuFramebufferOn,	Func_ReturnFromSettingsFrame }, // CPU FB: On
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	240.0,	 75.0,	56.0,	19,	23,	20,	20,	Func_CpuFramebufferOff,	Func_ReturnFromSettingsFrame }, // CPU FB: Off
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	310.0,	 75.0,	56.0,	20,	24,	23,	23,	Func_2xSaiTexturesOn,	Func_ReturnFromSettingsFrame }, // 2xSai: On
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	310.0,	 75.0,	56.0,	21,	25,	22,	22,	Func_2xSaiTexturesOff,	Func_ReturnFromSettingsFrame }, // 2xSai: Off
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	380.0,	 75.0,	56.0,	22,	39,	25,	25,	Func_FbTexturesOn,		Func_ReturnFromSettingsFrame }, // FbTex: On
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	380.0,	 75.0,	56.0,	23,	40,	24,	24,	Func_FbTexturesOff,		Func_ReturnFromSettingsFrame }, // FbTex: Off
-	//Buttons for Input Tab (starts at button[26])
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[25],	180.0,	100.0,	280.0,	56.0,	 2,	27,	-1,	-1,	Func_ConfigureInput,	Func_ReturnFromSettingsFrame }, // Configure Mappings
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[26],	180.0,	170.0,	280.0,	56.0,	26,	28,	-1,	-1,	Func_ConfigurePaks,		Func_ReturnFromSettingsFrame }, // Configure Paks
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[27],	180.0,	240.0,	280.0,	56.0,	27,	29,	-1,	-1,	Func_ConfigureButtons,	Func_ReturnFromSettingsFrame }, // Configure Buttons
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	28,	31,	30,	30,	Func_SaveButtonsSD,		Func_ReturnFromSettingsFrame }, // Save Button Configs to SD
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[10],	360.0,	310.0,	 70.0,	56.0,	28,	31,	29,	29,	Func_SaveButtonsUSB,	Func_ReturnFromSettingsFrame }, // Save Button Configs to USB
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[30],	295.0,	380.0,	135.0,	56.0,	29,	 2,	-1,	-1,	Func_ToggleButtonLoad,	Func_ReturnFromSettingsFrame }, // Toggle Button Load Slot
-	//Buttons for Audio Tab (starts at button[32])
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[32],	345.0,	100.0,	 75.0,	56.0,	 3,	 3,	33,	33,	Func_DisableAudioYes,	Func_ReturnFromSettingsFrame }, // Disable Audio: Yes
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	440.0,	100.0,	 75.0,	56.0,	 3,	 3,	32,	32,	Func_DisableAudioNo,	Func_ReturnFromSettingsFrame }, // Disable Audio: No
-	//Buttons for Saves Tab (starts at button[34])
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[32],	375.0,	100.0,	 75.0,	56.0,	 4,	36,	35,	35,	Func_AutoSaveNativeYes,	Func_ReturnFromSettingsFrame }, // Auto Save Native: Yes
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	470.0,	100.0,	 75.0,	56.0,	 4,	36,	34,	34,	Func_AutoSaveNativeNo,	Func_ReturnFromSettingsFrame }, // Auto Save Native: No
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[35],	365.0,	170.0,	190.0,	56.0,	34,	37,	-1,	-1,	Func_CopySaves,			Func_ReturnFromSettingsFrame }, // Copy Saves
-	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[36],	365.0,	240.0,	190.0,	56.0,	36,	 4,	-1,	-1,	Func_DeleteSaves,		Func_ReturnFromSettingsFrame }, // Delete Saves
-	//Buttons for Resolution (starts at button[38])
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[38],	230.0,	450.0,	 85.0,	56.0,	24,	 1,	41,	39,	Func_Resolution320x240,	Func_ReturnFromSettingsFrame }, // Resolution: 320x240
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[39],	325.0,	450.0,	 85.0,	56.0,	24,	 1,	38,	40,	Func_Resolution640x480,	Func_ReturnFromSettingsFrame }, // Resolution: 640x480
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[40],	420.0,	450.0,	 85.0,	56.0,	25,	 1,	39,	41,	Func_Resolution720p,	Func_ReturnFromSettingsFrame }, // Resolution: 720p
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[41],	525.0,	450.0,	 85.0,	56.0,	25,	 1,	40,	38,	Func_Resolution1080p,	Func_ReturnFromSettingsFrame }, // Resolution: 1080p
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	240.0,	 75.0,	56.0,	18,	23,	21,	21,	Func_CpuFramebufferOn,	Func_ReturnFromSettingsFrame }, // CPU FB: On
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	240.0,	 75.0,	56.0,	19,	24,	20,	20,	Func_CpuFramebufferOff,	Func_ReturnFromSettingsFrame }, // CPU FB: Off
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	230.0,	310.0,	 85.0,	56.0,	20,	26,	25,	23,	Func_TexFilterOff,		Func_ReturnFromSettingsFrame }, // Tex Filter: Off
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[42],	325.0,	310.0,	 85.0,	56.0,	20,	26,	22,	24,	Func_TexFilter2xSaI,	Func_ReturnFromSettingsFrame }, // Tex Filter: 2xSAI
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[43],	420.0,	310.0,	 85.0,	56.0,	21,	27,	23,	25,	Func_TexFilterXBRZ,		Func_ReturnFromSettingsFrame }, // Tex Filter: xBRZ
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[44],	525.0,	310.0,	 85.0,	56.0,	21,	27,	24,	22,	Func_TexFilterHQ4X,		Func_ReturnFromSettingsFrame }, // Tex Filter: HQ4x
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[20],	325.0,	380.0,	 75.0,	56.0,	23,	41,	27,	27,	Func_FbTexturesOn,		Func_ReturnFromSettingsFrame }, // FbTex: On
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[21],	420.0,	380.0,	 75.0,	56.0,	24,	42,	26,	26,	Func_FbTexturesOff,		Func_ReturnFromSettingsFrame }, // FbTex: Off
+	//Buttons for Input Tab (starts at button[28])
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[25],	180.0,	100.0,	280.0,	56.0,	 2,	29,	-1,	-1,	Func_ConfigureInput,	Func_ReturnFromSettingsFrame }, // Configure Mappings
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[26],	180.0,	170.0,	280.0,	56.0,	28,	30,	-1,	-1,	Func_ConfigurePaks,		Func_ReturnFromSettingsFrame }, // Configure Paks
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[27],	180.0,	240.0,	280.0,	56.0,	29,	31,	-1,	-1,	Func_ConfigureButtons,	Func_ReturnFromSettingsFrame }, // Configure Buttons
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	30,	33,	32,	32,	Func_SaveButtonsSD,		Func_ReturnFromSettingsFrame }, // Save Button Configs to SD
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[10],	360.0,	310.0,	 70.0,	56.0,	30,	33,	31,	31,	Func_SaveButtonsUSB,	Func_ReturnFromSettingsFrame }, // Save Button Configs to USB
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[30],	295.0,	380.0,	135.0,	56.0,	31,	 2,	-1,	-1,	Func_ToggleButtonLoad,	Func_ReturnFromSettingsFrame }, // Toggle Button Load Slot
+	//Buttons for Audio Tab (starts at button[34])
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[32],	345.0,	100.0,	 75.0,	56.0,	 3,	 3,	35,	35,	Func_DisableAudioYes,	Func_ReturnFromSettingsFrame }, // Disable Audio: Yes
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	440.0,	100.0,	 75.0,	56.0,	 3,	 3,	34,	34,	Func_DisableAudioNo,	Func_ReturnFromSettingsFrame }, // Disable Audio: No
+	//Buttons for Saves Tab (starts at button[36])
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[32],	375.0,	100.0,	 75.0,	56.0,	 4,	38,	37,	37,	Func_AutoSaveNativeYes,	Func_ReturnFromSettingsFrame }, // Auto Save Native: Yes
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[33],	470.0,	100.0,	 75.0,	56.0,	 4,	38,	36,	36,	Func_AutoSaveNativeNo,	Func_ReturnFromSettingsFrame }, // Auto Save Native: No
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[35],	365.0,	170.0,	190.0,	56.0,	36,	39,	-1,	-1,	Func_CopySaves,			Func_ReturnFromSettingsFrame }, // Copy Saves
+	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[36],	365.0,	240.0,	190.0,	56.0,	38,	 4,	-1,	-1,	Func_DeleteSaves,		Func_ReturnFromSettingsFrame }, // Delete Saves
+	//Buttons for Resolution (starts at button[40])
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[38],	230.0,	450.0,	 85.0,	56.0,	26,	 1,	43,	41,	Func_Resolution320x240,	Func_ReturnFromSettingsFrame }, // Resolution: 320x240
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[39],	325.0,	450.0,	 85.0,	56.0,	26,	 1,	40,	42,	Func_Resolution640x480,	Func_ReturnFromSettingsFrame }, // Resolution: 640x480
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[40],	420.0,	450.0,	 85.0,	56.0,	27,	 1,	41,	43,	Func_Resolution720p,	Func_ReturnFromSettingsFrame }, // Resolution: 720p
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[41],	525.0,	450.0,	 85.0,	56.0,	27,	 1,	42,	40,	Func_Resolution1080p,	Func_ReturnFromSettingsFrame }, // Resolution: 1080p
 };
 
 struct TextBoxInfo
@@ -238,7 +246,7 @@ struct TextBoxInfo
 	{	NULL,	FRAME_STRINGS[15],	190.0,	128.0,	 1.0,	true }, // Show FPS: On/Off
 	{	NULL,	FRAME_STRINGS[16],	130.0,	198.0,	 1.0,	true }, // ScreenMode: 4x3/16x9/Force16x9
 	{	NULL,	FRAME_STRINGS[17],	190.0,	268.0,	 1.0,	true }, // CPU Framebuffer: On/Off
-	{	NULL,	FRAME_STRINGS[18],	190.0,	338.0,	 1.0,	true }, // 2xSai: On/Off
+	{	NULL,	FRAME_STRINGS[18],	190.0,	338.0,	 1.0,	true }, // Tex Filter: Off/2xSAI/xBRZ/HQ4x
 	{	NULL,	FRAME_STRINGS[19],	190.0,	408.0,	 1.0,	true }, // FBTex: On/Off
 	{	NULL,	FRAME_STRINGS[37],	130.0,	478.0,	 1.0,	true }, // Resolution: 320x240/640x480/720p/1080p
 	//TextBoxes for Input Tab (starts at textBox[9])
@@ -345,7 +353,7 @@ case SUBMENU_VIDEO:
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[15].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[38].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[40].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
 			for (int i = 4; i < 10; i++)
@@ -358,20 +366,22 @@ case SUBMENU_VIDEO:
 			else									FRAME_BUTTONS[19].button->setSelected(true);
 			if (renderCpuFramebuffer == CPUFRAMEBUFFER_ENABLE)	FRAME_BUTTONS[20].button->setSelected(true);
 			else												FRAME_BUTTONS[21].button->setSelected(true);
-			if (glN64_use2xSaiTextures == GLN64_2XSAI_ENABLE)	FRAME_BUTTONS[22].button->setSelected(true);
-			else												FRAME_BUTTONS[23].button->setSelected(true);
-			if (glN64_useFrameBufferTextures == GLN64_FBTEX_ENABLE)	FRAME_BUTTONS[24].button->setSelected(true);
-			else													FRAME_BUTTONS[25].button->setSelected(true);
-			if (vidResolution == RESOLUTION_320X240)		FRAME_BUTTONS[38].button->setSelected(true);
-			else if (vidResolution == RESOLUTION_640X480)	FRAME_BUTTONS[39].button->setSelected(true);
-			else if (vidResolution == RESOLUTION_720P)		FRAME_BUTTONS[40].button->setSelected(true);
-			else											FRAME_BUTTONS[41].button->setSelected(true);
-			for (int i = 15; i < 26; i++)
+			if (glN64_textureFilter == GLN64_FILTER_OFF)		FRAME_BUTTONS[22].button->setSelected(true);
+			else if (glN64_textureFilter == GLN64_FILTER_2XSAI)	FRAME_BUTTONS[23].button->setSelected(true);
+			else if (glN64_textureFilter == GLN64_FILTER_XBRZ)	FRAME_BUTTONS[24].button->setSelected(true);
+			else												FRAME_BUTTONS[25].button->setSelected(true);
+			if (glN64_useFrameBufferTextures == GLN64_FBTEX_ENABLE)	FRAME_BUTTONS[26].button->setSelected(true);
+			else													FRAME_BUTTONS[27].button->setSelected(true);
+			if (vidResolution == RESOLUTION_320X240)		FRAME_BUTTONS[40].button->setSelected(true);
+			else if (vidResolution == RESOLUTION_640X480)	FRAME_BUTTONS[41].button->setSelected(true);
+			else if (vidResolution == RESOLUTION_720P)		FRAME_BUTTONS[42].button->setSelected(true);
+			else											FRAME_BUTTONS[43].button->setSelected(true);
+			for (int i = 15; i < 28; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
-			for (int i = 38; i < 42; i++)
+			for (int i = 40; i < 44; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -382,8 +392,8 @@ case SUBMENU_VIDEO:
 			for (int i = 0; i < NUM_TAB_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[26].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[31].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[28].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[33].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
 			for (int i = 9; i < 11; i++)
@@ -391,7 +401,7 @@ case SUBMENU_VIDEO:
 			FRAME_BUTTONS[2].button->setSelected(true);
 			if (loadButtonSlot == LOADBUTTON_DEFAULT)	strcpy(FRAME_STRINGS[30], "Default");
 			else										sprintf(FRAME_STRINGS[30], "Slot %d", loadButtonSlot+1);
-			for (int i = 26; i < 32; i++)
+			for (int i = 28; i < 34; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -402,16 +412,16 @@ case SUBMENU_VIDEO:
 			for (int i = 0; i < NUM_TAB_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[32].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[32].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[34].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[34].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
 			for (int i = 11; i < 12; i++)
 				FRAME_TEXTBOXES[i].textBox->setVisible(true);
 			FRAME_BUTTONS[3].button->setSelected(true);
-			if (audioEnabled == AUDIO_DISABLE)	FRAME_BUTTONS[32].button->setSelected(true);
-			else								FRAME_BUTTONS[33].button->setSelected(true);
-			for (int i = 32; i < 34; i++)
+			if (audioEnabled == AUDIO_DISABLE)	FRAME_BUTTONS[34].button->setSelected(true);
+			else								FRAME_BUTTONS[35].button->setSelected(true);
+			for (int i = 34; i < 36; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -422,16 +432,16 @@ case SUBMENU_VIDEO:
 			for (int i = 0; i < NUM_TAB_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[34].button);
-				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[37].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_DOWN, FRAME_BUTTONS[36].button);
+				FRAME_BUTTONS[i].button->setNextFocus(menu::Focus::DIRECTION_UP, FRAME_BUTTONS[39].button);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
 			for (int i = 12; i < 13; i++)
 				FRAME_TEXTBOXES[i].textBox->setVisible(true);
 			FRAME_BUTTONS[4].button->setSelected(true);
-			if (autoSave == AUTOSAVE_ENABLE)	FRAME_BUTTONS[34].button->setSelected(true);
-			else								FRAME_BUTTONS[35].button->setSelected(true);
-			for (int i = 34; i < NUM_FRAME_BUTTONS; i++)
+			if (autoSave == AUTOSAVE_ENABLE)	FRAME_BUTTONS[36].button->setSelected(true);
+			else								FRAME_BUTTONS[37].button->setSelected(true);
+			for (int i = 36; i < NUM_FRAME_BUTTONS; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
@@ -774,35 +784,51 @@ void Func_CpuFramebufferOff()
 	renderCpuFramebuffer = CPUFRAMEBUFFER_DISABLE;
 }
 
-void Func_2xSaiTexturesOn()
+void Func_TexFilterOff()
 {
-	for (int i = 22; i <= 23; i++)
+	for (int i = 22; i <= 25; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
 	FRAME_BUTTONS[22].button->setSelected(true);
-	glN64_use2xSaiTextures = GLN64_2XSAI_ENABLE;
+	glN64_textureFilter = GLN64_FILTER_OFF;
 }
 
-void Func_2xSaiTexturesOff()
+void Func_TexFilter2xSaI()
 {
-	for (int i = 22; i <= 23; i++)
+	for (int i = 22; i <= 25; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
 	FRAME_BUTTONS[23].button->setSelected(true);
-	glN64_use2xSaiTextures = GLN64_2XSAI_DISABLE;
+	glN64_textureFilter = GLN64_FILTER_2XSAI;
+}
+
+void Func_TexFilterXBRZ()
+{
+	for (int i = 22; i <= 25; i++)
+		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[24].button->setSelected(true);
+	glN64_textureFilter = GLN64_FILTER_XBRZ;
+}
+
+void Func_TexFilterHQ4X()
+{
+	for (int i = 22; i <= 25; i++)
+		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[25].button->setSelected(true);
+	glN64_textureFilter = GLN64_FILTER_HQ4X;
 }
 
 void Func_FbTexturesOn()
 {
-	for (int i = 24; i <= 25; i++)
+	for (int i = 26; i <= 27; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[24].button->setSelected(true);
+	FRAME_BUTTONS[26].button->setSelected(true);
 	glN64_useFrameBufferTextures = GLN64_FBTEX_ENABLE;
 }
 
 void Func_FbTexturesOff()
 {
-	for (int i = 24; i <= 25; i++)
+	for (int i = 26; i <= 27; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[25].button->setSelected(true);
+	FRAME_BUTTONS[27].button->setSelected(true);
 	glN64_useFrameBufferTextures = GLN64_FBTEX_DISABLE;
 }
 
@@ -930,33 +956,33 @@ void Func_ToggleButtonLoad()
 
 void Func_DisableAudioYes()
 {
-	for (int i = 32; i <= 33; i++)
+	for (int i = 34; i <= 35; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[32].button->setSelected(true);
+	FRAME_BUTTONS[34].button->setSelected(true);
 	audioEnabled = AUDIO_DISABLE;
 }
 
 void Func_DisableAudioNo()
 {
-	for (int i = 32; i <= 33; i++)
+	for (int i = 34; i <= 35; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[33].button->setSelected(true);
+	FRAME_BUTTONS[35].button->setSelected(true);
 	audioEnabled = AUDIO_ENABLE;
 }
 
 void Func_AutoSaveNativeYes()
 {
-	for (int i = 34; i <= 35; i++)
+	for (int i = 36; i <= 37; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[34].button->setSelected(true);
+	FRAME_BUTTONS[36].button->setSelected(true);
 	autoSave = AUTOSAVE_ENABLE;
 }
 
 void Func_AutoSaveNativeNo()
 {
-	for (int i = 34; i <= 35; i++)
+	for (int i = 36; i <= 37; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[35].button->setSelected(true);
+	FRAME_BUTTONS[37].button->setSelected(true);
 	autoSave = AUTOSAVE_DISABLE;
 }
 
@@ -972,36 +998,36 @@ void Func_DeleteSaves()
 
 void Func_Resolution320x240()
 {
-	for (int i = 38; i < 42; i++)
+	for (int i = 40; i < 44; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[38].button->setSelected(true);
+	FRAME_BUTTONS[40].button->setSelected(true);
 	vidResolution = RESOLUTION_320X240;
 	RSX_ApplyConfigResolution();
 }
 
 void Func_Resolution640x480()
 {
-	for (int i = 38; i < 42; i++)
+	for (int i = 40; i < 44; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[39].button->setSelected(true);
+	FRAME_BUTTONS[41].button->setSelected(true);
 	vidResolution = RESOLUTION_640X480;
 	RSX_ApplyConfigResolution();
 }
 
 void Func_Resolution720p()
 {
-	for (int i = 38; i < 42; i++)
+	for (int i = 40; i < 44; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[40].button->setSelected(true);
+	FRAME_BUTTONS[42].button->setSelected(true);
 	vidResolution = RESOLUTION_720P;
 	RSX_ApplyConfigResolution();
 }
 
 void Func_Resolution1080p()
 {
-	for (int i = 38; i < 42; i++)
+	for (int i = 40; i < 44; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
-	FRAME_BUTTONS[41].button->setSelected(true);
+	FRAME_BUTTONS[43].button->setSelected(true);
 	vidResolution = RESOLUTION_1080P;
 	RSX_ApplyConfigResolution();
 }
