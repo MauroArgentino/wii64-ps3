@@ -241,8 +241,18 @@ void translate_event_queue(u32 base)
     aux->count = (aux->count - Count)+base;
     aux = aux->next;
   }
-  add_interrupt_event_count(COMPARE_INT, Compare);
-  add_interrupt_event_count(SPECIAL_INT, 0);
+  /* Only re-add COMPARE_INT if Compare is in the future relative to
+   * the new Count (base). A stale Compare would create an event that
+   * fires immediately, causing a FLOOD of exceptions. */
+  if ((s32)(Compare - base) >= 0) {
+    add_interrupt_event_count(COMPARE_INT, Compare);
+  }
+  /* SPECIAL_INT is only meaningful during boot (Count < 0x10000000).
+   * Don't re-add after boot — its handler discards it anyway but
+   * the event still wastes a queue slot and triggers diagnostics. */
+  if (base < 0x10000000) {
+    add_interrupt_event_count(SPECIAL_INT, 0);
+  }
 }
 
 // save the queue (for save states)
@@ -434,15 +444,18 @@ void gen_interrupt()
     case COMPARE_INT:
       remove_interrupt_event();
   
+      /* If Compare is already behind Count (stale event, e.g. from before
+       * Count wrapped around), discard silently. Firing the interrupt would
+       * cause the game handler to re-write Compare, re-add the stale event,
+       * and create a FLOOD of exceptions that slows emulation to ~10%. */
+      if ((s32)(Compare - Count) < 0) {
+        return;
+      }
+  
       Cause = (Cause | 0x8000) & 0xFFFFFF83;
       if(!chk_status(0)) {
         return;
       }
-      /* Only re-schedule COMPARE_INT if Compare is in the future.
-       * If Count already passed Compare, the game must write a new Compare
-       * value before we re-schedule. Without this guard, COMPARE_INT fires
-       * on every instruction (event re-added at stale Compare) and the game
-       * gets stuck in an infinite exception loop. */
       if (Compare > Count) {
         Count+=2;
         add_interrupt_event_count(COMPARE_INT, Compare);
