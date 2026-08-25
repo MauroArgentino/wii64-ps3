@@ -349,6 +349,7 @@ void dbg_dump_queue(void)
 
 void gen_interrupt()
 {
+  static unsigned int last_flood_count = 0;
   if (savestates_job & LOADSTATE) {
     savestates_load();
     savestates_job &= ~LOADSTATE;
@@ -374,6 +375,18 @@ void gen_interrupt()
     return;
   } 
 
+  /* Diagnostic: print when gen_interrupt fires with next_interrupt already in the past */
+   if ((s32)(r4300.next_interrupt - Count) <= 0) {
+    unsigned int delta = (unsigned int)(Count - r4300.next_interrupt);
+    if (delta > 0x200 && (unsigned int)Count - last_flood_count > 0x100000) {
+      printf("[FLOOD] ni=%08X Count=%08X delta=%u type=%d qcount=%08X\n",
+        (unsigned int)r4300.next_interrupt, (unsigned int)Count, delta,
+        q->type, (unsigned int)q->count);
+      fflush(stdout);
+      last_flood_count = (unsigned int)Count;
+    }
+  }
+
   switch(q->type) {
     case SPECIAL_INT:
       if (Count > 0x10000000) {
@@ -386,13 +399,23 @@ void gen_interrupt()
     break;
     case VI_INT:
     {
+      static int vi_flood_printed = 0;
       extern s64 sysGetSystemTime(void);
       s64 t0 = sysGetSystemTime();
       updateScreen();
       s64 t1 = sysGetSystemTime();
-      if ((t1 - t0) > 500000) {
-        printf("[VI] updateScreen SLOW %lldus Count=%08X\n", (long long)(t1-t0), (unsigned int)Count);
+      if (!vi_flood_printed && (t1 - t0) > 500000) {
+        printf("[VI] updateScreen SLOW %lldus Count=%08X q=%p q->type=%d q->count=%08X\n",
+          (long long)(t1-t0), (unsigned int)Count, (void*)q, q->type, (unsigned int)q->count);
         fflush(stdout);
+        vi_flood_printed = 1;
+      }
+      if (!vi_flood_printed && (s32)(r4300.next_interrupt - Count) <= 0) {
+        printf("[VI-FLOOD] ni=%08X <= Count=%08X delta=%d q->count=%08X\n",
+          (unsigned int)r4300.next_interrupt, (unsigned int)Count,
+          (int)(Count - r4300.next_interrupt), (unsigned int)q->count);
+        fflush(stdout);
+        vi_flood_printed = 1;
       }
     }
       new_vi();
@@ -410,13 +433,20 @@ void gen_interrupt()
   
     case COMPARE_INT:
       remove_interrupt_event();
-      Count+=2;
-      add_interrupt_event_count(COMPARE_INT, Compare);
-      Count-=2;
   
       Cause = (Cause | 0x8000) & 0xFFFFFF83;
       if(!chk_status(0)) {
         return;
+      }
+      /* Only re-schedule COMPARE_INT if Compare is in the future.
+       * If Count already passed Compare, the game must write a new Compare
+       * value before we re-schedule. Without this guard, COMPARE_INT fires
+       * on every instruction (event re-added at stale Compare) and the game
+       * gets stuck in an infinite exception loop. */
+      if (Compare > Count) {
+        Count+=2;
+        add_interrupt_event_count(COMPARE_INT, Compare);
+        Count-=2;
       }
     break;
   

@@ -265,7 +265,7 @@ static void autostart_test(void)
 	fflush(stdout);
 #endif
 	for (i = 0; i < n; i++) {
-		if (dir[i].attr == 0 && strstr(dir[i].name, "Mario Kart 64")) {
+		if (dir[i].attr == 0 && strstr(dir[i].name, "Banjo-Kazooie")) {
 #ifdef DEBUG
 			printf("[AUTOSTART] found match, loading: %s (size=0x%x)\n", dir[i].name, dir[i].size);
 			fflush(stdout);

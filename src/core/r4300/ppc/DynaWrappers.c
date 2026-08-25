@@ -126,7 +126,7 @@ void dynarec(unsigned int address){
 		if(!noCheckInterrupt){
 			r4300.last_pc = r4300.pc;
 			// Check for interrupts
-			if(r4300.next_interrupt <= Count){
+			if((s32)(r4300.next_interrupt - Count) <= 0){
 				gen_interrupt();
 				address = r4300.pc;
 			}

@@ -1515,7 +1515,7 @@ while (!r4300.stop)
          }
 #endif
          PC->ops();
-      if (r4300.next_interrupt <= Count)
+      if ((s32)(r4300.next_interrupt - Count) <= 0)
       {
          u32 pc_before_int = r4300.pc;
          r4300.pc = PC->addr;
