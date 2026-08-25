@@ -210,9 +210,22 @@ void init_screen(void *host_addr,u32 size) {
 }
 
 void waitflip() {
-	while(gcmGetFlipStatus()!=0)
+	int wait_count = 0;
+	while(gcmGetFlipStatus()!=0) {
 		usleep(200);
-	gcmResetFlipStatus();
+		if (++wait_count > 50000) { /* 10 second timeout */
+			printf("[WAITFLIP] TIMEOUT 10s, force reset\n"); fflush(stdout);
+			gcmResetFlipStatus();
+			break;
+		}
+	}
+	if (wait_count > 50000) {
+		/* already printed timeout above */
+	} else if (wait_count > 50) {
+		printf("[WAITFLIP] waited %d (%dus)\n", wait_count, wait_count * 200); fflush(stdout);
+	}
+	if (wait_count > 0 && wait_count <= 50000)
+		gcmResetFlipStatus();
 }
 
 #ifdef DEBUG

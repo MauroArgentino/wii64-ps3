@@ -175,6 +175,7 @@ void add_interrupt_event_count(int type, u32 count)
 
 void remove_interrupt_event()
 {
+  if (q == NULL) return;
   interrupt_queue *aux = q->next;
   if(q->type == SPECIAL_INT) {
     SPECIAL_done = 1;
@@ -184,8 +185,11 @@ void remove_interrupt_event()
   if (q != NULL && (q->count - Count) < 0x80000000) {
     r4300.next_interrupt = q->count;
   }
+  else if (q != NULL) {
+    r4300.next_interrupt = q->count;
+  }
   else {
-    r4300.next_interrupt = 0;
+    r4300.next_interrupt = 0x7FFFFFFF;
   }
 }
 
@@ -350,12 +354,19 @@ void gen_interrupt()
     savestates_job &= ~LOADSTATE;
     return;
   }
+  if (q == NULL) {
+    r4300.next_interrupt = 0x7FFFFFFF;
+    return;
+  }
   if (r4300.skip_jump) {
-    if ((q->count - Count) < 0x80000000) {
+    if (q != NULL && (q->count - Count) < 0x80000000) {
+      r4300.next_interrupt = q->count;
+    }
+    else if (q != NULL) {
       r4300.next_interrupt = q->count;
     }
     else {
-      r4300.next_interrupt = 0;
+      r4300.next_interrupt = 0x7FFFFFFF;
     }
     r4300.pc = r4300.skip_jump;
     r4300.last_pc = r4300.pc;
@@ -374,30 +385,16 @@ void gen_interrupt()
       return;
     break;
     case VI_INT:
-#ifdef DEBUG
-      dbg_vi_count++;
-      {
-        extern s64 sysGetSystemTime(void);
-        s64 now = sysGetSystemTime();
-        s64 wall_gap = now - vi_last_wall_us;
-        vi_last_wall_us = now;
-        s64 t0 = now;
-        updateScreen();
-        s64 t1 = sysGetSystemTime();
-        s64 dt_us = t1 - t0;
-        /* Log every VI_INT for first 64, then every 64th or if gap > 200ms */
-        if (dbg_vi_count <= 64 || dt_us > 200000 || wall_gap > 200000 || (dbg_vi_count & 0x3F) == 0) {
-          printf("[VI_INT #%d] updateScreen=%lldus wall_gap=%lldus Count=%08X\n",
-            dbg_vi_count, (long long)dt_us, (long long)wall_gap, (unsigned int)Count);
-          fflush(stdout);
-        }
-      }
-#else
+    {
+      extern s64 sysGetSystemTime(void);
+      s64 t0 = sysGetSystemTime();
       updateScreen();
-#endif
-#ifdef PROFILE
-      refresh_stat();
-#endif
+      s64 t1 = sysGetSystemTime();
+      if ((t1 - t0) > 500000) {
+        printf("[VI] updateScreen SLOW %lldus Count=%08X\n", (long long)(t1-t0), (unsigned int)Count);
+        fflush(stdout);
+      }
+    }
       new_vi();
       vi_register.vi_delay = (vi_register.vi_v_sync == 0) ? 500000 : ((vi_register.vi_v_sync + 1)*1500);
       next_vi += vi_register.vi_delay;

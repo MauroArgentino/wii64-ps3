@@ -243,28 +243,33 @@ void init_blocks()
 static int cpu_inited;
 void go()
 {
+	extern void controller_PS3_reset_pad_state(void);
+	controller_PS3_reset_pad_state();
+
 	r4300.stop = 0;
 	
-	DBG_LOG("[GO] go() called, dynacore=%d, pc=0x%08x, cpu_inited=%d\n", 
-	       dynacore, r4300.pc, cpu_inited);
+	printf("[GO] go() called, dynacore=%d, pc=0x%08x\n", dynacore, r4300.pc);
+	fflush(stdout);
 	
 	if(dynacore == 2) {
 		dynacore = 0;
 		interpcore = 1;
-		DBG_LOG("[GO] Starting pure interpreter\n");
+		printf("[GO] Starting pure interpreter\n"); fflush(stdout);
 		pure_interpreter();
 		dynacore = 2;
-		DBG_LOG("[GO] Pure interpreter returned, stop=%d\n", r4300.stop);
+		printf("[GO] Pure interpreter returned, stop=%d, pc=0x%08x, Count=0x%08x\n", r4300.stop, r4300.pc, Count);
+		fflush(stdout);
 	} else if(dynacore == 3) {
 		dynacore = 0;
 		interpcore = 2;
-		DBG_LOG("[GO] Starting cached interpreter\n");
+		printf("[GO] Starting cached interpreter\n"); fflush(stdout);
 		init_cached_blocks();
 		run_cached_interpreter();
 		free_cached_blocks();
 		PC = NULL;
 		dynacore = 3;
-		DBG_LOG("[GO] Cached interpreter returned, stop=%d\n", r4300.stop);
+		printf("[GO] Cached interpreter returned, stop=%d, pc=0x%08x, Count=0x%08x\n", r4300.stop, r4300.pc, Count);
+		fflush(stdout);
 	} else {
 		interpcore = 0;
 		dynacore = 1;

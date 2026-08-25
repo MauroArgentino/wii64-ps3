@@ -2962,10 +2962,8 @@ void pure_interpreter()
 	static unsigned long long dbg_icount = 0;
 #endif
 #ifdef PS3
-#ifdef DEBUG
 	static s64 hb_last_us = 0;
 	extern s64 sysGetSystemTime(void);
-#endif
 #endif
 	while (!r4300.stop)
      {
@@ -2989,21 +2987,18 @@ void pure_interpreter()
 	dbg_icount++;
 #endif
 #ifdef PS3
-	/* Heartbeat every ~10M instructions: prints wall clock, PC, Count.
-	 * If PC stops changing while Count still advances, we're in a spin loop.
-	 * If wall clock jumps but PC doesn't move, something else is blocking. */
-#ifdef DEBUG
-	if ((dbg_icount & 0xFFFFFF) == 0)
 	{
 		s64 now_us = sysGetSystemTime();
 		s64 dt_us = now_us - hb_last_us;
-		hb_last_us = now_us;
-		printf("[HB] ic=%llu pc=%08X Count=%08X dt=%lldus\n",
-			(unsigned long long)dbg_icount, (unsigned int)r4300.pc,
-			(unsigned int)Count, (long long)dt_us);
-		fflush(stdout);
+		if (dt_us > 2000000)  /* 2 seconds */
+		{
+			hb_last_us = now_us;
+			printf("[HB2] pc=%08X Count=%08X dt=%lldus\n",
+				(unsigned int)r4300.pc,
+				(unsigned int)Count, (long long)dt_us);
+			fflush(stdout);
+		}
 	}
-#endif
       if ((Count & 0x1FFF) == 0)
       {
          /* Poll pads periodically. This calls ioPadGetData which consumes

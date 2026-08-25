@@ -129,6 +129,7 @@ static u32 previousAnalogPS3[4] = {0x80808080, 0x80808080, 0x80808080, 0x8080808
 static u32 edgeButtons[4];       /* buttons detected as rising-edge pressed */
 static int edgeHoldCount[4];     /* frames to keep edge-detected buttons held */
 static int refreshCounter;       /* throttle refreshAvailable() calls */
+static int combo_was_active = 0;
 
 /* Shared pad cache: polled once per cycle from the interpreter loop.
  * Both _GetKeys and ps3_pad_exit_combo_pressed read from here.
@@ -176,6 +177,17 @@ static void poll_pad_reassign_if_needed(void)
  * len > 0 with valid button[], but subsequent calls return len = 0.
  * If we overwrite shared_buttons with the zeroed button[] from a len=0
  * read, the button press is lost before _GetKeys can consume it. */
+
+/* Reset shared pad state. Call when starting a new ROM to prevent
+ * ghost button presses from the previous session (e.g. exit combo). */
+void controller_PS3_reset_pad_state(void)
+{
+	memset(shared_buttons, 0, sizeof(shared_buttons));
+	memset(shared_analog, 0, sizeof(shared_analog));
+	memset(shared_pad, 0, sizeof(shared_pad));
+	combo_was_active = 0;
+}
+
 void controller_PS3_poll_pad(void)
 {
 	int i;
@@ -400,7 +412,8 @@ static void refreshAvailable(void){
 /* Poll del combo de salida directamente del pad (ioPadGetData), sin depender
  * de que la ROM lea el PIF. Permite volver al menu aunque el juego no procese
  * los controles (p.ej. DK64 atascado en el boot). Devuelve 1 si el combo
- * configurado de salida (por defecto Square+Triangle) esta presionado. */
+ * configurado de salida (por defecto Square+Triangle) esta presionado.
+ * Usa edge detection: requiere que los botones se suelten antes de re-activar. */
 int ps3_pad_exit_combo_pressed(void)
 {
 	int i;
@@ -413,7 +426,15 @@ int ps3_pad_exit_combo_pressed(void)
 	{
 		if (!controller_PS3.available[i]) continue;
 		if ((shared_buttons[i] & combo->mask) == combo->mask)
-			return 1;
+		{
+			if (!combo_was_active)
+			{
+				combo_was_active = 1;
+				return 1;
+			}
+			return 0;
+		}
 	}
+	combo_was_active = 0;
 	return 0;
 }

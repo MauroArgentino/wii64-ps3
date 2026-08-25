@@ -896,6 +896,8 @@ void run_cached_interpreter(void)
 #ifdef CACHED_DEBUG
    u32 spin_cnt = 0;
 #endif
+   static s64 chb_last_us = 0;
+   extern s64 sysGetSystemTime(void);
    r4300.stop = 0;
    r4300.last_pc = r4300.pc;
 
@@ -910,6 +912,18 @@ while (!r4300.stop)
     {
        Count += 2;
 #ifdef PS3
+       {
+          s64 now_us = sysGetSystemTime();
+          s64 dt_us = now_us - chb_last_us;
+          if (dt_us > 2000000)
+          {
+             chb_last_us = now_us;
+             printf("[CHB2] pc=%08X Count=%08X ni=%08X dt=%lldus\n",
+                (unsigned int)r4300.pc, (unsigned int)Count,
+                (unsigned int)r4300.next_interrupt, (long long)dt_us);
+             fflush(stdout);
+          }
+       }
        if ((Count & 0x1FFF) == 0)
        {
           /* Poll pads periodically. Low frequency avoids draining
@@ -925,19 +939,21 @@ while (!r4300.stop)
           }
        }
 #endif
-       if (!PC) { r4300.stop = 1; break; }
+       if (!PC) { printf("[STOP] PC=NULL Count=%08X\n", (unsigned int)Count); fflush(stdout); r4300.stop = 1; break; }
       if (ci.actual && ci.actual->block)
       {
          u32 length = (ci.actual->end - ci.actual->start) / 4;
          precomp_instr* block_end = ci.actual->block + length + 1 + (length >> 2);
          if (PC < ci.actual->block || PC >= block_end)
          {
+            printf("[STOP] PC OOB pc=%p block=[%p,%p) Count=%08X\n", (void*)PC, (void*)ci.actual->block, (void*)block_end, (unsigned int)Count); fflush(stdout);
             r4300.stop = 1;
             break;
          }
       }
       if (!PC->ops)
       {
+         printf("[STOP] PC->ops=NULL pc=%08X Count=%08X\n", (unsigned int)PC->addr, (unsigned int)Count); fflush(stdout);
          r4300.stop = 1;
          break;
       }
@@ -1683,9 +1699,9 @@ void cached_interp_NOTCOMPILED2(void)
 void cached_interp_NI(void)
 {
    u32 iw = read_inst(PC->addr);
-   DBG_LOG("NI at 0x%08x (iw=0x%08x op=%d rs=%d rt=%d rd=%d funct=0x%02x)\n",
-          PC->addr, iw, (iw >> 26) & 0x3F, (iw >> 21) & 0x1F,
-          (iw >> 16) & 0x1F, (iw >> 11) & 0x1F, iw & 0x3F);
+   printf("[NI] at 0x%08x (iw=0x%08x op=%d funct=0x%02x) Count=%08X\n",
+          PC->addr, iw, (iw >> 26) & 0x3F, iw & 0x3F, (unsigned int)Count);
+   fflush(stdout);
    r4300.stop = 1;
    PC++;
 }
