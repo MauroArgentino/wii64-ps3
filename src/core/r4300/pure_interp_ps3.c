@@ -38,6 +38,9 @@
 #include "interrupt.h"
 #include "../../debug.h"
 #include <ppu-types.h>
+#ifdef PS3
+#include <lv2/systime.h>
+#endif
 
 #ifdef PPC_DYNAREC
 #include "Invalid_Code.h"
@@ -2955,8 +2958,14 @@ void pure_interpreter()
    //r4300.pc = 0xa4000040;
    r4300.stop=0;
 	r4300.last_pc = r4300.pc;
-#ifdef DEBUGON
+#ifdef DEBUG
 	static unsigned long long dbg_icount = 0;
+#endif
+#ifdef PS3
+#ifdef DEBUG
+	static s64 hb_last_us = 0;
+	extern s64 sysGetSystemTime(void);
+#endif
 #endif
 	while (!r4300.stop)
      {
@@ -2976,7 +2985,25 @@ void pure_interpreter()
 	compare_core();
 #endif
 	Count += 2;   /* PS3: Count avanzado por el main loop (no update_count) */
+#ifdef DEBUG
+	dbg_icount++;
+#endif
 #ifdef PS3
+	/* Heartbeat every ~10M instructions: prints wall clock, PC, Count.
+	 * If PC stops changing while Count still advances, we're in a spin loop.
+	 * If wall clock jumps but PC doesn't move, something else is blocking. */
+#ifdef DEBUG
+	if ((dbg_icount & 0xFFFFFF) == 0)
+	{
+		s64 now_us = sysGetSystemTime();
+		s64 dt_us = now_us - hb_last_us;
+		hb_last_us = now_us;
+		printf("[HB] ic=%llu pc=%08X Count=%08X dt=%lldus\n",
+			(unsigned long long)dbg_icount, (unsigned int)r4300.pc,
+			(unsigned int)Count, (long long)dt_us);
+		fflush(stdout);
+	}
+#endif
       if ((Count & 0x1FFF) == 0)
       {
          /* Poll pads periodically. This calls ioPadGetData which consumes
@@ -2987,17 +3014,19 @@ void pure_interpreter()
          {
 #ifdef DEBUG
             printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
+            fflush(stdout);
 #endif
             r4300.stop = 1;
             break;
          }
       }
 #endif
-#ifdef DEBUGON
-	if ((dbg_icount++ & 0x1FFFFF) == 0) {
+#ifdef DEBUG
+	if ((dbg_icount & 0x1FFFFF) == 0) {
 		printf("[PC] icount=%llu pc=%08X sp=%08X ra=%08X\n",
 			(unsigned long long)dbg_icount, (unsigned int)r4300.pc,
 			(unsigned int)r4300.gpr[29], (unsigned int)r4300.gpr[31]);
+		fflush(stdout);
 	}
 #endif
 	interp_ops[((op >> 26) & 0x3F)]();

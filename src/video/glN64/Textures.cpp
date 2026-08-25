@@ -418,6 +418,7 @@ void TextureCache_Init()
 	cache.bottom = NULL;
 	cache.numCached = 0;
 	cache.cachedBytes = 0;
+	cache.maxBytes = 8 * 1024 * 1024;
 	cache.textureFilter = OGL.textureFilter;
 	cache.bitDepth = OGL.textureBitDepth;
 
@@ -1148,6 +1149,8 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 				}
 			}
 		}
+		/* Update textureBytes to actual RSX VRAM so cachedBytes tracks real usage. */
+		texInfo->textureBytes = rsxBytes;
 		texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
 		rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
 		texInfo->rsxTex.format		= texInfo->rsxFmt;
@@ -1757,6 +1760,10 @@ GetTexel = imageFormat[texInfo->size][texInfo->format].Get32;
 				}
 			}
 		}
+		/* Update textureBytes to actual RSX VRAM so cachedBytes tracks real usage.
+		 * Without this, HQ4x textures (16x larger) are counted at original size,
+		 * causing cache to grow 16x beyond maxBytes and exhausting RSX VRAM. */
+		texInfo->textureBytes = rsxBytes;
 		texInfo->rsxFmt = GCM_TEXTURE_FORMAT_A8R8G8B8 | GCM_TEXTURE_FORMAT_LIN;
 		rsxAddressToOffset(texInfo->rsxTextureBuffer,&texInfo->rsxTextureOffset);
 		texInfo->rsxTex.format		= texInfo->rsxFmt;

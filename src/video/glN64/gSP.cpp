@@ -44,14 +44,7 @@ extern u32 uc_crc, uc_dcrc;
 extern char uc_str[256];
 #endif
 
-#define gSPFlushTriangles() \
-	if ((OGL.numTriangles > 0) && \
-		(RSP.nextCmd != G_TRI1) && \
-		(RSP.nextCmd != G_TRI2) && \
-		(RSP.nextCmd != G_TRI4) && \
-		(RSP.nextCmd != G_QUAD) && \
-		(RSP.nextCmd != G_DMA_TRI)) \
-		OGL_DrawTriangles()
+#define gSPFlushTriangles() OGL_DrawTriangles()
 
 gSPInfo gSP;
 
@@ -995,12 +988,6 @@ void gSPInterpolateVertex( SPVertex *dest, f32 percent, SPVertex *first, SPVerte
 
 void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 {
-	static u32 dbg_total = 0, dbg_culled = 0, dbg_nonclip = 0, dbg_direct = 0;
-	if (++dbg_total >= 3000)
-	{
-		DBG_GFX("[TRI-DBG] total=%d culled=%d NoNclip=%d direct=%d NoN=%d\n", dbg_total, dbg_culled, dbg_nonclip, dbg_direct, GBI.current->NoN);
-		dbg_total = dbg_culled = dbg_nonclip = dbg_direct = 0;
-	}
 	if ((v0 < 80) && (v1 < 80) && (v2 < 80))
 	{
 #ifndef __GX__
@@ -1024,7 +1011,9 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 			((gSP.vertices[v0].zClip < -0.1f) &&
 			 (gSP.vertices[v1].zClip < -0.1f) &&
 			 (gSP.vertices[v2].zClip < -0.1f))))
-			{ dbg_culled++; return; }
+			{
+				return;
+			}
 
 		// NoN work-around, clips triangles, and draws the clipped-off parts with clamped z
 		if (GBI.current->NoN &&
@@ -1032,7 +1021,6 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 			(gSP.vertices[v1].zClip < 0.0f) ||
 			(gSP.vertices[v2].zClip < 0.0f)))
 		{
-			dbg_nonclip++;
 			SPVertex nearVertices[4];
 			SPVertex clippedVertices[4];
 			//s32 numNearTris = 0;
@@ -1104,7 +1092,6 @@ void gSPTriangle( s32 v0, s32 v1, s32 v2, s32 flag )
 		}
 		else
 		{
-			dbg_direct++;
 			OGL_AddTriangle( gSP.vertices, v0, v1, v2 );
 		}
 

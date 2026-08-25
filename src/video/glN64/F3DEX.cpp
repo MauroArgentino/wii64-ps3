@@ -21,6 +21,7 @@
 #include "gSP.h"
 #include "gDP.h"
 #include "GBI.h"
+#include <stdio.h>
 
 void F3DEX_Vtx( u32 w0, u32 w1 )
 {
@@ -29,6 +30,10 @@ void F3DEX_Vtx( u32 w0, u32 w1 )
 
 void F3DEX_Tri1( u32 w0, u32 w1 )
 {
+#ifdef DEBUG
+	static int triCount = 0;
+	if (triCount < 5) { printf("[TRI] F3DEX_Tri1 v0=%d v1=%d v2=%d\n", _SHIFTR(w1,17,7), _SHIFTR(w1,9,7), _SHIFTR(w1,1,7)); fflush(stdout); triCount++; }
+#endif
 	gSP1Triangle( _SHIFTR( w1, 17, 7 ), _SHIFTR( w1, 9, 7 ), _SHIFTR( w1, 1, 7 ), 0 );
 }
 
@@ -50,7 +55,8 @@ void F3DEX_Tri2( u32 w0, u32 w1 )
 
 void F3DEX_Quad( u32 w0, u32 w1 )
 {
-	gSP1Quadrangle( _SHIFTR( w1, 25, 7 ), _SHIFTR( w1, 17, 7 ), _SHIFTR( w1, 9, 7 ), _SHIFTR( w1, 1, 7 ) );
+	u32 v0 = _SHIFTR( w1, 25, 7 ), v1 = _SHIFTR( w1, 17, 7 ), v2 = _SHIFTR( w1, 9, 7 ), v3 = _SHIFTR( w1, 1, 7 );
+	gSP1Quadrangle( v0, v1, v2, v3 );
 }
 
 void F3DEX_Branch_Z( u32 w0, u32 w1 )

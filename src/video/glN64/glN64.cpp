@@ -23,6 +23,10 @@
 #define MAINDEF		//Ensures only one copy of MicrocodeTypes and Combiner tables
 #endif //__GX__ PS3
 
+#ifdef PS3
+#include <stdio.h>
+#endif
+
 #ifdef __GX__
 #include <gccore.h>
 #include <stdio.h>

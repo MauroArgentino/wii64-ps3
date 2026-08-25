@@ -17,6 +17,9 @@
 # include <windows.h>
 #else
 # include "../../main/winlnxdefs.h"
+#ifdef PS3
+# include <stdio.h>
+#endif
 
 # ifndef min
 #  define min(a,b) ((a) < (b) ? (a) : (b))
@@ -299,51 +302,36 @@ void RSP_ProcessDList()
 	OGL_GXinitDlist();
 #endif //__GX__
 
+#ifdef DEBUG
+	static int dl_total = 0;
+	u32 dl_cmds = 0;
+#endif
 	while (!RSP.halt)
 	{
+#ifdef DEBUG
+		dl_cmds++;
+#endif
+
 		if ((RSP.PC[RSP.PCi] + 8) > RDRAMSize)
 		{
-#ifdef DEBUG
-			switch (Debug.level)
-			{
-				case DEBUG_LOW:
-                    DebugMsg( DEBUG_LOW | DEBUG_ERROR, "ATTEMPTING TO EXECUTE RSP COMMAND AT INVALID RDRAM LOCATION\n" );
-					break;
-				case DEBUG_MEDIUM:
-                    DebugMsg( DEBUG_MEDIUM | DEBUG_ERROR, "Attempting to execute RSP command at invalid RDRAM location\n" );
-					break;
-				case DEBUG_HIGH:
-                    DebugMsg( DEBUG_HIGH | DEBUG_ERROR, "// Attempting to execute RSP command at invalid RDRAM location\n" );
-					break;
-			}
-#endif
 			break;
 		}
 
-//		printf( "!!!!!! RDRAM = 0x%8.8x\n", RDRAM );//RSP.PC[RSP.PCi] );
-/*		{
-			static u8 *lastRDRAM = 0;
-			if (lastRDRAM == 0)
-				lastRDRAM = RDRAM;
-			if (RDRAM != lastRDRAM)
-			{
-				__asm__( "int $3" );
-			}
-		}*/
 		u32 w0 = *(u32*)&RDRAM[RSP.PC[RSP.PCi]];
 		u32 w1 = *(u32*)&RDRAM[RSP.PC[RSP.PCi] + 4];
 		RSP.cmd = _SHIFTR( w0, 24, 8 );
-
-#ifdef DEBUG
-		DebugRSPState( RSP.PCi, RSP.PC[RSP.PCi], _SHIFTR( w0, 24, 8 ), w0, w1 );
-		DebugMsg( DEBUG_LOW | DEBUG_HANDLED, "0x%08lX: CMD=0x%02lX W0=0x%08lX W1=0x%08lX\n", RSP.PC[RSP.PCi], _SHIFTR( w0, 24, 8 ), w0, w1 );
-#endif
 
 		RSP.PC[RSP.PCi] += 8;
 		RSP.nextCmd = _SHIFTR( *(u32*)&RDRAM[RSP.PC[RSP.PCi]], 24, 8 );
 
 		GBI.cmd[RSP.cmd]( w0, w1 );
 	}
+
+#ifdef DEBUG
+	dl_total++;
+	printf("[DL] #%d cmds=%d halt=%d PC=0x%08X\n", dl_total, dl_cmds, RSP.halt, RSP.PC[RSP.PCi]);
+	fflush(stdout);
+#endif
 
 /*	if (OGL.frameBufferTextures && gDP.colorImage.changed)
 	{

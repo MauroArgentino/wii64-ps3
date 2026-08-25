@@ -1288,7 +1288,9 @@ void OGL_AddTriangle( SPVertex *vertices, int v0, int v1, int v2 )
 	int v[] = { v0, v1, v2 };
 
 	if (gSP.changed || gDP.changed)
+	{
 		OGL_UpdateStates();
+	}
 
 //	Playing around with lod fraction junk...
 //	float ds = max( max( fabs( vertices[v0].s - vertices[v1].s ), fabs( vertices[v0].s - vertices[v2].s ) ), fabs( vertices[v1].s - vertices[v2].s ) ) * cache.current[0]->shiftScaleS * gSP.texture.scales;
@@ -1340,7 +1342,7 @@ void OGL_AddTriangle( SPVertex *vertices, int v0, int v1, int v2 )
 		//Fog is taken care of in hardware with GX.
 #endif //__GX__
 
-		if (combiner.usesT0)
+		if (combiner.usesT0 && cache.current[0])
 		{
 			if (cache.current[0]->frameBufferTexture)
 			{
@@ -1371,7 +1373,7 @@ void OGL_AddTriangle( SPVertex *vertices, int v0, int v1, int v2 )
 			}
 		}
 
-		if (combiner.usesT1)
+		if (combiner.usesT1 && cache.current[0] && cache.current[1])
 		{
 			if (cache.current[0]->frameBufferTexture)
 			{
@@ -2845,6 +2847,15 @@ void OGL_ReadScreen( void **dest, long *width, long *height )
 #ifdef PS3
 void OGL_RSXinitDlist()
 {
+#ifdef DEBUG
+	static int dlist_count = 0;
+	dlist_count++;
+	if (dlist_count <= 5 || (dlist_count % 60 == 0)) {
+		printf("[RSX] OGL_RSXinitDlist #%d  curr_fb=%d\n", dlist_count, curr_fb);
+		fflush(stdout);
+	}
+#endif
+
 	OGL.frameReady = 1;
 #ifdef SHOW_DEBUG
 	static int count=0;
@@ -2917,8 +2928,12 @@ void OGL_RSXinitDlist()
 									   GCM_USER_CLIP_PLANE_DISABLE);
 
 	// Sync render settings from menu
+#ifdef PS3
+	OGL.frameBufferTextures = 0; // RSX framebuffer transfers hang on RPCS3
+#else
 	OGL.frameBufferTextures = glN64_useFrameBufferTextures;
 	if (gameHacks.mm_fbtex) OGL.frameBufferTextures = 1;
+#endif
 	OGL.textureFilter = glN64_textureFilter;
 
 	//Turn off Blending

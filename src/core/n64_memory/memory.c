@@ -31,6 +31,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef PS3
+#include <lv2/systime.h>
+#endif
 #include "../../main/winlnxdefs.h"
 
 
@@ -804,6 +807,17 @@ void update_SP()
     if (!sp_register.halt && !sp_register.broke)
       {
 	int save_pc = rsp_register.rsp_pc & ~0xFFF;
+	{
+#ifdef DEBUG
+		static int sp_print = 0;
+		sp_print++;
+		if (sp_print <= 10) {
+			printf("[SP] task#%d FC0=%d w=0x%08X\n",
+				sp_print, SP_DMEM[0xFC0/4], sp_register.w_sp_status_reg);
+			fflush(stdout);
+		}
+#endif
+	}
 #ifdef DEBUG_PROBES
 	DBG_LOG("[RSPSTART] pc=%08X SP_DMEM[FC0]=%d\n", rsp_register.rsp_pc, SP_DMEM[0xFC0/4]);
 #endif
@@ -849,7 +863,21 @@ void update_SP()
 		    }
 	       }
 	     
-	     //processDList();
+	     {
+#ifdef DEBUG
+		extern s64 sysGetSystemTime(void);
+		s64 t0 = sysGetSystemTime();
+#endif
+	     processDList();
+#ifdef DEBUG
+		s64 t1 = sysGetSystemTime();
+		if ((t1 - t0) > 50000) {
+			printf("[SP] processDList %lldus Count=%08X\n",
+				(long long)(t1 - t0), (unsigned int)Count);
+			fflush(stdout);
+		}
+#endif
+	     }
 	     rsp_register.rsp_pc &= 0xFFF;
 	     start_section(GFX_SECTION);
 	     doRspCycles(100);

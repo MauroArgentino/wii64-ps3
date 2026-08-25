@@ -244,7 +244,7 @@ void (*fBWrite)(DWORD addr, DWORD size) = NULL;
 void (*fBGetFrameBufferInfo)(void *p) = NULL;
 int loadROM(fileBrowser_file* rom);
 
-// TEMPORAL: autostart de prueba (SM64 + core del settings.cfg). No commitear.
+// TEMPORAL: autostart de prueba. No commitear.
 static void autostart_test(void)
 {
 	fileBrowser_file* dir = NULL;
@@ -260,15 +260,18 @@ static void autostart_test(void)
 	if (romFile_init)   romFile_init(romFile_topLevel);
 
 	n = romFile_readDir(romFile_topLevel, &dir);
-	DBG_LOG("[AUTOSTART] dynacore=%d, rom dir entries=%d\n", dynacore, n);
+#ifdef DEBUG
+	printf("[AUTOSTART] dynacore=%d, rom dir entries=%d\n", dynacore, n);
+	fflush(stdout);
+#endif
 	for (i = 0; i < n; i++) {
 		if (dir[i].attr == 0 && strstr(dir[i].name, "Mario Kart 64")) {
-			DBG_LOG("[AUTOSTART] loading: %s (size=0x%x)\n", dir[i].name, dir[i].size);
+#ifdef DEBUG
+			printf("[AUTOSTART] found match, loading: %s (size=0x%x)\n", dir[i].name, dir[i].size);
+			fflush(stdout);
+#endif
 			if (!loadROM(&dir[i])) {
 				menuActive = 0;
-				DBG_LOG("[AUTOSTART] ROM loaded OK, menuActive=0 -> go()\n");
-			} else {
-				DBG_LOG("[AUTOSTART] loadROM FAILED\n");
 			}
 			break;
 		}

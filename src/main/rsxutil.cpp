@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <malloc.h>
 #include <ppu-types.h>
+#include <lv2/systime.h>
 
 #include <rsx/rsx.h>
 #include <rsx/nv40.h>
@@ -214,7 +215,16 @@ void waitflip() {
 	gcmResetFlipStatus();
 }
 
+#ifdef DEBUG
+static int flip_count = 0;
+#endif
 void flip() {
+#ifdef DEBUG
+	flip_count++;
+	s64 t0 = 0, t1 = 0;
+	extern s64 sysGetSystemTime(void);
+	t0 = sysGetSystemTime();
+#endif
 	if(!first_fb) waitflip();
 	else gcmResetFlipStatus();
 
@@ -228,6 +238,13 @@ void flip() {
 	rsxClearSurface(context, GCM_CLEAR_R | GCM_CLEAR_G | GCM_CLEAR_B | GCM_CLEAR_A | GCM_CLEAR_S | GCM_CLEAR_Z);
 
 	rsxFlushBuffer(context);
+#ifdef DEBUG
+	t1 = sysGetSystemTime();
+	if ((t1 - t0) > 50000 || (flip_count & 0x3F) == 0) {
+		printf("[FLIP #%d] %lldus first=%d\n", flip_count, (long long)(t1 - t0), first_fb);
+		fflush(stdout);
+	}
+#endif
 
 	first_fb = 0;
 }

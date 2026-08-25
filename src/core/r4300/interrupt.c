@@ -42,10 +42,17 @@
 #include "../n64_memory/memory.h"
 #include "../../debug.h"
 #include <ppu-types.h>
+#ifdef PS3
+#include <lv2/systime.h>
+#endif
 
 static int SPECIAL_done = 0;
 int vi_field            = 0;
-int dbg_vi_count        = 0;u32 next_vi   = 0;
+#ifdef DEBUG
+int dbg_vi_count        = 0;
+static s64 vi_last_wall_us = 0;
+#endif
+u32 next_vi   = 0;
 static interrupt_queue *q = NULL;
 
 void clear_queue()
@@ -174,7 +181,7 @@ void remove_interrupt_event()
   }
   free(q);
   q = aux;
-  if (q != NULL && (q->count > Count || (Count - q->count) < 0x80000000)) {
+  if (q != NULL && (q->count - Count) < 0x80000000) {
     r4300.next_interrupt = q->count;
   }
   else {
@@ -344,7 +351,7 @@ void gen_interrupt()
     return;
   }
   if (r4300.skip_jump) {
-    if (q->count > Count || (Count - q->count) < 0x80000000) {
+    if ((q->count - Count) < 0x80000000) {
       r4300.next_interrupt = q->count;
     }
     else {
@@ -367,8 +374,27 @@ void gen_interrupt()
       return;
     break;
     case VI_INT:
+#ifdef DEBUG
       dbg_vi_count++;
+      {
+        extern s64 sysGetSystemTime(void);
+        s64 now = sysGetSystemTime();
+        s64 wall_gap = now - vi_last_wall_us;
+        vi_last_wall_us = now;
+        s64 t0 = now;
+        updateScreen();
+        s64 t1 = sysGetSystemTime();
+        s64 dt_us = t1 - t0;
+        /* Log every VI_INT for first 64, then every 64th or if gap > 200ms */
+        if (dbg_vi_count <= 64 || dt_us > 200000 || wall_gap > 200000 || (dbg_vi_count & 0x3F) == 0) {
+          printf("[VI_INT #%d] updateScreen=%lldus wall_gap=%lldus Count=%08X\n",
+            dbg_vi_count, (long long)dt_us, (long long)wall_gap, (unsigned int)Count);
+          fflush(stdout);
+        }
+      }
+#else
       updateScreen();
+#endif
 #ifdef PROFILE
       refresh_stat();
 #endif
