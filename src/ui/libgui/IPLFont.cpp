@@ -111,6 +111,7 @@ IplFont::~IplFont()
 {
 #ifndef __GX__
 	rsxFree(rsx_texture_buffer);
+	if (fp_buffer) rsxFree(fp_buffer);
 #endif //!__GX__
 }
 
@@ -464,31 +465,31 @@ void IplFont::drawInit(GXColor fontColor)
 
 	//Reset params from gfx plugin (TODO..)
 
-	//init_shader
-	if (fp_buffer)
-		rsxFree(fp_buffer);
+	// Lazy-init shader: allocate fp_buffer only on first call, never re-allocate
+	if (!fp_buffer)
+	{
+		vpo = (rsxVertexProgram*)combined_shader_vpo;
+		fpo = (rsxFragmentProgram*)combined_shader_fpo;
 
-	vpo = (rsxVertexProgram*)combined_shader_vpo;
-	fpo = (rsxFragmentProgram*)combined_shader_fpo;
+		vp_ucode = rsxVertexProgramGetUCode(vpo);
+		projMatrix_id = rsxVertexProgramGetConst(vpo,"projMatrix");
+		modelViewMatrix_id = rsxVertexProgramGetConst(vpo,"modelViewMatrix");
+		vertexPosition_id = rsxVertexProgramGetAttrib(vpo,"vertexPosition");
+		vertexColor0_id = rsxVertexProgramGetAttrib(vpo,"vertexColor");
+		vertexTexcoord_id = rsxVertexProgramGetAttrib(vpo,"vertexTexcoord");
 
-	vp_ucode = rsxVertexProgramGetUCode(vpo);
-	projMatrix_id = rsxVertexProgramGetConst(vpo,"projMatrix");
-	modelViewMatrix_id = rsxVertexProgramGetConst(vpo,"modelViewMatrix");
-	vertexPosition_id = rsxVertexProgramGetAttrib(vpo,"vertexPosition");
-	vertexColor0_id = rsxVertexProgramGetAttrib(vpo,"vertexColor");
-	vertexTexcoord_id = rsxVertexProgramGetAttrib(vpo,"vertexTexcoord");
+		fp_ucode = rsxFragmentProgramGetUCode(fpo,&fpsize);
+		fp_buffer = (u32*)rsxMemalign(64,fpsize);
+		memcpy(fp_buffer,fp_ucode,fpsize);
+		rsxAddressToOffset(fp_buffer,&fp_offset);
 
-	fp_ucode = rsxFragmentProgramGetUCode(fpo,&fpsize);
-	fp_buffer = (u32*)rsxMemalign(64,fpsize);
-	memcpy(fp_buffer,fp_ucode,fpsize);
-	rsxAddressToOffset(fp_buffer,&fp_offset);
+		mode_id = rsxFragmentProgramGetConst(fpo,"mode");
+		alpha_mode_id = rsxFragmentProgramGetConst(fpo,"alpha_mode");
+		shader_alpha_mode = 0.0f;
+		textureUnit_id = rsxFragmentProgramGetAttrib(fpo,"texture");
+	}
 
-	mode_id = rsxFragmentProgramGetConst(fpo,"mode");
-	alpha_mode_id = rsxFragmentProgramGetConst(fpo,"alpha_mode");
-	shader_alpha_mode = 0.0f;
-	textureUnit_id = rsxFragmentProgramGetAttrib(fpo,"texture");
-
-	//Init font texture
+	// Font texture is cached — just invalidate and bind
 	rsxInvalidateTextureCache(context,GCM_INVALIDATE_TEXTURE);
 	rsxLoadTexture(context,textureUnit_id,&texobj);
 	rsxTextureControl(context,textureUnit_id,GCM_TRUE,0<<8,12<<8,GCM_TEXTURE_MAX_ANISO_1);
@@ -522,7 +523,6 @@ void IplFont::drawInit(GXColor fontColor)
 	offset[3] = 0.0f;
 
 	rsxSetViewport(context,x, y, w, h, min, max, scale, offset);
-	rsxSetScissor(context,x,y,w,h);
 
 //	rsxSetDepthTestEnable(context,GCM_TRUE);
 	rsxSetDepthTestEnable(context,GCM_TRUE);
