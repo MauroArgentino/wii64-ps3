@@ -101,13 +101,13 @@ void MenuManager::init() {
         float x = startX + (i % columns) * (chW + margin);
         float y = startY + (i / columns) * (chH + margin);
         ChannelButton* btn = new ChannelButton(channels[i], x, y, chW, chH); // Renombrado
-        
-        // Asignar acciones globales
-        if      (channels[i].id == "LOAD_ROM") btn->setClicked(Func_LoadROM);
-        else if (channels[i].id == "SETTINGS") btn->setClicked(Func_Settings);
-        else if (channels[i].id == "CREDITS")  btn->setClicked(Func_Credits);
-        else if (channels[i].id == "RESUME")   btn->setClicked(Func_PlayGame);
-        else if (channels[i].id == "EXIT")     btn->setClicked(Func_ExitToLoader);
+
+        // NOTA: NO asignamos setClicked() aquí. La navegación de los canales se
+        // maneja ÚNICAMENTE a través del efecto de flip (MenuManager::update ->
+        // isTransitioning -> executeAction al final de la transición). Si setClicked
+        // estuviera asignado, Focus::updateFocus() dispararía doClicked() -> Func_* ->
+        // setActiveFrame() inmediatamente en el mismo frame, cortando el flip (y solo
+        // se veía en Reanudar Juego / Gestionar Saves, que no navegan por setActiveFrame).
 
         add(btn);
         buttonComponents.push_back(btn);
@@ -145,6 +145,13 @@ void MenuManager::reset() {
     }
 }
 
+void MenuManager::resetTransition() {
+    // Limpia solo el estado de transición (sin tocar el foco ni el pad)
+    isTransitioning = false;
+    transitionProgress = 0.0f;
+    transitionedButtonIndex = -1;
+}
+
 static float pulse = 0.0f;
 static float g_tvStaticTime = 0.0f;
 void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa directamente
@@ -156,8 +163,14 @@ void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa direc
             transitionProgress = 0.0f;
         }
         
-        // Actualizar solo el botón que está animando
-        buttonComponents[transitionedButtonIndex]->updateAnimation(pulse, transitionProgress);
+        // Actualizar solo el botón que está animando.
+        // IMPORTANTE: executeAction() puede navegar a otro frame y llamar a
+        // setActiveFrame()->resetTransition(), que deja transitionedButtonIndex=-1.
+        // Sin este control de rango, buttonComponents[-1] es un acceso fuera de
+        // límites que escribe sobre memoria basura (~0x199) y crashea RPCS3.
+        if (transitionedButtonIndex >= 0 && transitionedButtonIndex < (int)buttonComponents.size()) {
+            buttonComponents[transitionedButtonIndex]->updateAnimation(pulse, transitionProgress);
+        }
         return;
     }
 
@@ -199,6 +212,12 @@ void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa direc
 }
 
 void MenuManager::drawChildren(menu::Graphics& gfx) {
+    // Gui::draw() llama drawChildren() de TODOS los frames cada frame, incluso
+    // cuando no son visibles. Sin este gate, el menú de canales (las "tarjetas")
+    // se dibujaba en las pantallas hijas (File Browser, Settings) porque la rama
+    // de transición dibuja sin chequear isVisible().
+    if (!isVisible()) return;
+
     // Asegurar que no hay recortes de pantalla de componentes previos
     gfx.disableScissor();
 
@@ -229,7 +248,7 @@ void MenuManager::drawChildren(menu::Graphics& gfx) {
                     else if (channels[i].id == "SETTINGS") description = "Opciones";
                     else if (channels[i].id == "SAVES")    description = "Gestionar Saves";
                     else if (channels[i].id == "RESUME")   description = "Reanudar Juego"; // Corregido el typo
-                    else if (channels[i].id == "CREDITS")  description = "Créditos";
+                    else if (channels[i].id == "CREDITS")  description = "Cr" "\xE9" "ditos"; // é como Latin-1 (0xE9); la IplFont dibuja byte a byte
                     else if (channels[i].id == "EXIT")     description = "Salir";
                 }
 

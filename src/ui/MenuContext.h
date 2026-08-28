@@ -47,6 +47,10 @@ public:
 	void setActiveFrame(int frameIndex);
 	void setActiveFrame(int frameIndex, int submenu);
 	menu::Frame* getFrame(int frameIndex);
+	// Muestra u oculta el menú de canales (tarjetas). Al ocultarlo se ocultan también
+	// los widgets del frame genérico (bg.tx lo dibuja Gui::drawBackground() por sí solo),
+	// de modo que un modal (MessageBox) se vea únicamente sobre el fondo.
+	void showChannelMenu(bool show);
 	enum FrameIndices
 	{
 		FRAME_MAIN=1,

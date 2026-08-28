@@ -202,7 +202,11 @@ void Func_Credits()
 	strcat(CreditsInfo,"Team Twiizers - for Wii homebrew\n");
 #endif
 
+	// Ocultar el menú de canales y mostrar el fondo (bg.tx) mientras el modal de
+	// créditos está abierto, para que solo se vea el modal semitransparente gris.
+	pMenuContext->showChannelMenu(false);
 	menu::MessageBox::getInstance().setMessage(CreditsInfo);
+	pMenuContext->showChannelMenu(true);
 }
 
 extern char shutdownMenu;

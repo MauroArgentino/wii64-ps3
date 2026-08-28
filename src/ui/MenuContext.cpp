@@ -162,6 +162,14 @@ void MenuContext::setActiveFrame(int frameIndex)
 	if(currentActiveFrame)
 		currentActiveFrame->hideFrame();
 
+	// Al navegar a un frame que no es el principal, ocultamos el menú de canales
+	// (tarjetas) y reseteamos su estado de transición para evitar que queden dibujadas
+	// detrás de File Browser / Settings (Gui::draw dibuja todos los frames cada frame).
+	if (frameIndex != FRAME_MAIN && g_mainMenu) {
+		g_mainMenu->setVisible(false);
+		g_mainMenu->resetTransition();
+	}
+
 	switch(frameIndex) {
 	case FRAME_MAIN:
 		currentActiveFrame = mainFrame;
@@ -210,6 +218,24 @@ void MenuContext::setActiveFrame(int frameIndex, int submenu)
 {
 	setActiveFrame(frameIndex);
 	if(currentActiveFrame) currentActiveFrame->activateSubmenu(submenu);
+}
+
+void MenuContext::showChannelMenu(bool show)
+{
+	if (!g_mainMenu) return;
+	if (show) {
+		// Volver al menú de canales: mostrar tarjetas, ocultar el frame genérico
+		g_mainMenu->resetTransition();
+		g_mainMenu->setVisible(true);
+		if (mainFrame) mainFrame->setVisible(false);
+	} else {
+		// Mostrar un modal (MessageBox) sobre el fondo. El bg.tx lo dibuja
+		// Gui::drawBackground() siempre, así que ocultamos AMBOS menús (el de
+		// canales y el frame genérico con sus widgets) para que solo se vea el fondo.
+		g_mainMenu->resetTransition();
+		g_mainMenu->setVisible(false);
+		if (mainFrame) mainFrame->setVisible(false);
+	}
 }
 
 menu::Frame* MenuContext::getFrame(int frameIndex)

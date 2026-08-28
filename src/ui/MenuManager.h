@@ -38,6 +38,7 @@ public:
 
     void init();
     void reset(); // Nueva función para reiniciar el estado del menú
+    void resetTransition(); // Limpia el estado de transición si quedó atascado
     void update(uint32_t padInput); // Maneja la navegación con el DualShock
     void drawChildren(menu::Graphics& gfx); // Reemplaza al renderizador manual
 
