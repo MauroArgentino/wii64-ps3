@@ -48,15 +48,15 @@ CFLAGS		= -O0 -g3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-DDEBUG_POLYGONS -DSHOW_DEBUG -DDEBUG -DDEBUGON -DCACHED_DEBUG \
 			-include ../src/main/winlnxdefs.h \
 			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__ \
-			-DBYPASS_CIC_CHECKSUM
+			-DBYPASS_CIC_CHECKSUM -DWII64_VERSION_STR="\"$(VERSION)\""
 else
 CFLAGS		= -O3 -Wall -mcpu=cell -mtune=cell $(MACHDEP) $(INCLUDE) \
 			-fno-exceptions -Wno-unused-parameter -pipe -DUSE_EXPANSION -D__BIG_ENDIAN__ -DNDEBUG -D_GLIBCXX_DEBUG=0 -U_GLIBCXX_DEBUG \
 			-include ../src/main/winlnxdefs.h \
 			-DPPC -D_BIG_ENDIAN -DPS3 -DPPC_DYNAREC -DUSE_RECOMP_CACHE -D__PSL1GHT__ \
-			-DBYPASS_CIC_CHECKSUM
+			-DBYPASS_CIC_CHECKSUM -DWII64_VERSION_STR="\"$(VERSION)\""
 endif
-	  
+
 CXXFLAGS	=	$(CFLAGS) -fno-rtti -fno-exceptions -fpermissive
 
 LDFLAGS		=	$(MACHDEP) -Wl,-Map,$(notdir $@).map

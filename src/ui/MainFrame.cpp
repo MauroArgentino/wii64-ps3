@@ -181,7 +181,10 @@ void Func_Settings()
 
 void Func_Credits()
 {
-	char CreditsInfo[512] = "";
+#ifndef WII64_VERSION_STR
+	#define WII64_VERSION_STR "1.0.5"
+#endif
+	char CreditsInfo[1024] = "";
 #ifdef HW_RVL
   int iosversion = IOS_GetVersion();
   sprintf(CreditsInfo,"Wii64 Beta 1.1 'Honey' - IOS %i\n",iosversion);
@@ -201,6 +204,7 @@ void Func_Credits()
 #ifdef HW_RVL
 	strcat(CreditsInfo,"Team Twiizers - for Wii homebrew\n");
 #endif
+	strcat(CreditsInfo,"Versi" "\xF3" "n " WII64_VERSION_STR " (compilaci" "\xF3" "n " __DATE__ " " __TIME__ ")\n");
 
 	// Ocultar el menú de canales y mostrar el fondo (bg.tx) mientras el modal de
 	// créditos está abierto, para que solo se vea el modal semitransparente gris.
@@ -213,8 +217,12 @@ extern char shutdownMenu;
 
 void Func_ExitToLoader()
 {
+	// Ocultar el menú de canales y mostrar solo el fondo (bg.tx) mientras el
+	// modal de confirmación está abierto (mismo comportamiento que Créditos).
+	pMenuContext->showChannelMenu(false);
 	if(menu::MessageBox::getInstance().askMessage("Are you sure you want to exit to loader?"))
 		shutdownMenu = 2;
+	pMenuContext->showChannelMenu(true);
 //#ifdef WII
 //	DI_Close();
 //#endif

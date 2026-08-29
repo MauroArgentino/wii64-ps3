@@ -140,9 +140,10 @@ void MenuManager::reset() {
     transitionProgress = 0.0f;
     transitionedButtonIndex = -1;
     lastInput = 0; // Forzamos un reset del estado del pad
-    if (!buttonComponents.empty()) {
-        setDefaultFocus(buttonComponents[0]);
-    }
+    // NOTA: No tocamos setDefaultFocus aquí. El foco por defecto se registra en
+    // update() al navegar (ver más arriba), de modo que al volver al menú
+    // principal Focus::updateFocus() restaura la misma tarjeta desde la que
+    // se entró. Si aún no se navegó ninguna vez, init() ya dejó card[0].
 }
 
 void MenuManager::resetTransition() {
@@ -159,6 +160,11 @@ void MenuManager::update(uint32_t /*padInput*/) { // padInput ya no se usa direc
         transitionProgress += 0.04f; // Velocidad de la transición
         if (transitionProgress >= 1.0f) {
             isTransitioning = false;
+            // Registrar la tarjeta desde la que se navega como foco por defecto
+            // del menú. Al volver al menú principal (ya sea desde una frame hija
+            // o desde un modal/closing) Focus::updateFocus() re-selecciona
+            // getDefaultFocus(), por lo que el foco vuelve a esta misma tarjeta.
+            setDefaultFocus(buttonComponents[transitionedButtonIndex]);
             executeAction(channels[transitionedButtonIndex].id);
             transitionProgress = 0.0f;
         }
