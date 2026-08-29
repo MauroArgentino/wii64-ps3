@@ -4,15 +4,22 @@
 MenuAudioSynthesizer g_menuAudioSynthesizer;
 
 MenuAudioSynthesizer::MenuAudioSynthesizer()
-    : sampleCounter(0), nextChordChange(0), introProgress(0.0f), introComplete(false),
-      currentChord(0), chordCrossfade(1.0f), prevChordVol(1.0f), nextChordVol(0.0f),
-      padLfoPhase(0.0f), padLfoStep(0.0f)
+    : sampleCounter(0), nextChordChange(0),
+      padLfoPhase(0.0f), padLfoStep(0.0f),
+      introProgress(0.0f), introComplete(false),
+      currentChord(0), chordCrossfade(1.0f), prevChordVol(1.0f), nextChordVol(0.0f)
 {
     generateSineTable();
     for (int i = 0; i < MAX_VOICES; i++) {
         voices[i].active = false;
         voices[i].isPad = false;
+        voices[i].waveShape = 0;
+        voices[i].freqEnd = 0.0f;
+        voices[i].freqInc = 0.0f;
+        voices[i].envDecay = 0.0f;
+        voices[i].reachedPeak = false;
     }
+    pendingHover = false;
 }
 
 MenuAudioSynthesizer::~MenuAudioSynthesizer() {}
@@ -28,6 +35,13 @@ float MenuAudioSynthesizer::lookupSine(float phase) {
     return sineTable[index];
 }
 
+// Onda triangular: fase 0..1 -> -1..1..-1 (dos rampas lineales)
+float MenuAudioSynthesizer::lookupTriangle(float phase) {
+    float p = phase - (float)(int)phase;
+    float t = (p < 0.5f) ? (p * 2.0f) : ((1.0f - p) * 2.0f);
+    return t * 2.0f - 1.0f;
+}
+
 void MenuAudioSynthesizer::init() {
     sampleCounter = 0;
     introProgress = 0.0f;
@@ -38,23 +52,69 @@ void MenuAudioSynthesizer::init() {
     nextChordVol = 0.0f;
     padLfoPhase = 0.0f;
 
-    // Chord change cada 15 segundos
-    nextChordChange = MENU_SAMPLE_RATE * 15;
+    nextChordChange = MENU_SAMPLE_RATE * 3; // El ambiente empieza tras la intro (3s)
 
     // Reiniciar todas las voces
     for (int i = 0; i < MAX_VOICES; i++) {
         voices[i].active = false;
         voices[i].isPad = false;
+        voices[i].waveShape = 0;
+        voices[i].freqEnd = 0.0f;
+        voices[i].freqInc = 0.0f;
+        voices[i].envDecay = 0.0f;
     }
+    pendingHover = false;
 
-    // Iniciar el pad base perpetuo
-    initPadVoices();
+    // Intro Wii + programar el ambiente evolutivo
+    programIntro();
 }
 
 void MenuAudioSynthesizer::stop() {
     for (int i = 0; i < MAX_VOICES; i++) {
         voices[i].active = false;
         voices[i].isPad = false;
+        voices[i].waveShape = 0;
+        voices[i].freqEnd = 0.0f;
+        voices[i].freqInc = 0.0f;
+        voices[i].envDecay = 0.0f;
+    }
+    pendingHover = false;
+}
+
+// Blip de navegación: triángulo que barre 420Hz->150Hz en 40ms con
+// decaimiento exponencial (equivalente al playWiiHover del menú Wii).
+// Se llama desde el hilo principal; solo marca un flag para process().
+void MenuAudioSynthesizer::triggerHoverBlip() {
+    pendingHover = true;
+}
+
+void MenuAudioSynthesizer::spawnHoverBlip() {
+    for (int i = NUM_PAD_VOICES; i < MAX_VOICES; i++) {
+        if (!voices[i].active) {
+            voices[i].active = true;
+            voices[i].isPad = false;
+            voices[i].waveShape = 1;                 // triangle
+            voices[i].freq = 420.0f;
+            voices[i].freqEnd = 150.0f;
+            // 40ms -> 1920 muestras a 48kHz; barrido lineal 420->150
+            voices[i].freqInc = (150.0f - 420.0f) / 1920.0f;
+            voices[i].phase = 0.0f;
+            voices[i].step = 420.0f / (float)MENU_SAMPLE_RATE;
+            voices[i].volume = 0.11f;
+            voices[i].targetVol = 0.11f;
+            voices[i].currentVol = 0.11f;            // ataque inmediato
+            voices[i].attackRate = 0.0f;
+            voices[i].releaseRate = 0.9f;
+            voices[i].reachedPeak = true;              // pico inmediato
+            // Decaimiento 0.11 -> ~0.0011 en 1920 muestras (exponencial)
+            voices[i].envDecay = 0.9976f;
+            voices[i].samplesLeft = 1920;
+            voices[i].delaySamples = 0;
+            voices[i].lfoPhase = 0.0f;
+            voices[i].lfoStep = 0.0f;
+            voices[i].lfoDepth = 0.0f;
+            return;
+        }
     }
 }
 
@@ -110,7 +170,10 @@ void MenuAudioSynthesizer::playAmbientNote(float freq, float delaySec, float dur
         if (!voices[i].active) {
             voices[i].active = true;
             voices[i].isPad = false;
+            voices[i].waveShape = 0;
             voices[i].freq = freq;
+            voices[i].freqEnd = 0.0f;
+            voices[i].freqInc = 0.0f;
             voices[i].phase = 0.0f;
             voices[i].step = freq / (float)MENU_SAMPLE_RATE;
             voices[i].volume = vol * 0.12f;
@@ -118,6 +181,7 @@ void MenuAudioSynthesizer::playAmbientNote(float freq, float delaySec, float dur
             voices[i].currentVol = 0.0f;
             voices[i].attackRate = voices[i].volume / ((float)MENU_SAMPLE_RATE * 0.5f); // 0.5s attack
             voices[i].releaseRate = 0.99997f;
+            voices[i].envDecay = 0.0f;
             voices[i].samplesLeft = (uint32_t)(durationSec * (float)MENU_SAMPLE_RATE);
             voices[i].delaySamples = (uint32_t)(delaySec * (float)MENU_SAMPLE_RATE);
             voices[i].lfoPhase = 0.0f;
@@ -125,6 +189,70 @@ void MenuAudioSynthesizer::playAmbientNote(float freq, float delaySec, float dur
             voices[i].lfoDepth = 0.03f;
             return;
         }
+    }
+}
+
+// Nota general: forma de onda (0=sine,1=triangle), ataque lineal y
+// decaimiento exponencial a silencio en la duración restante.
+void MenuAudioSynthesizer::playNote(float freq, float delaySec, float durationSec, float vol, int shape, float attackSec) {
+    for (int i = NUM_PAD_VOICES; i < MAX_VOICES; i++) {
+        if (!voices[i].active) {
+            voices[i].active = true;
+            voices[i].isPad = false;
+            voices[i].waveShape = shape;
+            voices[i].freq = freq;
+            voices[i].freqEnd = 0.0f;
+            voices[i].freqInc = 0.0f;
+            voices[i].phase = 0.0f;
+            voices[i].step = freq / (float)MENU_SAMPLE_RATE;
+            voices[i].volume = vol;
+            voices[i].targetVol = vol;
+            voices[i].currentVol = 0.0f;
+            voices[i].attackRate = (attackSec > 0.0f) ? vol / ((float)MENU_SAMPLE_RATE * attackSec) : vol;
+            voices[i].releaseRate = 0.9f;
+            voices[i].reachedPeak = false;             // ADSR con ataque
+            float remainSec = durationSec - attackSec;
+            if (remainSec < 0.01f) remainSec = 0.01f;
+            if (vol > 0.0f)
+                voices[i].envDecay = powf(0.001f / vol, 1.0f / ((float)MENU_SAMPLE_RATE * remainSec));
+            else
+                voices[i].envDecay = 0.0f;
+            voices[i].samplesLeft = (uint32_t)(durationSec * (float)MENU_SAMPLE_RATE);
+            voices[i].delaySamples = (uint32_t)(delaySec * (float)MENU_SAMPLE_RATE);
+            voices[i].lfoPhase = 0.0f;
+            voices[i].lfoStep = 0.0f;
+            voices[i].lfoDepth = 0.0f;
+            return;
+        }
+    }
+}
+
+// Intro Wii: acorde Cmaj9 en "swell" + plinks cristalinos (playWiiIntro del .html)
+void MenuAudioSynthesizer::programIntro() {
+    const float cmaj9[5] = {261.63f, 329.63f, 392.00f, 493.88f, 587.33f}; // C4 E4 G4 B4 D5
+    for (int i = 0; i < 5; i++)
+        playNote(cmaj9[i], 0.0f, 4.0f, 0.12f, 0, 0.1f); // swell 0.1s, decay 4s
+    // Plinks cristalinos
+    playNote(1046.50f, 0.5f, 0.6f, 0.05f, 0, 0.05f); // C6
+    playNote(1318.51f, 0.8f, 0.6f, 0.05f, 0, 0.05f); // E6
+    playNote(1567.98f, 1.2f, 0.6f, 0.05f, 0, 0.05f); // G6
+}
+
+// Ambiente procedural: acorde aleatorio (triángulo) + pings melódicos (generateEvolution)
+void MenuAudioSynthesizer::generateAmbient() {
+    const float chordPool[3][4] = {
+        {174.61f, 220.00f, 261.63f, 329.63f}, // Fmaj7
+        {261.63f, 329.63f, 392.00f, 493.88f}, // Cmaj7
+        {196.00f, 246.94f, 293.66f, 392.00f}  // G6
+    };
+    int c = rand() % 3;
+    for (int i = 0; i < 4; i++)
+        playNote(chordPool[c][i], 0.0f, 12.0f, 0.02f, 1, 3.6f); // triángulo, 12s, ataque 30% (3.6s)
+
+    const float scale[5] = {523.25f, 659.25f, 783.99f, 880.00f, 1046.50f};
+    for (int i = 0; i < 2; i++) {
+        float delay = 1.0f + (float)(rand() % 8000) / 1000.0f; // 1..9s
+        playNote(scale[rand() % 5], delay, 4.0f, 0.03f, 0, 1.2f); // sine, 4s, ataque 30% (1.2s)
     }
 }
 
@@ -152,58 +280,10 @@ void MenuAudioSynthesizer::changeChord() {
 void MenuAudioSynthesizer::process(float* buffer, uint32_t numSamples) {
     memset(buffer, 0, numSamples * 2 * sizeof(float));
 
-    // --- Intro ---
-    if (!introComplete) {
-        introProgress += (float)numSamples / ((float)MENU_SAMPLE_RATE * 6.0f); // 6s intro
-        if (introProgress >= 1.0f) {
-            introProgress = 1.0f;
-            introComplete = true;
-        }
-
-        // Arpeggio que sube y baja durante la intro
-        // Notas del arpeggio: C4, Eb4, G4, Bb4, D5, C5, Bb4, G4, Eb4, C4 (sube y baja)
-        float arpNotes[] = {261.63f, 311.13f, 392.00f, 466.16f, 587.33f, 523.25f, 466.16f, 392.00f, 311.13f, 261.63f};
-        int numArpNotes = 10;
-        float arpPosition = introProgress * (float)numArpNotes;
-        int noteIdx = (int)arpPosition;
-        float noteFrac = arpPosition - (float)noteIdx;
-
-        if (noteIdx < numArpNotes - 1) {
-            // Crossfade entre notas adyacentes del arpeggio
-            float vol1 = (1.0f - noteFrac) * 0.06f * (0.5f + 0.5f * introProgress);
-            float vol2 = noteFrac * 0.06f * (0.5f + 0.5f * introProgress);
-            if (vol1 > 0.001f)
-                playAmbientNote(arpNotes[noteIdx], 0.0f, 1.5f, vol1 / 0.12f);
-            if (vol2 > 0.001f)
-                playAmbientNote(arpNotes[noteIdx + 1], 0.0f, 1.5f, vol2 / 0.12f);
-        }
-
-        // El fade-in del pad se acelera durante la intro
-        for (int i = 0; i < NUM_PAD_VOICES; i++) {
-            voices[i].attackRate = voices[i].volume / ((float)MENU_SAMPLE_RATE * 2.0f);
-        }
-    }
-
-    // --- Evolucion del acorde ---
-    if (sampleCounter >= nextChordChange && introComplete) {
-        changeChord();
-        nextChordChange = sampleCounter + (uint64_t)((float)MENU_SAMPLE_RATE * 18.0f); // Cada 18s
-
-        // Notas efimeras ocasionales (matices)
-        // Pentatonica de Do menor: C, Eb, F, G, Bb
-        float scale[] = {523.25f, 622.25f, 698.46f, 783.99f, 932.33f, 1046.50f};
-        int numPings = 1 + (sampleCounter % 3);
-        for (int i = 0; i < numPings; i++) {
-            float delay = 2.0f + (float)(sampleCounter % 7000) / 2000.0f;
-            float noteVol = 0.02f + (float)(sampleCounter % 200) / 10000.0f;
-            playAmbientNote(scale[sampleCounter % 6], delay, 6.0f + (float)(sampleCounter % 4000) / 1000.0f, noteVol / 0.12f);
-        }
-    }
-
-    // Crossfade de acordes
-    if (chordCrossfade < 1.0f) {
-        chordCrossfade += (float)numSamples / ((float)MENU_SAMPLE_RATE * 4.0f); // 4s crossfade
-        if (chordCrossfade > 1.0f) chordCrossfade = 1.0f;
+    // --- Ambiente evolutivo: cada 10s se genera un acorde ambiental nuevo ---
+    if (sampleCounter >= nextChordChange) {
+        generateAmbient();
+        nextChordChange = sampleCounter + (uint64_t)((float)MENU_SAMPLE_RATE * 10.0f); // Cada 10s
     }
 
     // --- LFO maestro del pad (respiración global) ---
@@ -211,6 +291,12 @@ void MenuAudioSynthesizer::process(float* buffer, uint32_t numSamples) {
     float masterLfo = lookupSine(padLfoPhase);
     padLfoPhase += padLfoStep;
     if (padLfoPhase > 1.0f) padLfoPhase -= 1.0f;
+
+    // --- Consumir blip de navegación pendiente (disparado desde el menú) ---
+    if (pendingHover) {
+        pendingHover = false;
+        spawnHoverBlip();
+    }
 
     // --- Mezclar voces ---
     for (int i = 0; i < MAX_VOICES; i++) {
@@ -234,14 +320,23 @@ void MenuAudioSynthesizer::process(float* buffer, uint32_t numSamples) {
             v.lfoPhase += v.lfoStep;
             if (v.lfoPhase > 1.0f) v.lfoPhase -= 1.0f;
 
-            float currentStep = (v.freq * (1.0f + lfoMod)) / (float)MENU_SAMPLE_RATE;
-            float sample = lookupSine(v.phase);
+            // Glide de frecuencia (solo blips de navegación)
+            if (v.freqInc != 0.0f) v.freq += v.freqInc;
 
-            // Attack suave
-            if (v.currentVol < v.targetVol) {
+            float currentStep = (v.freq * (1.0f + lfoMod)) / (float)MENU_SAMPLE_RATE;
+            float sample = (v.waveShape == 1) ? lookupTriangle(v.phase) : lookupSine(v.phase);
+
+            // Ataque suave (una sola vez hasta el pico)
+            if (!v.reachedPeak) {
                 v.currentVol += v.attackRate;
-                if (v.currentVol > v.targetVol) v.currentVol = v.targetVol;
+                if (v.currentVol >= v.targetVol) {
+                    v.currentVol = v.targetVol;
+                    v.reachedPeak = true;
+                }
             }
+
+            // Decaimiento exponencial (solo tras el pico -- ADSR correcto)
+            if (v.envDecay != 0.0f && v.reachedPeak) v.currentVol *= v.envDecay;
 
             // Aplicar LFO de amplitud (solo para voces del pad)
             float ampMod = 1.0f;

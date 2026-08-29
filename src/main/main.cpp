@@ -301,7 +301,11 @@ int main(int argc, char* argv[]){
 	setRenderTarget(curr_fb);
 	atexit(program_exit_callback);
 	sysUtilRegisterCallback(0,sysutil_exit_callback,NULL);
-	// ps3_audio_init(); // DISABLED: second audio port interferes with ROM audio on RPCS3
+	// Audio de fondo del menú (WAV). El hilo de ps3audio_backend solo abre el
+	// puerto de audio mientras menuActive==1 (menú) y lo CIERRA cuando arranca
+	// un juego (menuActive==0), así no choca con el audio del ROM (audio.c usa
+	// el puerto 1). Por eso ya no es un conflicto activar esto en RPCS3.
+	ps3_audio_init();
 
 	/* Initialize SPU manager (Phase 0 skeleton) */
 	if (spu_manager_init() == 0) {

@@ -22,6 +22,7 @@
 #include "InputManager.h"
 #include "Frame.h"
 #include "IPLFont.h"
+#include "../MenuAudioSynthesizer.h"
 
 namespace menu {
 
@@ -125,8 +126,13 @@ void Focus::updateFocus()
 				focusDirection = DIRECTION_NONE;
 				buttonsDown = 0;
 			}
-			if (primaryFocusOwner) primaryFocusOwner = primaryFocusOwner->updateFocus(focusDirection,buttonsDown);
-			else primaryFocusOwner = currentFrame->updateFocus(focusDirection,buttonsDown);
+			if (primaryFocusOwner) {
+				Component* oldOwner = primaryFocusOwner;
+				primaryFocusOwner = primaryFocusOwner->updateFocus(focusDirection,buttonsDown);
+				// Blip de navegación: solo cuando realmente cambia la tarjeta enfocada
+				if (primaryFocusOwner != oldOwner && focusDirection != DIRECTION_NONE)
+					g_menuAudioSynthesizer.triggerHoverBlip();
+			} else primaryFocusOwner = currentFrame->updateFocus(focusDirection,buttonsDown);
 			previousButtonsPS3[i] = currentButtonsPS3;
 			break;
 		}

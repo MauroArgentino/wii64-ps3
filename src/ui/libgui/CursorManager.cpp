@@ -21,6 +21,7 @@
 #include "CursorManager.h"
 #include "InputManager.h"
 #include "FocusManager.h"
+#include "../MenuAudioSynthesizer.h"
 #ifdef __GX__
 #include "GraphicsGX.h"
 #else //__GX__
@@ -207,7 +208,13 @@ void Cursor::setCursorFocus(Component* component)
 	if (pressed) buttonsDown |= Focus::ACTION_SELECT;
 #endif
 	if (freezeAction) buttonsDown = 0;
-	if (component) newHoverOverComponent = component->updateFocus(focusDirection,buttonsDown);
+	if (component) 
+	{
+		Component* oldHover = hoverOverComponent;
+		newHoverOverComponent = component->updateFocus(focusDirection,buttonsDown);
+		if (newHoverOverComponent && newHoverOverComponent != oldHover)
+			g_menuAudioSynthesizer.triggerHoverBlip();
+	}
 	if (newHoverOverComponent) 
 	{
 		if (hoverOverComponent) hoverOverComponent->setFocus(false);
