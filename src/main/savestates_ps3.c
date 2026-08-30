@@ -46,6 +46,8 @@
 #include "wii64config.h"
 #include "../debug.h"
 
+#include <zlib.h>
+
 extern int *autoinc_save_slot;
 void pauseAudio(void);
 void resumeAudio(void);
@@ -58,7 +60,14 @@ static u32 saved_ai_int = 0; /* pending AI_INT absolute count restored on load *
 
 #define ST_MAGIC      0x53545053 /* "STPS" */
 #define ST_VERSION    1
+#define ST_VERSION_Z  2           /* body compressed with zlib (DEFLATE) */
 #define ST_PATH       "/dev_usb000/wii64/savestates/"
+
+/* Fixed-size part of the body: cpu + ai + 32*TLB (all byte-exact structs).
+ * The variable RDRAM (rdram_words*4) and the 0x800-word SP_DMEM follow. */
+#define ST_BODY_FIXED  (sizeof(st_cpu) + sizeof(st_ai) + 32*sizeof(st_tlb))
+#define ST_BODY_SPDMEM (0x800*4)
+#define ST_BODY_MAX    (ST_BODY_FIXED + ST_RDRAM_MAXW*4 + ST_BODY_SPDMEM)
 
 /* RDRAM: 4MB (0x100000 words) without USE_EXPANSION, 8MB with it.
  * We persist the actual allocated buffer; caps at 8MB. */
@@ -162,26 +171,20 @@ int savestates_exists(int mode)
 	return 0;
 }
 
-void savestates_save()
+/* The N64 framebuffer lives in the C++ video layer (REG.VI_ORIGIN / VI).
+ * Capture + 1/10 BMP are done there via this extern "C" bridge, which also
+ * owns the in-game "photo" shrink animation on save. */
+extern int ps3_fb_snapshot(const char *st_path);
+
+/* Serialize the state body (everything after the 64-byte header) into a
+ * caller-provided buffer. Returns the number of bytes written, or 0 on a
+ * NULL RDRAM. The buffer must be at least ST_BODY_MAX bytes. */
+static size_t st_serialize_body(u8 *out, u32 rdram_words)
 {
-	char path[160];
-	FILE *f;
 	int i;
-	st_header hdr;
+	size_t pos = 0;
 	st_cpu cpu;
-	size_t rdram_bytes = ST_RDRAM_WORDS*4;
-
-	if (!rdram) return;
-
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.magic   = ST_MAGIC;
-	hdr.version = ST_VERSION;
-	hdr.slot    = savestates_slot;
-	hdr.rdram_words = 0;
-	if (ROM_HEADER && ROM_HEADER->nom)
-		memcpy(hdr.rom_name, ROM_HEADER->nom, 32);
-	else
-		memcpy(hdr.rom_name, "unknown", 8);
+	st_ai ai;
 
 	memset(&cpu, 0, sizeof(cpu));
 	cpu.pc            = r4300.pc;
@@ -201,16 +204,9 @@ void savestates_save()
 	cpu.skip_jump     = r4300.skip_jump;
 	cpu.stop          = r4300.stop;
 	cpu.llbit         = r4300.llbit;
-
-	st_build_name(path, sizeof(path));
-	f = fopen(path, "wb");
-	if (!f) { printf("Save State: no se pudo escribir %s", path); return; }
-
-	fwrite(&hdr, 1, sizeof(hdr), f);
-	fwrite(&cpu, 1, sizeof(cpu), f);
+	memcpy(out + pos, &cpu, sizeof(cpu)); pos += sizeof(cpu);
 
 	/* AI audio hardware state + pending AI_INT absolute count. */
-	st_ai ai;
 	memset(&ai, 0, sizeof(ai));
 	ai.ai_dram_addr  = ai_register.ai_dram_addr;
 	ai.ai_len        = ai_register.ai_len;
@@ -224,7 +220,7 @@ void savestates_save()
 	ai.current_len   = ai_register.current_len;
 	ai.ai_int_count  = get_event(AI_INT);
 	ai.present       = (ai_register.current_delay != 0);
-	fwrite(&ai, 1, sizeof(ai), f);
+	memcpy(out + pos, &ai, sizeof(ai)); pos += sizeof(ai);
 
 	/* Persist the volatile TLB fields only (derivations are recomputed on load). */
 	for (i = 0; i < 32; i++) {
@@ -243,49 +239,41 @@ void savestates_save()
 		t.d_odd    = tlb_e[i].d_odd;
 		t.v_odd    = tlb_e[i].v_odd;
 		t.r        = tlb_e[i].r;
-		fwrite(&t, 1, sizeof(t), f);
+		memcpy(out + pos, &t, sizeof(t)); pos += sizeof(t);
 	}
-	if (rdram_bytes > 0x800000) rdram_bytes = 0x800000;
-	fwrite(rdram, 4, rdram_bytes/4, f);
-	fwrite(SP_DMEM, 4, 0x800, f);
-	fclose(f);
-	DBG_LOG("[ST] Saved slot %u -> %s\n", savestates_slot, path);
+
+	/* RDRAM (cap at 8MB) then SP_DMEM (contiguous with SP_IMEM). */
+	if (rdram_words * 4 > 0x800000) rdram_words = 0x800000 / 4;
+	if (rdram) memcpy(out + pos, rdram, (size_t)rdram_words*4);
+	pos += (size_t)rdram_words*4;
+	memcpy(out + pos, SP_DMEM, ST_BODY_SPDMEM);
+	pos += ST_BODY_SPDMEM;
+
+	return pos;
 }
 
-void savestates_load()
+/* Restore emulator state from a serialized body buffer. Returns 0 on success,
+ * -1 if the buffer is too small (corrupt). */
+static int st_restore_body(const u8 *in, size_t len, u32 rdram_words)
 {
-	char path[160];
-	FILE *f;
 	int i;
-	st_header hdr;
+	size_t pos = 0;
 	st_cpu cpu;
-	size_t rdram_bytes;
+	st_ai ai;
+	st_tlb t;
 	u32 sp_dmem[0x800];
+	size_t rdram_bytes = (size_t)rdram_words * 4;
 
-	st_build_name(path, sizeof(path));
-	f = fopen(path, "rb");
-	if (!f) { printf("Load State: no existe %s", path); return; }
+	if (rdram_bytes > 0x800000) rdram_bytes = 0x800000;
+	if (len < ST_BODY_FIXED + rdram_bytes + ST_BODY_SPDMEM) return -1;
 
-	if (fread(&hdr, 1, sizeof(hdr), f) != sizeof(hdr) ||
-	    hdr.magic != ST_MAGIC || hdr.version != ST_VERSION) {
-		fclose(f);
-		printf("Load State: archivo invalido");
-		return;
-	}
-	if (fread(&cpu, 1, sizeof(cpu), f) != sizeof(cpu)) {
-		fclose(f);
-		printf("Load State: archivo corrupto");
-		return;
-	}
+	if (pos + sizeof(cpu) > len) return -1;
+	memcpy(&cpu, in + pos, sizeof(cpu)); pos += sizeof(cpu);
 
 	/* Restore AI audio hardware state. */
-	st_ai ai;
 	memset(&ai, 0, sizeof(ai));
-	if (fread(&ai, 1, sizeof(ai), f) != sizeof(ai)) {
-		fclose(f);
-		printf("Load State: archivo corrupto (ai)");
-		return;
-	}
+	if (pos + sizeof(ai) > len) return -1;
+	memcpy(&ai, in + pos, sizeof(ai)); pos += sizeof(ai);
 	ai_register.ai_dram_addr  = ai.ai_dram_addr;
 	ai_register.ai_len        = ai.ai_len;
 	ai_register.ai_control    = ai.ai_control;
@@ -297,7 +285,6 @@ void savestates_load()
 	ai_register.current_delay = ai.current_delay;
 	ai_register.current_len   = ai.current_len;
 	saved_ai_int = ai.ai_int_count;   /* pending AI_INT absolute count (or 0) */
-
 	(void)ai.present;
 
 	/* CPU values (pointers are re-established afterward). */
@@ -322,9 +309,9 @@ void savestates_load()
 	/* TLB: restore volatile fields, recompute derivations, rebuild LUT. */
 	memset(tlb_LUT_r, 0, 0x100000*4);
 	memset(tlb_LUT_w, 0, 0x100000*4);
+	if (pos + 32*sizeof(st_tlb) > len) return -1;
 	for (i = 0; i < 32; i++) {
-		st_tlb t;
-		if (fread(&t, 1, sizeof(t), f) != sizeof(t)) break;
+		memcpy(&t, in + pos, sizeof(t)); pos += sizeof(t);
 		tlb_e[i].mask     = t.mask;
 		tlb_e[i].vpn2     = t.vpn2;
 		tlb_e[i].g        = t.g;
@@ -350,47 +337,176 @@ void savestates_load()
 	}
 
 	/* RDRAM. */
-	if (rdram) {
-		rdram_bytes = ST_RDRAM_WORDS*4;
-		if (fread(rdram, 4, rdram_bytes/4, f) != rdram_bytes/4) {
-			fclose(f);
-			printf("Load State: rdram corrupto");
-			return;
-		}
-	}
+	if (pos + rdram_bytes > len) return -1;
+	if (rdram) memcpy(rdram, in + pos, rdram_bytes);
+	pos += rdram_bytes;
 
 	/* SP_DMEM + SP_IMEM form a single contiguous block sized 0x800 words. */
-	if (fread(sp_dmem, 4, 0x800, f) == 0x800) {
-		for (i = 0; i < 0x800; i++) SP_DMEM[i] = sp_dmem[i];
+	if (pos + sizeof(sp_dmem) > len) return -1;
+	memcpy(sp_dmem, in + pos, sizeof(sp_dmem)); pos += sizeof(sp_dmem);
+	for (i = 0; i < 0x800; i++) SP_DMEM[i] = sp_dmem[i];
+
+	return 0;
+}
+
+/* Re-arm interrupt queue + audio after restoring a body (shared by v1/v2). */
+static void st_finish_load(void)
+{
+	u32 saved_next = r4300.next_interrupt;
+	set_fpr_pointers(r4300.fcr31 & 0x3);
+	init_interrupt();
+	clear_queue();
+
+	if (saved_ai_int && r4300.reg_cop0[9] < saved_ai_int) {
+		add_interrupt_event_count(AI_INT, saved_ai_int);
+	}
+
+	if (saved_next && saved_next != 0x7FFFFFFF) {
+		next_vi = r4300.next_interrupt = saved_next;
+		vi_register.vi_delay = saved_next;
+		add_interrupt_event_count(VI_INT, saved_next);
+	} else {
+		r4300.next_interrupt = 0x7FFFFFFF;
+	}
+	saved_ai_int = 0;
+
+	resetAudioAfterLoad();
+}
+
+void savestates_save()
+{
+	char path[160];
+	FILE *f;
+	st_header hdr;
+	u32 rdram_words = ST_RDRAM_WORDS;
+	size_t body_len, comp_len;
+	u8 *body, *comp;
+	int use_z = 0;
+
+	if (!rdram) return;
+
+	/* Serialize body into a heap buffer. */
+	body = (u8*)malloc(ST_BODY_MAX);
+	if (!body) return;
+	body_len = st_serialize_body(body, rdram_words);
+
+	/* Try to compress with zlib. If it fits smaller (or equal), store version 2. */
+	comp_len = compressBound((uLong)body_len);
+	comp = (u8*)malloc(comp_len);
+	if (comp && body_len <= 0x7FFFFFFF
+	    && compress2(comp, (uLongf*)&comp_len, body, (uLong)body_len, 1) == Z_OK
+	    && comp_len < body_len) {
+		use_z = 1;
+	}
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.magic   = ST_MAGIC;
+	hdr.version = use_z ? ST_VERSION_Z : ST_VERSION;
+	hdr.slot    = savestates_slot;
+	hdr.rdram_words = rdram_words;
+	if (ROM_HEADER && ROM_HEADER->nom)
+		memcpy(hdr.rom_name, ROM_HEADER->nom, 32);
+	else
+		memcpy(hdr.rom_name, "unknown", 8);
+
+	st_build_name(path, sizeof(path));
+	f = fopen(path, "wb");
+	if (!f) { printf("Save State: no se pudo escribir %s", path); free(body); if (comp) free(comp); return; }
+
+	fwrite(&hdr, 1, sizeof(hdr), f);
+	if (use_z) {
+		/* Body descriptor: uncompressed size then compressed size, then stream. */
+		u32 ul = (u32)body_len, cl = (u32)comp_len;
+		fwrite(&ul, 1, sizeof(ul), f);
+		fwrite(&cl, 1, sizeof(cl), f);
+		fwrite(comp, 1, comp_len, f);
+	} else {
+		fwrite(body, 1, body_len, f);
+	}
+	fclose(f);
+
+	if (comp) free(comp);
+	free(body);
+
+	ps3_fb_snapshot(path);
+	DBG_LOG("[ST] Saved slot %u -> %s (%s, %u->%u bytes)\n",
+	        savestates_slot, path, use_z ? "zlib" : "raw",
+	        (unsigned)body_len, use_z ? (unsigned)comp_len : (unsigned)body_len);
+}
+
+void savestates_load()
+{
+	char path[160];
+	FILE *f;
+	int i;
+	st_header hdr;
+	u32 rdram_words;
+	u8 *body = NULL;
+	size_t body_len = 0;
+	int rc;
+
+	st_build_name(path, sizeof(path));
+	f = fopen(path, "rb");
+	if (!f) { printf("Load State: no existe %s", path); return; }
+
+	if (fread(&hdr, 1, sizeof(hdr), f) != sizeof(hdr) ||
+	    hdr.magic != ST_MAGIC || (hdr.version != ST_VERSION && hdr.version != ST_VERSION_Z)) {
+		fclose(f);
+		printf("Load State: archivo invalido");
+		return;
+	}
+	rdram_words = hdr.rdram_words ? hdr.rdram_words : ST_RDRAM_WORDS;
+
+	if (hdr.version == ST_VERSION_Z) {
+		/* Compressed body: read descriptor + stream, decompress to a buffer. */
+		u32 dul = 0, dcl = 0;
+		uLongf dLen = 0;
+		if (fread(&dul, 1, sizeof(dul), f) != sizeof(dul) ||
+		    fread(&dcl, 1, sizeof(dcl), f) != sizeof(dcl) || dul == 0 ||
+		    dul > ST_BODY_MAX || dcl == 0 || dcl > ST_BODY_MAX) {
+			fclose(f);
+			printf("Load State: descriptor corrupto");
+			return;
+		}
+		body = (u8*)malloc(dul);
+		dLen = dul;   /* capacity for uncompress (uLongf is 64-bit on PPU) */
+		{
+			u8 *cd = (u8*)malloc(dcl);
+			if (!body || !cd) { if (body) free(body); if (cd) free(cd); fclose(f); return; }
+			if (fread(cd, 1, dcl, f) != dcl ||
+			    uncompress(body, &dLen, cd, (uLong)dcl) != Z_OK) {
+				free(cd); free(body); fclose(f);
+				printf("Load State: descompresion fallo");
+				return;
+			}
+			free(cd);
+		}
+		body_len = (size_t)dLen;
+	} else {
+		/* Legacy version 1: raw body, read it all into a buffer. */
+		size_t raw_len = ST_BODY_FIXED + (size_t)rdram_words*4 + ST_BODY_SPDMEM;
+		if (raw_len > ST_BODY_MAX * 4) { fclose(f); printf("Load State: invalido"); return; }
+		body = (u8*)malloc(raw_len);
+		if (!body) { fclose(f); return; }
+		if (fread(body, 1, raw_len, f) != raw_len) {
+			free(body); fclose(f);
+			printf("Load State: archivo corrupto");
+			return;
+		}
+		body_len = raw_len;
 	}
 
 	fclose(f);
 
-	/* Rebuild floating point register pointers + re-arm the interrupt queue. */
-	set_fpr_pointers(r4300.fcr31 & 0x3);
-	{
-		u32 saved_next = cpu.next_interrupt;
-		init_interrupt();
-		clear_queue();
-
-		/* Re-arm the pending AI audio interrupt so the restored AI registers
-		 * keep advancing (audio playback depends on get_event(AI_INT)). */
-		if (saved_ai_int && r4300.reg_cop0[9] < saved_ai_int) {
-			add_interrupt_event_count(AI_INT, saved_ai_int);
-		}
-
-		if (saved_next && saved_next != 0x7FFFFFFF) {
-			next_vi = r4300.next_interrupt = saved_next;
-			vi_register.vi_delay = saved_next;
-			add_interrupt_event_count(VI_INT, saved_next);
-		} else {
-			r4300.next_interrupt = 0x7FFFFFFF;
-		}
+	/* Restore emulator state from the body buffer, then re-arm interrupts. */
+	rc = st_restore_body(body, body_len, rdram_words);
+	(void)i;
+	free(body);
+	if (rc != 0) {
+		printf("Load State: archivo corrupto (body)");
+		return;
 	}
-	saved_ai_int = 0;
-
-	/* Re-sync the audio backend so the restored AI registers restart it. */
-	resetAudioAfterLoad();
+	st_finish_load();
 
 	DBG_LOG("[ST] Loaded slot %u <- %s\n", savestates_slot, path);
 }
