@@ -389,7 +389,7 @@ void gen_interrupt()
    if ((s32)(r4300.next_interrupt - Count) <= 0) {
     unsigned int delta = (unsigned int)(Count - r4300.next_interrupt);
     if (delta > 0x200 && (unsigned int)Count - last_flood_count > 0x100000) {
-      printf("[FLOOD] ni=%08X Count=%08X delta=%u type=%d qcount=%08X\n",
+      DBG_LOG("[FLOOD] ni=%08X Count=%08X delta=%u type=%d qcount=%08X\n",
         (unsigned int)r4300.next_interrupt, (unsigned int)Count, delta,
         q->type, (unsigned int)q->count);
       fflush(stdout);
@@ -415,13 +415,13 @@ void gen_interrupt()
       updateScreen();
       s64 t1 = sysGetSystemTime();
       if (!vi_flood_printed && (t1 - t0) > 500000) {
-        printf("[VI] updateScreen SLOW %lldus Count=%08X q=%p q->type=%d q->count=%08X\n",
+        DBG_LOG("[VI] updateScreen SLOW %lldus Count=%08X q=%p q->type=%d q->count=%08X\n",
           (long long)(t1-t0), (unsigned int)Count, (void*)q, q->type, (unsigned int)q->count);
         fflush(stdout);
         vi_flood_printed = 1;
       }
       if (!vi_flood_printed && (s32)(r4300.next_interrupt - Count) <= 0) {
-        printf("[VI-FLOOD] ni=%08X <= Count=%08X delta=%d q->count=%08X\n",
+        DBG_LOG("[VI-FLOOD] ni=%08X <= Count=%08X delta=%d q->count=%08X\n",
           (unsigned int)r4300.next_interrupt, (unsigned int)Count,
           (int)(Count - r4300.next_interrupt), (unsigned int)q->count);
         fflush(stdout);

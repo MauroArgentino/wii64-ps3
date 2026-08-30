@@ -434,7 +434,8 @@ void VI_RSX_showFPS(){
 	if(showFPSonScreen)
 		menu::IplFont::getInstance().drawString(10,35,caption, 1.0, false);
 
-	// Frame counter timer (always visible)
+#ifdef DEBUG
+	// Frame counter timer (debug only)
 	{
 		extern u32 gettick();
 		static u32 viFrameCount = 0;
@@ -460,7 +461,6 @@ void VI_RSX_showFPS(){
 		menu::IplFont::getInstance().drawString(10, 55, timerStr, 0.8, false);
 	}
 
-#ifdef DEBUG
 	// Render state debug (shown whenever a ROM is loaded)
 	if (ROM_HEADER)
 	{
@@ -555,7 +555,8 @@ void VI_RSX_showFPS(){
 	}
 #endif
 
-	// Pad OSD: always visible during gameplay for input debug
+#ifdef DEBUG_INPUT
+	// Pad OSD: input debug
 	if (ROM_HEADER)
 	{
 		extern char osd_pad_status[];
@@ -563,6 +564,7 @@ void VI_RSX_showFPS(){
 		menu::IplFont::getInstance().drawInit(padColor);
 		menu::IplFont::getInstance().drawString(10, 210, osd_pad_status, 0.40, false);
 	}
+#endif
 
 }
 void VI_RSX_resetGameInfo(void)

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Mupen64 - pure_interp.c
  * Copyright (C) 2002 Hacktarux
  *
@@ -342,7 +342,7 @@ static void DMULT()
    if (p_dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       p_dm_log_cnt++;
-      printf("[PDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+      DBG_LOG("[PDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
 #endif
@@ -377,7 +377,7 @@ static void DMULTU()
    if (p_dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       p_dm_log_cnt++;
-      printf("[PDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+      DBG_LOG("[PDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
 #endif
@@ -2993,7 +2993,7 @@ void pure_interpreter()
 		if (dt_us > 2000000)  /* 2 seconds */
 		{
 			hb_last_us = now_us;
-			printf("[HB2] pc=%08X Count=%08X dt=%lldus\n",
+			DBG_LOG("[HB2] pc=%08X Count=%08X dt=%lldus\n",
 				(unsigned int)r4300.pc,
 				(unsigned int)Count, (long long)dt_us);
 			fflush(stdout);
@@ -3008,7 +3008,7 @@ void pure_interpreter()
          if (ps3_pad_exit_combo_pressed())
          {
 #ifdef DEBUG
-            printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
+            DBG_LOG("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
             fflush(stdout);
 #endif
             r4300.stop = 1;
@@ -3018,7 +3018,7 @@ void pure_interpreter()
 #endif
 #ifdef DEBUG
 	if ((dbg_icount & 0x1FFFFF) == 0) {
-		printf("[PC] icount=%llu pc=%08X sp=%08X ra=%08X\n",
+		DBG_LOG("[PC] icount=%llu pc=%08X sp=%08X ra=%08X\n",
 			(unsigned long long)dbg_icount, (unsigned int)r4300.pc,
 			(unsigned int)r4300.gpr[29], (unsigned int)r4300.gpr[31]);
 		fflush(stdout);

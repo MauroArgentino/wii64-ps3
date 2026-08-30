@@ -214,7 +214,7 @@ void waitflip() {
 	while(gcmGetFlipStatus()!=0) {
 		usleep(200);
 		if (++wait_count > 50000) { /* 10 second timeout */
-			printf("[WAITFLIP] TIMEOUT 10s, force reset\n"); fflush(stdout);
+			DBG_LOG("[WAITFLIP] TIMEOUT 10s, force reset\n");
 			gcmResetFlipStatus();
 			break;
 		}
@@ -222,7 +222,7 @@ void waitflip() {
 	if (wait_count > 50000) {
 		/* already printed timeout above */
 	} else if (wait_count > 50) {
-		printf("[WAITFLIP] waited %d (%dus)\n", wait_count, wait_count * 200); fflush(stdout);
+		DBG_LOG("[WAITFLIP] waited %d (%dus)\n", wait_count, wait_count * 200);
 	}
 	if (wait_count > 0 && wait_count <= 50000)
 		gcmResetFlipStatus();

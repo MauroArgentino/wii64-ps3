@@ -248,7 +248,7 @@ void cached_interp_init_block(u32 address)
    if (b == NULL)
    {
       b = (struct precomp_block*)malloc(sizeof(struct precomp_block));
-      if (!b) return;
+      if (!b) { DBG_LOG("[BALLOC_FAIL] precomp_block at %08X Count=%08X\n", address, (unsigned int)Count); fflush(stdout); return; }
       b->block = NULL;
       b->start = address & ~0xFFF;
       b->end = (address & ~0xFFF) + 0x1000;
@@ -261,7 +261,7 @@ void cached_interp_init_block(u32 address)
    {
       int memsize = (length + 1 + (length >> 2)) * sizeof(precomp_instr);
       b->block = (precomp_instr*)malloc(memsize);
-      if (!b->block) return;
+      if (!b->block) { DBG_LOG("[BBLOCK_FAIL] addr=%08X memsize=%d Count=%08X\n", address, memsize, (unsigned int)Count); fflush(stdout); return; }
       memset(b->block, 0, memsize);
    }
 
@@ -918,7 +918,7 @@ while (!r4300.stop)
           if (dt_us > 2000000)
           {
              chb_last_us = now_us;
-             printf("[CHB2] pc=%08X Count=%08X ni=%08X dt=%lldus\n",
+             DBG_LOG("[CHB2] pc=%08X Count=%08X ni=%08X dt=%lldus\n",
                 (unsigned int)r4300.pc, (unsigned int)Count,
                 (unsigned int)r4300.next_interrupt, (long long)dt_us);
              fflush(stdout);
@@ -932,28 +932,28 @@ while (!r4300.stop)
           if (ps3_pad_exit_combo_pressed())
           {
 #ifdef DEBUG
-             printf("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
+             DBG_LOG("[EXIT] Combo Square+Triangle -> r4300.stop=1\n");
 #endif
              r4300.stop = 1;
              break;
           }
        }
 #endif
-       if (!PC) { printf("[STOP] PC=NULL Count=%08X\n", (unsigned int)Count); fflush(stdout); r4300.stop = 1; break; }
+       if (!PC) { DBG_LOG("[STOP] PC=NULL Count=%08X\n", (unsigned int)Count); fflush(stdout); r4300.stop = 1; break; }
       if (ci.actual && ci.actual->block)
       {
          u32 length = (ci.actual->end - ci.actual->start) / 4;
          precomp_instr* block_end = ci.actual->block + length + 1 + (length >> 2);
          if (PC < ci.actual->block || PC >= block_end)
          {
-            printf("[STOP] PC OOB pc=%p block=[%p,%p) Count=%08X\n", (void*)PC, (void*)ci.actual->block, (void*)block_end, (unsigned int)Count); fflush(stdout);
+            DBG_LOG("[STOP] PC OOB pc=%p block=[%p,%p) Count=%08X\n", (void*)PC, (void*)ci.actual->block, (void*)block_end, (unsigned int)Count); fflush(stdout);
             r4300.stop = 1;
             break;
          }
       }
       if (!PC->ops)
       {
-         printf("[STOP] PC->ops=NULL pc=%08X Count=%08X\n", (unsigned int)PC->addr, (unsigned int)Count); fflush(stdout);
+         DBG_LOG("[STOP] PC->ops=NULL pc=%08X Count=%08X\n", (unsigned int)PC->addr, (unsigned int)Count); fflush(stdout);
          r4300.stop = 1;
          break;
       }
@@ -961,7 +961,7 @@ while (!r4300.stop)
 #ifdef CACHED_DEBUG
       ci_trace_cnt++;
       if ((ci_trace_cnt & 0xFFFFF) == 0)
-         printf("[TC] %08llX %08X v0=%08X a0=%08X sp=%08X\n", ci_trace_cnt,
+         DBG_LOG("[TC] %08llX %08X v0=%08X a0=%08X sp=%08X\n", ci_trace_cnt,
             r4300.pc, (u32)r4300.gpr[2], (u32)r4300.gpr[4], (u32)r4300.gpr[29]);
       if (r4300.pc == 0x8019BBD8 && gd_fail_cnt < 8)
       {
@@ -971,14 +971,14 @@ while (!r4300.stop)
          u32 cra = 0;
          if (rdram && r4300.gpr[29])
             cra = (unsigned int)rdram[(((u32)r4300.gpr[29] + 0x14) & 0xFFFFFF) / 4];
-         printf("[GDFAIL#%d] size=%u (0x%X) a1=%u sp=%08X caller_ra=%08X poolPtr=%08X poolEnd=%08X remain=%d\n",
+         DBG_LOG("[GDFAIL#%d] size=%u (0x%X) a1=%u sp=%08X caller_ra=%08X poolPtr=%08X poolEnd=%08X remain=%d\n",
             gd_fail_cnt, gs, gs, (u32)r4300.gpr[5], (u32)r4300.gpr[29], cra, gp, ge, (int)(ge - gp));
          gd_fail_cnt++;
       }
        if (r4300.pc == 0x80317934)
        {
           if ((spin_cnt & 0xFFFF) == 0)
-             printf("[SPINVAL] a0=%08X val=%08X\n", (u32)r4300.gpr[4],
+             DBG_LOG("[SPINVAL] a0=%08X val=%08X\n", (u32)r4300.gpr[4],
                 rdram ? rdram[(0x80226B80 & 0xFFFFFF) / 4] : 0xDEADBEEF);
        }
        if (r4300.pc == 0x80188B80 && gw_cnt < 100)
@@ -986,7 +986,7 @@ while (!r4300.stop)
           u32 gwptr = rdram ? rdram[(0x801A83E4 & 0xFFFFFF) / 4] : 0;
           u32 gwtag = (gwptr && rdram) ? rdram[((gwptr + 12) & 0xFFFFFF) / 4] : 0;
           u32 gwname = rdram ? rdram[(0x801BA0C0 & 0xFFFFFF) / 4] : 0;
-          printf("[GW#%u] ptr=%08X tag=%08X name=%08X a0=%08X sp=%08X Count=%08X\n",
+          DBG_LOG("[GW#%u] ptr=%08X tag=%08X name=%08X a0=%08X sp=%08X Count=%08X\n",
              gw_cnt, gwptr, gwtag, gwname, (u32)r4300.gpr[4], (u32)r4300.gpr[29],
              (unsigned int)Count);
           gw_cnt++;
@@ -998,12 +998,12 @@ while (!r4300.stop)
           u32 gwname = rdram ? rdram[(0x801BA0C0 & 0xFFFFFF) / 4] : 0;
           int oi;
           gw_fatal = 1;
-          printf("[GWFATAL] pc=801891B0 ptr=%08X tag=%08X name=%08X a0=%08X sp=%08X ra=%08X Count=%08X ni=%08X\n",
+          DBG_LOG("[GWFATAL] pc=801891B0 ptr=%08X tag=%08X name=%08X a0=%08X sp=%08X ra=%08X Count=%08X ni=%08X\n",
              gwptr, gwtag, gwname, (u32)r4300.gpr[4], (u32)r4300.gpr[29], (u32)r4300.gpr[31],
              (unsigned int)Count, r4300.next_interrupt);
           if (gwptr && (gwptr & 0xFFFFFF) + 64 < 0xFFFFFF)
           {
-             printf("[GWFATAL] obj dump @%08X:\n", gwptr);
+             DBG_LOG("[GWFATAL] obj dump @%08X:\n", gwptr);
              for (oi = 0; oi < 16; oi++)
                 printf("  +0x%02X: %08X\n", oi * 4, rdram[((gwptr + oi * 4) & 0xFFFFFF) / 4]);
           }
@@ -1012,13 +1012,13 @@ while (!r4300.stop)
         {
            u32 frbase = rdram ? rdram[(0x801A83E0 & 0xFFFFFF) / 4] : 0;
            u32 frcnt = rdram ? rdram[(0x801BA0BC & 0xFFFFFF) / 4] : 0;
-           printf("[FR#%u] a0=%08X base=%08X cnt=%u ra=%08X Count=%08X\n",
+           DBG_LOG("[FR#%u] a0=%08X base=%08X cnt=%u ra=%08X Count=%08X\n",
               fr_cnt, (u32)r4300.gpr[4], frbase, frcnt, (u32)r4300.gpr[31], (unsigned int)Count);
            fr_cnt++;
         }
         if (r4300.pc == 0x80186C00 && du_cnt < 120)
         {
-           printf("[DU#%u] a0=%08X ra=%08X Count=%08X\n",
+           DBG_LOG("[DU#%u] a0=%08X ra=%08X Count=%08X\n",
               du_cnt, (u32)r4300.gpr[4], (u32)r4300.gpr[31], (unsigned int)Count);
            du_cnt++;
         }
@@ -1027,7 +1027,7 @@ while (!r4300.stop)
             u32 fmtaddr = (u32)r4300.gpr[5];
             int fi;
             frk_sprintf_active = 1;
-            printf("[FRKSPF] sprintf entry a0=%08X a1=%08X a2=%08X a3=%08X Count=%08X fmt=\"",
+            DBG_LOG("[FRKSPF] sprintf entry a0=%08X a1=%08X a2=%08X a3=%08X Count=%08X fmt=\"",
                (u32)r4300.gpr[4], (u32)r4300.gpr[5], (u32)r4300.gpr[6], (u32)r4300.gpr[7],
                (unsigned int)Count);
             if (rdram && fmtaddr)
@@ -1056,21 +1056,21 @@ while (!r4300.stop)
             md_arg_lo = (u32)r4300.gpr[4];
             md_arg_hi = (u32)r4300.gpr[5];
             md_base = (u32)r4300.gpr[7];
-            printf("[MD#%u] MOD  in arg=%08X%08X base=%u ra=%08X Count=%08X\n",
+            DBG_LOG("[MD#%u] MOD  in arg=%08X%08X base=%u ra=%08X Count=%08X\n",
                md_cnt, md_arg_hi, md_arg_lo, md_base, (u32)r4300.gpr[31], (unsigned int)Count);
             if (!dumped_mod_code && rdram)
             {
                int di;
                dumped_mod_code = 1;
-               printf("[MODCODEDUMP] around 0x8032411C:\n");
+               DBG_LOG("[MODCODEDUMP] around 0x8032411C:\n");
                for (di = 0; di < 164; di++)
                   printf("  0x%08X: %08X\n", 0x803240E0 + di * 4,
                      rdram[((0x803240E0 + di * 4) & 0xFFFFFF) / 4]);
-               printf("[DIGHANDLERDUMP] around 0x80329790:\n");
+               DBG_LOG("[DIGHANDLERDUMP] around 0x80329790:\n");
                for (di = 0; di < 160; di++)
                   printf("  0x%08X: %08X\n", 0x80329760 + di * 4,
                      rdram[((0x80329760 + di * 4) & 0xFFFFFF) / 4]);
-               printf("[DIVMODHELPER] around 0x8032B060:\n");
+               DBG_LOG("[DIVMODHELPER] around 0x8032B060:\n");
                for (di = 0; di < 112; di++)
                   printf("  0x%08X: %08X\n", 0x8032B060 + di * 4,
                      rdram[((0x8032B060 + di * 4) & 0xFFFFFF) / 4]);
@@ -1079,7 +1079,7 @@ while (!r4300.stop)
          if (r4300.pc == 0x80324148 && md_capture && md_cnt < 400)
         {
            md_capture = 0;
-           printf("[MD#%u] MOD  out v0=%016llX (arg=%08X%08X base=%u)\n",
+           DBG_LOG("[MD#%u] MOD  out v0=%016llX (arg=%08X%08X base=%u)\n",
               md_cnt, (unsigned long long)r4300.gpr[2], md_arg_hi, md_arg_lo, md_base);
         }
          if (r4300.pc == 0x80324158 && md_cnt < 400 && frk_sprintf_active)
@@ -1089,59 +1089,59 @@ while (!r4300.stop)
            md_arg_lo = (u32)r4300.gpr[4];
            md_arg_hi = (u32)r4300.gpr[5];
            md_base = (u32)r4300.gpr[7];
-           printf("[MD#%u] DIV  in arg=%08X%08X base=%u ra=%08X Count=%08X\n",
+           DBG_LOG("[MD#%u] DIV  in arg=%08X%08X base=%u ra=%08X Count=%08X\n",
               md_cnt, md_arg_hi, md_arg_lo, md_base, (u32)r4300.gpr[31], (unsigned int)Count);
         }
           if (r4300.pc == 0x80324184 && md_capture && md_cnt < 400)
          {
             md_capture = 0;
-            printf("[MD#%u] DIV  out v0=%016llX (arg=%08X%08X base=%u)\n",
+            DBG_LOG("[MD#%u] DIV  out v0=%016llX (arg=%08X%08X base=%u)\n",
                md_cnt, (unsigned long long)r4300.gpr[2], md_arg_hi, md_arg_lo, md_base);
          }
           if (r4300.pc == 0x8032B060 && dm2_cnt < 60)
          {
             dm2_active = 1;
             dm2_cnt++;
-            printf("[B0ENT] a0=%08X a2=%08X a3=%08X ra=%08X base=%08X\n",
+            DBG_LOG("[B0ENT] a0=%08X a2=%08X a3=%08X ra=%08X base=%08X\n",
                (u32)r4300.gpr[4], (u32)r4300.gpr[6], (u32)r4300.gpr[7],
                (u32)r4300.gpr[31],
                rdram ? rdram[(((u32)r4300.gpr[29] + 0x44) & 0xFFFFFF) / 4] : 0);
          }
          if (r4300.pc == 0x80324214 && dm2_active)
          {
-            printf("[BDDIV] t6=%016llX t7=%016llX\n",
+            DBG_LOG("[BDDIV] t6=%016llX t7=%016llX\n",
                (unsigned long long)r4300.gpr[14], (unsigned long long)r4300.gpr[15]);
          }
          if (r4300.pc == 0x8032421C && dm2_active)
          {
-            printf("[BDDIVRES] lo=%016llX hi=%016llX\n",
+            DBG_LOG("[BDDIVRES] lo=%016llX hi=%016llX\n",
                (unsigned long long)r4300.lo, (unsigned long long)r4300.hi);
          }
          if (r4300.pc == 0x80324248 && dm2_active)
          {
-            printf("[BDIVRES] v0=%016llX\n", (unsigned long long)r4300.gpr[2]);
+            DBG_LOG("[BDIVRES] v0=%016llX\n", (unsigned long long)r4300.gpr[2]);
          }
          if (r4300.pc == 0x80324270 && dm2_active)
          {
-            printf("[BMUL] t6=%016llX t7=%016llX\n",
+            DBG_LOG("[BMUL] t6=%016llX t7=%016llX\n",
                (unsigned long long)r4300.gpr[14], (unsigned long long)r4300.gpr[15]);
          }
          if (r4300.pc == 0x80324274 && dm2_active)
          {
-            printf("[BMULRES2] lo=%016llX hi=%016llX\n",
+            DBG_LOG("[BMULRES2] lo=%016llX hi=%016llX\n",
                (unsigned long long)r4300.lo, (unsigned long long)r4300.hi);
          }
          if (r4300.pc == 0x80324278 && dm2_active)
          {
-            printf("[BMULRES] v0=%016llX\n", (unsigned long long)r4300.gpr[2]);
+            DBG_LOG("[BMULRES] v0=%016llX\n", (unsigned long long)r4300.gpr[2]);
          }
          if (r4300.pc == 0x8032B0C8 && dm2_active)
          {
-            printf("[BB] t8=%08X v0=%016llX\n", (u32)r4300.gpr[24], (unsigned long long)r4300.gpr[2]);
+            DBG_LOG("[BB] t8=%08X v0=%016llX\n", (u32)r4300.gpr[24], (unsigned long long)r4300.gpr[2]);
          }
          if (r4300.pc == 0x8032B12C && dm2_active)
          {
-            printf("[BRET] rem_lo=%08X rem_hi=%08X\n",
+            DBG_LOG("[BRET] rem_lo=%08X rem_hi=%08X\n",
                rdram ? rdram[(((u32)r4300.gpr[29] + 0x20) & 0xFFFFFF) / 4] : 0,
                rdram ? rdram[(((u32)r4300.gpr[29] + 0x24) & 0xFFFFFF) / 4] : 0);
          }
@@ -1151,22 +1151,22 @@ while (!r4300.stop)
           {
              int di;
              dumped_reset_code = 1;
-             printf("[RESETCODE] around 0x8000008C:\n");
+             DBG_LOG("[RESETCODE] around 0x8000008C:\n");
              for (di = 0; di < 48; di++)
                 printf("  0x%08X: %08X\n", 0x80000060 + di * 4,
                    rdram ? rdram[((0x80000060 + di * 4) & 0xFFFFFF) / 4] : 0);
-             printf("[RESETCODE] sp=%08X ra=%08X a0=%08X a1=%08X a2=%08X v0=%08X Count=%08X\n",
+             DBG_LOG("[RESETCODE] sp=%08X ra=%08X a0=%08X a1=%08X a2=%08X v0=%08X Count=%08X\n",
                 (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[4],
                 (u32)r4300.gpr[5], (u32)r4300.gpr[6], (u32)r4300.gpr[2],
                 (unsigned int)Count);
-              printf("[RESETCODE] precompiled block @ pc 0x8000008C: block_start=%08X pc_index=%u\n",
+              DBG_LOG("[RESETCODE] precompiled block @ pc 0x8000008C: block_start=%08X pc_index=%u\n",
                  ci.actual ? ci.actual->start : 0,
                  ci.actual ? (unsigned int)((0x8000008C - ci.actual->start) / 4) : 0);
               if (PC)
               {
-                 printf("[RESETCODE] PC->addr=%08X PC->ops=%p\n",
+                 DBG_LOG("[RESETCODE] PC->addr=%08X PC->ops=%p\n",
                     PC->addr, (void*)PC->ops);
-                 printf("[RESETCODE] rdram[8C]=%08X rdram[88]=%08X rdram[90]=%08X\n",
+                 DBG_LOG("[RESETCODE] rdram[8C]=%08X rdram[88]=%08X rdram[90]=%08X\n",
                     rdram ? rdram[0x8C / 4] : 0,
                     rdram ? rdram[0x88 / 4] : 0,
                     rdram ? rdram[0x90 / 4] : 0);
@@ -1176,13 +1176,13 @@ while (!r4300.stop)
           {
              int di;
              t5create_cnt++;
-             printf("[T5CREATE#%d] pc=80246380 a0=%08X a1=%08X a2=%08X a3=%08X sp=%08X ra=%08X Count=%08X\n",
+             DBG_LOG("[T5CREATE#%d] pc=80246380 a0=%08X a1=%08X a2=%08X a3=%08X sp=%08X ra=%08X Count=%08X\n",
                 t5create_cnt, (u32)r4300.gpr[4], (u32)r4300.gpr[5], (u32)r4300.gpr[6],
                 (u32)r4300.gpr[7], (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
              if (!dumped_t5create_code)
              {
                 dumped_t5create_code = 1;
-                printf("[T5CREATE] thread5_create body 0x80246380:\n");
+                DBG_LOG("[T5CREATE] thread5_create body 0x80246380:\n");
                 for (di = 0; di < 48; di++)
                    printf("  0x%08X: %08X\n", 0x80246380 + di * 4,
                       rdram ? rdram[((0x80246380 + di * 4) & 0xFFFFFF) / 4] : 0);
@@ -1192,11 +1192,11 @@ while (!r4300.stop)
           {
              int di;
              t5ent_cnt++;
-             printf("[T5ENT#%d] thread5 ENTRY RAN pc=802469B8 sp=%08X ra=%08X a0=%08X Count=%08X\n",
+             DBG_LOG("[T5ENT#%d] thread5 ENTRY RAN pc=802469B8 sp=%08X ra=%08X a0=%08X Count=%08X\n",
                 t5ent_cnt, (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[4], (unsigned int)Count);
              if (t5ent_cnt == 1)
              {
-                printf("[T5ENT] thread5 entry code 0x802469B8:\n");
+                DBG_LOG("[T5ENT] thread5 entry code 0x802469B8:\n");
                 for (di = 0; di < 64; di++)
                    printf("  0x%08X: %08X\n", 0x802469B8 + di * 4,
                       rdram ? rdram[((0x802469B8 + di * 4) & 0xFFFFFF) / 4] : 0);
@@ -1206,12 +1206,12 @@ while (!r4300.stop)
           {
              int di;
              t5block_cnt++;
-             printf("[T5BLOCK#%d] pc=80278974 sp=%08X ra=%08X a0=%08X a1=%08X Count=%08X\n",
+             DBG_LOG("[T5BLOCK#%d] pc=80278974 sp=%08X ra=%08X a0=%08X a1=%08X Count=%08X\n",
                 t5block_cnt, (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[4],
                 (u32)r4300.gpr[5], (unsigned int)Count);
              if (t5block_cnt == 1)
              {
-                printf("[T5BLOCK] code 0x80278974:\n");
+                DBG_LOG("[T5BLOCK] code 0x80278974:\n");
                 for (di = 0; di < 64; di++)
                    printf("  0x%08X: %08X\n", 0x80278974 + di * 4,
                       rdram ? rdram[((0x80278974 + di * 4) & 0xFFFFFF) / 4] : 0);
@@ -1220,7 +1220,7 @@ while (!r4300.stop)
           if (r4300.pc >= 0x80278974 && r4300.pc < 0x80278A10 && t5pi_trace < 120)
           {
              t5pi_trace++;
-             printf("[T5PI] pc=%08X sp=%08X ra=%08X a0=%08X a1=%08X v0=%08X Count=%08X\n",
+             DBG_LOG("[T5PI] pc=%08X sp=%08X ra=%08X a0=%08X a1=%08X v0=%08X Count=%08X\n",
                 r4300.pc, (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[4],
                 (u32)r4300.gpr[5], (u32)r4300.gpr[2], (unsigned int)Count);
           }
@@ -1228,12 +1228,12 @@ while (!r4300.stop)
           {
              int di;
              t5load_trace++;
-             printf("[T5LOAD] pc=%08X sp=%08X ra=%08X a0=%08X a1=%08X a2=%08X Count=%08X\n",
+             DBG_LOG("[T5LOAD] pc=%08X sp=%08X ra=%08X a0=%08X a1=%08X a2=%08X Count=%08X\n",
                 r4300.pc, (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[4],
                 (u32)r4300.gpr[5], (u32)r4300.gpr[6], (unsigned int)Count);
              if (t5load_trace == 1)
              {
-                printf("[T5LOAD] code 0x80278504:\n");
+                DBG_LOG("[T5LOAD] code 0x80278504:\n");
                 for (di = 0; di < 80; di++)
                    printf("  0x%08X: %08X\n", 0x80278504 + di * 4,
                       rdram ? rdram[((0x80278504 + di * 4) & 0xFFFFFF) / 4] : 0);
@@ -1243,20 +1243,20 @@ while (!r4300.stop)
           {
              t5_was_in = 1;
              if ((t5_trace_cnt & 0xFFF) == 0)
-                printf("[T5TRACE] pc=%08X sp=%08X ra=%08X v0=%08X Count=%08X\n",
+                DBG_LOG("[T5TRACE] pc=%08X sp=%08X ra=%08X v0=%08X Count=%08X\n",
                    r4300.pc, (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[2], (unsigned int)Count);
              t5_trace_cnt++;
           }
           else if (t5_was_in)
           {
              t5_was_in = 0;
-             printf("[T5EXIT] pc=%08X sp=%08X ra=%08X Count=%08X\n",
+             DBG_LOG("[T5EXIT] pc=%08X sp=%08X ra=%08X Count=%08X\n",
                 r4300.pc, (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
           }
           if (r4300.pc == 0x80246CF0 && idle_dispatch_cnt < 10)
           {
              idle_dispatch_cnt++;
-             printf("[IDLEDISP#%d] pc=80246CF0 sp=%08X ra=%08X Count=%08X\n",
+             DBG_LOG("[IDLEDISP#%d] pc=80246CF0 sp=%08X ra=%08X Count=%08X\n",
                 idle_dispatch_cnt, (u32)r4300.gpr[29], (u32)r4300.gpr[31], (unsigned int)Count);
           }
           if (r4300.pc == 0x80246DD8 && !dumped_spin2_code)
@@ -1264,10 +1264,10 @@ while (!r4300.stop)
              int di;
              u32 fi;
              dumped_spin2_code = 1;
-             printf("[SPIN2CODE] around 0x80246DD8:\n");             for (di = 0; di < 144; di++)
+             DBG_LOG("[SPIN2CODE] around 0x80246DD8:\n");             for (di = 0; di < 144; di++)
                 printf("  0x%08X: %08X\n", 0x80246C40 + di * 4,
                    rdram ? rdram[((0x80246C40 + di * 4) & 0xFFFFFF) / 4] : 0);
-             printf("[SPIN2CODE] fmt@0x802469B8 = \"");
+             DBG_LOG("[SPIN2CODE] fmt@0x802469B8 = \"");
              if (rdram)
              {
                 for (fi = 0; fi < 128; fi++)
@@ -1284,7 +1284,7 @@ while (!r4300.stop)
                 }
              }
              printf("\"\n");
-             printf("[SPIN2CODE] buf@0x8034A8E0 = \"");
+             DBG_LOG("[SPIN2CODE] buf@0x8034A8E0 = \"");
              if (rdram)
              {
                 for (fi = 0; fi < 128; fi++)
@@ -1307,7 +1307,7 @@ while (!r4300.stop)
             int di;
             u32 base = 0x801844C0 & 0xFFFFFF;
             dumped_frk_code = 1;
-            printf("[FRKCODEDUMP] around 0x80184588:\n");
+            DBG_LOG("[FRKCODEDUMP] around 0x80184588:\n");
             for (di = 0; di < 64; di++)
             {
                printf("  0x%08X: %08X\n", 0x801844C0 + di * 4,
@@ -1328,7 +1328,7 @@ while (!r4300.stop)
               if (!ks[ki]) break;
            }
            ks[ki] = 0;
-           printf("[FRK#%u] key=\"%s\" mode=%08X a0=%08X ra=%08X Count=%08X\n",
+           DBG_LOG("[FRK#%u] key=\"%s\" mode=%08X a0=%08X ra=%08X Count=%08X\n",
               frk_cnt, ks, modeflag, rdram ? rdram[(((u32)r4300.gpr[29] + 0x120) & 0xFFFFFF) / 4] : 0, rdram ? rdram[(((u32)r4300.gpr[29] + 0x14) & 0xFFFFFF) / 4] : 0, (unsigned int)Count);
            frk_cnt++;
         }
@@ -1337,7 +1337,7 @@ while (!r4300.stop)
          int di;
          u32 base = 0x80317900 & 0xFFFFFF;
          dumped_spin_code = 1;
-         printf("[CODEDUMP] around 0x80317934:\n");
+         DBG_LOG("[CODEDUMP] around 0x80317934:\n");
          for (di = 0; di < 16; di++)
          {
             printf("  0x%08X: %08X\n", 0x80317900 + di * 4,
@@ -1348,12 +1348,12 @@ while (!r4300.stop)
       {
          u32 fi, fmt;
          dumped_fmt = 1;
-         printf("[PRINTFEXIT] sp=%08X fmt_slot=%08X\n",
+         DBG_LOG("[PRINTFEXIT] sp=%08X fmt_slot=%08X\n",
             (u32)r4300.gpr[29], (u32)(r4300.gpr[29] + 0x38));
          if (rdram && r4300.gpr[29])
          {
             fmt = (u32)rdram[(((u32)r4300.gpr[29] + 0x38) & 0xFFFFFF) / 4];
-            printf("[PRINTFEXIT] fmt=%08X text=\"", fmt);
+            DBG_LOG("[PRINTFEXIT] fmt=%08X text=\"", fmt);
             for (fi = 0; fi < 160; fi++)
             {
                u32 w = rdram[((fmt + fi) & 0xFFFFFF) / 4];
@@ -1369,7 +1369,7 @@ while (!r4300.stop)
             printf("\"\n");
             for (fi = 0; fi < 12; fi++)
             {
-               printf("[PRINTFEXIT] arg%u = %08X\n", fi,
+               DBG_LOG("[PRINTFEXIT] arg%u = %08X\n", fi,
                   (unsigned int)rdram[(((u32)r4300.gpr[29] + 0x3C + fi * 4) & 0xFFFFFF) / 4]);
             }
          }
@@ -1379,7 +1379,7 @@ while (!r4300.stop)
          int di;
          u32 base = 0x8019BB00 & 0xFFFFFF;
          dumped_final_code = 1;
-         printf("[CODEDUMP] around 0x8019BB28:\n");
+         DBG_LOG("[CODEDUMP] around 0x8019BB28:\n");
          for (di = 0; di < 32; di++)
          {
             printf("  0x%08X: %08X\n", 0x8019BB00 + di * 4,
@@ -1390,23 +1390,23 @@ while (!r4300.stop)
        {
           u32 fi, fmt;
           dumped_exit_entry = 1;
-          printf("[EXITENTRY] pc=8019BB0C sp=%08X ra=%08X a0=%08X [sp+0x14]=%08X\n",
+          DBG_LOG("[EXITENTRY] pc=8019BB0C sp=%08X ra=%08X a0=%08X [sp+0x14]=%08X\n",
              (u32)r4300.gpr[29], (u32)r4300.gpr[31], (u32)r4300.gpr[4],
              rdram ? (u32)rdram[(((u32)r4300.gpr[29] + 0x14) & 0xFFFFFF) / 4] : 0);
           if (rdram)
           {
              int ci2;
-             printf("[CALLERDUMP] around 0x8018C000 (callsite 0x8018D540/0x8018C3D4):\n");
+             DBG_LOG("[CALLERDUMP] around 0x8018C000 (callsite 0x8018D540/0x8018C3D4):\n");
              for (ci2 = 0; ci2 < 1536; ci2++)
              {
                 printf("  0x%08X: %08X\n", 0x8018C000 + ci2 * 4,
                    rdram[((0x8018C000 + ci2 * 4) & 0xFFFFFF) / 4]);
              }
-             printf("[CALLERREGS] v0=%08X v1=%08X a0=%08X a1=%08X a2=%08X a3=%08X t0=%08X t1=%08X\n",
+             DBG_LOG("[CALLERREGS] v0=%08X v1=%08X a0=%08X a1=%08X a2=%08X a3=%08X t0=%08X t1=%08X\n",
                 (u32)r4300.gpr[2], (u32)r4300.gpr[3], (u32)r4300.gpr[4],
                 (u32)r4300.gpr[5], (u32)r4300.gpr[6], (u32)r4300.gpr[7],
                 (u32)r4300.gpr[8], (u32)r4300.gpr[9]);
-             printf("[CALLERREGS] s0=%08X s1=%08X s2=%08X s3=%08X s4=%08X s5=%08X s6=%08X s7=%08X\n",
+             DBG_LOG("[CALLERREGS] s0=%08X s1=%08X s2=%08X s3=%08X s4=%08X s5=%08X s6=%08X s7=%08X\n",
                 (u32)r4300.gpr[16], (u32)r4300.gpr[17], (u32)r4300.gpr[18],
                 (u32)r4300.gpr[19], (u32)r4300.gpr[20], (u32)r4300.gpr[21],
                 (u32)r4300.gpr[22], (u32)r4300.gpr[23]);
@@ -1414,7 +1414,7 @@ while (!r4300.stop)
          if (rdram && r4300.gpr[29])
          {
             fmt = (u32)rdram[(((u32)r4300.gpr[29] + 0x38) & 0xFFFFFF) / 4];
-            printf("[EXITENTRY] fmt@[sp+0x38]=%08X text=\"", fmt);
+            DBG_LOG("[EXITENTRY] fmt@[sp+0x38]=%08X text=\"", fmt);
             for (fi = 0; fi < 160; fi++)
             {
                u32 w = rdram[((fmt + fi) & 0xFFFFFF) / 4];
@@ -1430,7 +1430,7 @@ while (!r4300.stop)
             printf("\"\n");
             for (fi = 0; fi < 12; fi++)
             {
-               printf("[EXITENTRY] arg%u = %08X\n", fi,
+               DBG_LOG("[EXITENTRY] arg%u = %08X\n", fi,
                   (unsigned int)rdram[(((u32)r4300.gpr[29] + 0x3C + fi * 4) & 0xFFFFFF) / 4]);
             }
           }
@@ -1444,7 +1444,7 @@ while (!r4300.stop)
              u32 gmax = rdram[((gstruct + 0x28) & 0xFFFFFF) / 4];
              if (gcnt >= gmax - 24)
              {
-                printf("[GFXHW#%u] cnt=%u/%u ra=%08X sp=%08X v0=%08X a0=%08X Count=%08X triCnt=%08X triTab=%08X\n",
+                DBG_LOG("[GFXHW#%u] cnt=%u/%u ra=%08X sp=%08X v0=%08X a0=%08X Count=%08X triCnt=%08X triTab=%08X\n",
                    gfx_alloc_cnt, gcnt, gmax, (u32)r4300.gpr[31], (u32)r4300.gpr[29],
                    (u32)r4300.gpr[2], (u32)r4300.gpr[4], (unsigned int)Count,
                    (unsigned int)rdram[(0x801BB254 & 0xFFFFFF) / 4],
@@ -1456,7 +1456,7 @@ while (!r4300.stop)
         if (r4300.pc == 0x801A0178 && rdram && trireset_cnt < 40)
         {
            trireset_cnt++;
-           printf("[TRIRESET#%u] triCnt=%08X vtxCnt=%08X triTab=%08X Count=%08X\n",
+           DBG_LOG("[TRIRESET#%u] triCnt=%08X vtxCnt=%08X triTab=%08X Count=%08X\n",
               trireset_cnt,
               (unsigned int)rdram[(0x801BB254 & 0xFFFFFF) / 4],
               (unsigned int)rdram[(0x801BB24C & 0xFFFFFF) / 4],
@@ -1466,7 +1466,7 @@ while (!r4300.stop)
         if (r4300.pc == 0x801A0030 && rdram && triadd_cnt < 60)
         {
            triadd_cnt++;
-           printf("[TRIADD#%u] triCnt=%08X vtxCnt=%08X Count=%08X\n",
+           DBG_LOG("[TRIADD#%u] triCnt=%08X vtxCnt=%08X Count=%08X\n",
               triadd_cnt,
               (unsigned int)rdram[(0x801BB254 & 0xFFFFFF) / 4],
               (unsigned int)rdram[(0x801BB24C & 0xFFFFFF) / 4],
@@ -1476,7 +1476,7 @@ while (!r4300.stop)
          {
             flushcall_cnt++;
             if (flushcall_cnt < 200)
-               printf("[FLUSHCALL#%u] triCnt=%08X vtxCnt=%08X Count=%08X\n",
+               DBG_LOG("[FLUSHCALL#%u] triCnt=%08X vtxCnt=%08X Count=%08X\n",
                   flushcall_cnt,
                   (unsigned int)rdram[(0x801BB254 & 0xFFFFFF) / 4],
                   (unsigned int)rdram[(0x801BB24C & 0xFFFFFF) / 4],
@@ -1486,7 +1486,7 @@ while (!r4300.stop)
          {
             dedup_cmp_cnt++;
             if (dedup_cmp_cnt < 40 || (dedup_cmp_cnt % 2000) == 0)
-               printf("[DEDUPCMP#%u] stored=%04X cur=%04X vtxCnt=%08X triCnt=%08X Count=%08X\n",
+               DBG_LOG("[DEDUPCMP#%u] stored=%04X cur=%04X vtxCnt=%08X triCnt=%08X Count=%08X\n",
                   dedup_cmp_cnt, (u32)(r4300.gpr[12] & 0xFFFF),
                   (u32)(r4300.gpr[8] & 0xFFFF),
                   (unsigned int)rdram[(0x801BB24C & 0xFFFFFF) / 4],
@@ -1497,7 +1497,7 @@ while (!r4300.stop)
         {
            append_hit_cnt++;
            if (append_hit_cnt < 30)
-              printf("[APPENDHIT#%u] vtxCnt=%08X triCnt=%08X Count=%08X\n",
+              DBG_LOG("[APPENDHIT#%u] vtxCnt=%08X triCnt=%08X Count=%08X\n",
                  append_hit_cnt,
                  (unsigned int)rdram[(0x801BB24C & 0xFFFFFF) / 4],
                  (unsigned int)rdram[(0x801BB254 & 0xFFFFFF) / 4],
@@ -1507,7 +1507,7 @@ while (!r4300.stop)
          {
             append_new_cnt++;
             if (append_new_cnt < 30)
-               printf("[APPENDNEW#%u] vtxCnt=%08X triCnt=%08X Count=%08X\n",
+               DBG_LOG("[APPENDNEW#%u] vtxCnt=%08X triCnt=%08X Count=%08X\n",
                   append_new_cnt,
                   (unsigned int)rdram[(0x801BB24C & 0xFFFFFF) / 4],
                   (unsigned int)rdram[(0x801BB254 & 0xFFFFFF) / 4],
@@ -1525,7 +1525,7 @@ while (!r4300.stop)
       }
 #ifdef CACHED_DEBUG
       if ((++spin_cnt & 0x7FFFFF) == 0)
-         printf("[SPIN] pc=%08X Count=%08X ni=%08X vi=%d mi=%08X Status=%08X Cause=%08X\n",
+         DBG_LOG("[SPIN] pc=%08X Count=%08X ni=%08X vi=%d mi=%08X Status=%08X Cause=%08X\n",
             r4300.pc, (unsigned int)Count, r4300.next_interrupt, dbg_vi_count,
             MI_register.mi_intr_reg, (u32)Status, (u32)Cause);
       if (!dumped_final_code && (r4300.pc == 0x8019BB24 || r4300.pc == 0x8019BB28))
@@ -1533,13 +1533,13 @@ while (!r4300.stop)
          int di;
          u32 base = 0x8019BB00 & 0xFFFFFF;
          dumped_final_code = 1;
-         printf("[CODEDUMP2] around 0x8019BB24/0x8019BB28 (exit spin):\n");
+         DBG_LOG("[CODEDUMP2] around 0x8019BB24/0x8019BB28 (exit spin):\n");
             for (di = 0; di < 32; di++)
             {
                printf("  0x%08X: %08X\n", 0x8019BB00 + di * 4,
                   rdram ? rdram[(base + di * 4) / 4] : 0);
             }
-            printf("[ASSERTSTR] 0x801B8ED8: ");
+            DBG_LOG("[ASSERTSTR] 0x801B8ED8: ");
             if (rdram)
             {
                u32 ai;
@@ -1560,7 +1560,7 @@ while (!r4300.stop)
                (u32)r4300.gpr[29], (u32)r4300.gpr[31],
                (u32)r4300.gpr[4], (u32)r4300.gpr[5], (u32)r4300.gpr[6], (u32)r4300.gpr[2]);
             if (rdram)
-               printf("[GFPOOL] ptr=%08X end=%08X remain=%d\n",
+               DBG_LOG("[GFPOOL] ptr=%08X end=%08X remain=%d\n",
                   (unsigned int)rdram[(0x801A882C & 0xFFFFFF) / 4],
                   (unsigned int)rdram[(0x801A8828 & 0xFFFFFF) / 4],
                   (int)((unsigned int)rdram[(0x801A8828 & 0xFFFFFF) / 4] -
@@ -1568,7 +1568,7 @@ while (!r4300.stop)
             if (rdram && r4300.gpr[29])
             {
                u32 si, saddr = (u32)r4300.gpr[29] & 0xFFFFFF;
-               printf("[STACKDUMP] 0x%08X (saved ra at sp+0x14 = 0x%08X):",
+               DBG_LOG("[STACKDUMP] 0x%08X (saved ra at sp+0x14 = 0x%08X):",
                   (u32)r4300.gpr[29], (u32)(r4300.gpr[29] + 0x14));
                for (si = 0; si < 32; si++)
                {
@@ -1580,7 +1580,7 @@ while (!r4300.stop)
             if (rdram)
             {
                u32 si2;
-               printf("[PFRAME] printf frame 0x80206940..0x80206C20 (caller_ra@0x80206974 fmt@0x80206990 vargs@0x80206984):");
+               DBG_LOG("[PFRAME] printf frame 0x80206940..0x80206C20 (caller_ra@0x80206974 fmt@0x80206990 vargs@0x80206984):");
                for (si2 = 0; si2 < 184; si2++)
                {
                   if ((si2 & 7) == 0) printf("\n  ");
@@ -1595,7 +1595,7 @@ while (!r4300.stop)
                for (rr = 0; rr < 2; rr++)
                {
                   u32 bi, baddr = regions[rr];
-                  printf("[HEXDUMP] 0x%08X:", baddr);
+                  DBG_LOG("[HEXDUMP] 0x%08X:", baddr);
                   for (bi = 0; bi < 64; bi++)
                   {
                      if ((bi & 15) == 0) printf("\n  ");
@@ -1607,7 +1607,7 @@ while (!r4300.stop)
              if (rdram)
              {
                 u32 bi, baddr = 0x801B70E0;
-                printf("[RAMDUMP] gd strings 0x801B70E0..0x801B72A0:");
+                DBG_LOG("[RAMDUMP] gd strings 0x801B70E0..0x801B72A0:");
                 for (bi = 0; bi < 448; bi++)
                 {
                    if ((bi & 15) == 0) printf("\n  %08X: ", baddr + bi);
@@ -1618,7 +1618,7 @@ while (!r4300.stop)
              if (rdram)
              {
                 u32 bi, baddr = 0x80206BA0;
-                printf("[EXFRAME] exit frame 0x80206BA0..0x80206C80:");
+                DBG_LOG("[EXFRAME] exit frame 0x80206BA0..0x80206C80:");
                 for (bi = 0; bi < 224; bi++)
                 {
                    if ((bi & 7) == 0) printf("\n  ");
@@ -1629,7 +1629,7 @@ while (!r4300.stop)
              if (rdram)
              {
                 u32 bi, baddr = 0x80000A80;
-                printf("[ARG1TGT] 0x80000A80..0x80000B00 (arg1=0x80000A84):");
+                DBG_LOG("[ARG1TGT] 0x80000A80..0x80000B00 (arg1=0x80000A84):");
                 for (bi = 0; bi < 128; bi++)
                 {
                    if ((bi & 15) == 0) printf("\n  ");
@@ -1639,7 +1639,7 @@ while (!r4300.stop)
               }
            if ((spin_cnt & 0xFFFFFF) == 0)
               dbg_dump_queue();
-            printf("[FINALSTOP] pc=%08X Count=%08X ni=%08X\n", r4300.pc,
+            DBG_LOG("[FINALSTOP] pc=%08X Count=%08X ni=%08X\n", r4300.pc,
                (unsigned int)Count, r4300.next_interrupt);
             r4300.stop = 1;
          }
@@ -1656,6 +1656,7 @@ void cached_interp_TLB_REFILL(void)
    ci.actual = ci.blocks[r4300.pc >> 12];
    if (!ci.actual || !ci.actual->block)
    {
+      DBG_LOG("[TLBREF_STUCK] vaddr=%08X vector=%08X Count=%08X\n", vaddr, (unsigned int)r4300.pc, (unsigned int)Count); fflush(stdout);
       DBG_LOG("TLB_REFILL stuck at 0x%08x (vector 0x%08x)\n", vaddr, r4300.pc);
       r4300.stop = 1;
       return;
@@ -1671,6 +1672,7 @@ void cached_interp_FIN_BLOCK(void)
    generic_jump_to(addr);
    if (PC == old)
    {
+      DBG_LOG("[FINBLOCK_STUCK] addr=%08X Count=%08X\n", addr, (unsigned int)Count); fflush(stdout);
       DBG_LOG("FIN_BLOCK stuck at 0x%08x\n", addr);
       r4300.stop = 1;
       return;
@@ -1684,6 +1686,7 @@ void cached_interp_NOTCOMPILED(void)
    cached_interp_recompile_block(addr);
    if (PC->ops == cached_interp_NOTCOMPILED)
    {
+      DBG_LOG("[NOTCOMPILED_STUCK] addr=%08X Count=%08X\n", addr, (unsigned int)Count); fflush(stdout);
       DBG_LOG("NOTCOMPILED stuck at 0x%08x\n", addr);
       r4300.stop = 1;
       return;
@@ -1699,7 +1702,7 @@ void cached_interp_NOTCOMPILED2(void)
 void cached_interp_NI(void)
 {
    u32 iw = read_inst(PC->addr);
-   printf("[NI] at 0x%08x (iw=0x%08x op=%d funct=0x%02x) Count=%08X\n",
+   DBG_LOG("[NI] at 0x%08x (iw=0x%08x op=%d funct=0x%02x) Count=%08X\n",
           PC->addr, iw, (iw >> 26) & 0x3F, iw & 0x3F, (unsigned int)Count);
    fflush(stdout);
    r4300.stop = 1;

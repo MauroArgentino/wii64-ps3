@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Mupen64 - pure_interp.c
  * Copyright (C) 2002 Hacktarux
  *
@@ -307,7 +307,7 @@ static void DMULT()
    if (p_dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       p_dm_log_cnt++;
-      printf("[PDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+      DBG_LOG("[PDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
 #endif
@@ -342,7 +342,7 @@ static void DMULTU()
    if (p_dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       p_dm_log_cnt++;
-      printf("[PDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+      DBG_LOG("[PDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
 #endif

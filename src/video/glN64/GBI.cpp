@@ -561,7 +561,7 @@ void GBI_MakeCurrent( MicrocodeInfo *current )
 	if (!GBI.current || (GBI.current->type != current->type))
 	{
 #ifdef DEBUG
-		printf("[GBI] MakeCurrent type=%d (NONE=0 F3D=1 F3DEX=2 F3DEX2=3) uc_start=0x%08X\n", current->type, current->address);
+		DBG_GFX("[GBI] MakeCurrent type=%d (NONE=0 F3D=1 F3DEX=2 F3DEX2=3) uc_start=0x%08X\n", current->type, current->address);
 		fflush(stdout);
 #endif
 		for (int i = 0; i <= 0xFF; i++)

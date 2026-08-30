@@ -240,6 +240,7 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 
 	if (!controller_PS3.available[Control]) return 0;
 
+#ifdef DEBUG_INPUT
 	/* OSD diagnostic: shows pad state and why _GetKeys might fail */
 	{
 		static unsigned int osd_cnt = 0;
@@ -255,6 +256,7 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 				sp->button[6], sp->button[7]);
 		}
 	}
+#endif
 
 #ifdef DEBUG_PROBES
 	{

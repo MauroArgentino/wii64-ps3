@@ -248,28 +248,25 @@ void go()
 
 	r4300.stop = 0;
 	
-	printf("[GO] go() called, dynacore=%d, pc=0x%08x\n", dynacore, r4300.pc);
-	fflush(stdout);
-	
+	DBG_LOG("[GO] go() called, dynacore=%d, pc=0x%08x\n", dynacore, r4300.pc);
+
 	if(dynacore == 2) {
 		dynacore = 0;
 		interpcore = 1;
-		printf("[GO] Starting pure interpreter\n"); fflush(stdout);
+		DBG_LOG("[GO] Starting pure interpreter\n");
 		pure_interpreter();
 		dynacore = 2;
-		printf("[GO] Pure interpreter returned, stop=%d, pc=0x%08x, Count=0x%08x\n", r4300.stop, r4300.pc, Count);
-		fflush(stdout);
+		DBG_LOG("[GO] Pure interpreter returned, stop=%d, pc=0x%08x, Count=0x%08x\n", r4300.stop, r4300.pc, Count);
 	} else if(dynacore == 3) {
 		dynacore = 0;
 		interpcore = 2;
-		printf("[GO] Starting cached interpreter\n"); fflush(stdout);
+		DBG_LOG("[GO] Starting cached interpreter\n");
 		init_cached_blocks();
 		run_cached_interpreter();
 		free_cached_blocks();
 		PC = NULL;
 		dynacore = 3;
-		printf("[GO] Cached interpreter returned, stop=%d, pc=0x%08x, Count=0x%08x\n", r4300.stop, r4300.pc, Count);
-		fflush(stdout);
+		DBG_LOG("[GO] Cached interpreter returned, stop=%d, pc=0x%08x, Count=0x%08x\n", r4300.stop, r4300.pc, Count);
 	} else {
 		interpcore = 0;
 		dynacore = 1;

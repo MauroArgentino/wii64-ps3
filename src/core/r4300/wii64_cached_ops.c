@@ -193,7 +193,7 @@ void cached_interp_DMULT(void)
    if (dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       dm_log_cnt++;
-      printf("[CDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+      DBG_LOG("[CDMULT] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
 #endif
@@ -228,7 +228,7 @@ void cached_interp_DMULTU(void)
    if (dm_log_cnt < 40 && (u32)r4300.pc < 0x80246F00)
    {
       dm_log_cnt++;
-      printf("[CDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
+      DBG_LOG("[CDMULTU] pc=%08X rs=%016llX rt=%016llX lo=%016llX hi=%016llX\n",
          (unsigned int)r4300.pc, rrs, rrt, r4300.lo, r4300.hi);
    }
 #endif
@@ -699,6 +699,7 @@ void cached_interp_JR(void)
    u32 addr = rrs32;
    if (addr & 3)
    {
+      DBG_LOG("[JR] misaligned target 0x%08x at %08X Count=%08X\n", addr, PC->addr, (unsigned int)Count); fflush(stdout);
       DBG_LOG("misaligned jump target in JR: 0x%08x\n", addr);
       r4300.stop = 1;
       PC++;
@@ -719,6 +720,7 @@ void cached_interp_JALR(void)
    u32 addr = rrs32;
    if (addr & 3)
    {
+      DBG_LOG("[JALR] misaligned target 0x%08x at %08X Count=%08X\n", addr, PC->addr, (unsigned int)Count); fflush(stdout);
       DBG_LOG("misaligned jump target in JALR: 0x%08x\n", addr);
       r4300.stop = 1;
       PC++;
@@ -1233,6 +1235,7 @@ void cached_interp_SDC1(void)
 
 void cached_interp_LQ(void)
 {
+   DBG_LOG("[LQ] not implemented pc=%08X Count=%08X\n", PC->addr, (unsigned int)Count); fflush(stdout);
    DBG_LOG("LQ not implemented\n");
    r4300.stop = 1;
    PC++;
@@ -1240,6 +1243,7 @@ void cached_interp_LQ(void)
 
 void cached_interp_SQ(void)
 {
+   DBG_LOG("[SQ] not implemented pc=%08X Count=%08X\n", PC->addr, (unsigned int)Count); fflush(stdout);
    DBG_LOG("SQ not implemented\n");
    r4300.stop = 1;
    PC++;
@@ -1276,6 +1280,7 @@ void cached_interp_SC(void)
 
 void cached_interp_LLD(void)
 {
+   DBG_LOG("[LLD] not implemented pc=%08X Count=%08X\n", PC->addr, (unsigned int)Count); fflush(stdout);
    DBG_LOG("LLD not implemented\n");
    r4300.stop = 1;
    PC++;
@@ -1283,6 +1288,7 @@ void cached_interp_LLD(void)
 
 void cached_interp_SCD(void)
 {
+   DBG_LOG("[SCD] not implemented pc=%08X Count=%08X\n", PC->addr, (unsigned int)Count); fflush(stdout);
    DBG_LOG("SCD not implemented\n");
    r4300.stop = 1;
    PC++;
