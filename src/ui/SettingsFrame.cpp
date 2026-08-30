@@ -57,6 +57,7 @@ void Func_SaveStateSD();
 void Func_SaveStateUSB();
 void Func_CpuPureInterp();
 void Func_CpuDynarec();
+void Func_CpuCached();
 void Func_SaveSettingsSD();
 void Func_SaveSettingsUSB();
 
@@ -96,14 +97,14 @@ void Func_DeleteSaves();
 void Func_ReturnFromSettingsFrame();
 
 
-#define NUM_FRAME_BUTTONS 44
+#define NUM_FRAME_BUTTONS 45
 #define NUM_TAB_BUTTONS 5
 #define FRAME_BUTTONS settingsFrameButtons
 #define FRAME_STRINGS settingsFrameStrings
 #define NUM_FRAME_TEXTBOXES 14
 #define FRAME_TEXTBOXES settingsFrameTextBoxes
 
-static char FRAME_STRINGS[45][23] =
+static char FRAME_STRINGS[46][23] =
 	{ "General",
 	  "Video",
 	  "Input",
@@ -155,7 +156,8 @@ static char FRAME_STRINGS[45][23] =
 	//Strings for Tex Filter [42]
 	  "2xSAI",
 	  "xBRZ",
-	  "HQ4x"};
+	  "HQ4x",
+	  "Cached"};
 
 struct ButtonInfo
 {
@@ -187,8 +189,8 @@ struct ButtonInfo
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[12],	540.0,	100.0,	 90.0,	56.0,	 0,	10,	 7,	 5,	Func_NativeSaveCardB,	Func_ReturnFromSettingsFrame }, // Native Save: Card B
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[9],	295.0,	170.0,	 55.0,	56.0,	 5,	11,	10,	10,	Func_SaveStateSD,		Func_ReturnFromSettingsFrame }, // Save State: SD
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[10],	360.0,	170.0,	 70.0,	56.0,	 6,	11,	 9,	 9,	Func_SaveStateUSB,		Func_ReturnFromSettingsFrame }, // Save State: USB
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[13],	295.0,	240.0,	160.0,	56.0,	 9,	13,	12,	12,	Func_CpuPureInterp,		Func_ReturnFromSettingsFrame }, // CPU: Pure Interp
-	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[14],	465.0,	240.0,	130.0,	56.0,	10,	14,	11,	11,	Func_CpuDynarec,		Func_ReturnFromSettingsFrame }, // CPU: Dynarec
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[13],	250.0,	240.0,	100.0,	56.0,	 9,	14,	12,	12,	Func_CpuPureInterp,		Func_ReturnFromSettingsFrame }, // CPU: Pure Interp
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[14],	360.0,	240.0,	100.0,	56.0,	 9,	14,	11,	44,	Func_CpuDynarec,		Func_ReturnFromSettingsFrame }, // CPU: Dynarec
 	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[9],	295.0,	310.0,	 55.0,	56.0,	11,	 0,	14,	14,	Func_SaveSettingsSD,	Func_ReturnFromSettingsFrame }, // Save Settings: SD
 	{	NULL,	BTN_A_NRM,	FRAME_STRINGS[10],	360.0,	310.0,	 70.0,	56.0,	11,	 0,	13,	13,	Func_SaveSettingsUSB,	Func_ReturnFromSettingsFrame }, // Save Settings: USB
 	//Buttons for Video Tab (starts at button[15])
@@ -225,6 +227,7 @@ struct ButtonInfo
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[39],	325.0,	450.0,	 85.0,	56.0,	26,	 1,	40,	42,	Func_Resolution640x480,	Func_ReturnFromSettingsFrame }, // Resolution: 640x480
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[40],	420.0,	450.0,	 85.0,	56.0,	27,	 1,	41,	43,	Func_Resolution720p,	Func_ReturnFromSettingsFrame }, // Resolution: 720p
 	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[41],	525.0,	450.0,	 85.0,	56.0,	27,	 1,	42,	40,	Func_Resolution1080p,	Func_ReturnFromSettingsFrame }, // Resolution: 1080p
+	{	NULL,	BTN_A_SEL,	FRAME_STRINGS[45],	470.0,	240.0,	100.0,	56.0,	 9,	14,	12,	12,	Func_CpuCached,			Func_ReturnFromSettingsFrame }, // CPU: Cached
 };
 
 struct TextBoxInfo
@@ -339,13 +342,17 @@ void SettingsFrame::activateSubmenu(int submenu)
 			FRAME_BUTTONS[0].button->setSelected(true);
 			FRAME_BUTTONS[5+nativeSaveDevice].button->setSelected(true);
 			FRAME_BUTTONS[9+saveStateDevice].button->setSelected(true);
-			if (dynacore == DYNACORE_PURE_INTERP)	FRAME_BUTTONS[11].button->setSelected(true);
-			else									FRAME_BUTTONS[12].button->setSelected(true);
+			if (dynacore == DYNACORE_PURE_INTERP)		FRAME_BUTTONS[11].button->setSelected(true);
+			else if (dynacore == DYNACORE_DYNAREC)		FRAME_BUTTONS[12].button->setSelected(true);
+			else if (dynacore == DYNACORE_CACHED_INTERP)FRAME_BUTTONS[44].button->setSelected(true);
+			else										FRAME_BUTTONS[12].button->setSelected(true);
 			for (int i = 5; i < 15; i++)
 			{
 				FRAME_BUTTONS[i].button->setVisible(true);
 				FRAME_BUTTONS[i].button->setActive(true);
 			}
+			FRAME_BUTTONS[44].button->setVisible(true);
+			FRAME_BUTTONS[44].button->setActive(true);
 			break;
 case SUBMENU_VIDEO:
 			setDefaultFocus(FRAME_BUTTONS[1].button);
@@ -635,6 +642,7 @@ void Func_CpuPureInterp()
 {
 	for (int i = 11; i <= 12; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[44].button->setSelected(false);
 	FRAME_BUTTONS[11].button->setSelected(true);
 
 	int needInit = 0;
@@ -647,11 +655,25 @@ void Func_CpuDynarec()
 {
 	for (int i = 11; i <= 12; i++)
 		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[44].button->setSelected(false);
 	FRAME_BUTTONS[12].button->setSelected(true);
 
 	int needInit = 0;
 	if(hasLoadedROM && dynacore != DYNACORE_DYNAREC){ cpu_deinit(); needInit = 1; }
 	dynacore = DYNACORE_DYNAREC;
+	if(hasLoadedROM && needInit) cpu_init();
+}
+
+void Func_CpuCached()
+{
+	for (int i = 11; i <= 12; i++)
+		FRAME_BUTTONS[i].button->setSelected(false);
+	FRAME_BUTTONS[44].button->setSelected(false);
+	FRAME_BUTTONS[44].button->setSelected(true);
+
+	int needInit = 0;
+	if(hasLoadedROM && dynacore != DYNACORE_CACHED_INTERP){ cpu_deinit(); needInit = 1; }
+	dynacore = DYNACORE_CACHED_INTERP;
 	if(hasLoadedROM && needInit) cpu_init();
 }
 
