@@ -33,6 +33,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/file.h>
 #include "savestates.h"
 #include "guifuncs.h"
 #include "rom.h"
@@ -57,7 +58,7 @@ static u32 saved_ai_int = 0; /* pending AI_INT absolute count restored on load *
 
 #define ST_MAGIC      0x53545053 /* "STPS" */
 #define ST_VERSION    1
-#define ST_PATH       "/dev_usb000/wii64/"
+#define ST_PATH       "/dev_usb000/wii64/savestates/"
 
 /* RDRAM: 4MB (0x100000 words) without USE_EXPANSION, 8MB with it.
  * We persist the actual allocated buffer; caps at 8MB. */
@@ -138,6 +139,14 @@ static void st_build_name(char *out, size_t outlen)
 		}
 	}
 	if (n == 0) strcpy(clean, "rom");
+
+	/* Ensure the savestates/ directory exists before writing (PS3 runtime). */
+	{
+		sysFSStat st;
+		if (sysLv2FsStat("/dev_usb000/wii64/savestates", &st) != 0)
+			sysLv2FsMkdir("/dev_usb000/wii64/savestates", 0777);
+	}
+
 	snprintf(out, outlen, ST_PATH "%s_%u.st", clean, savestates_slot);
 }
 
