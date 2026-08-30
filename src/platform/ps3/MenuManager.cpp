@@ -84,9 +84,10 @@ void MenuManager::init() {
     ch.visible = true;
     channels.push_back(ch);
 
-    // Rellenar vacíos para mantener la estética de la cuadrícula
+    // Rellenar vacíos para mantener la estética de la cuadrícula.
+    // El índice 6 (la tarjeta a la derecha de "Salir") es la portada de prueba.
     while(channels.size() < 12) {
-        ch.id = "EMPTY"; ch.titleKey = ""; ch.color = 0xEEEEEEFF; ch.iconId = -1; ch.visible = false;
+        ch.id = (channels.size() == 6) ? "COVER_SM64" : "EMPTY"; ch.titleKey = ""; ch.color = 0xEEEEEEFF; ch.iconId = -1; ch.visible = false;
         channels.push_back(ch);
     }
 
@@ -361,7 +362,7 @@ void ChannelButton::drawComponent(menu::Graphics& gfx) { // Renombrado
 
     // Dibujamos el fondo del canal (Profundidad base)
     gfx.pushDepth(0.5f);
-    if (channelData.id == "EMPTY") {
+    if (channelData.id == "EMPTY" || channelData.id == "COVER_SM64") {
         drawChannelStatic(gfx, finalCX, finalCY, finalW, finalH, g_tvStaticTime);
     } else {
         drawChannelBackground(gfx, finalCX, finalCY, finalW, finalH, drawColor); // Renombrado
@@ -385,6 +386,21 @@ void ChannelButton::drawComponent(menu::Graphics& gfx) { // Renombrado
             float iconSize = 72.0f * (transitionProgress > 0.0f ? 1.0f : displayScale) * fabsf(cosf(transitionProgress * 3.14159f));
             gfx.drawImage(0, (int)(finalCX - iconSize/2.0f), (int)(finalCY - iconSize/2.0f), 
                           (int)iconSize, (int)iconSize, 0, 1, 0, 1);
+        }
+    }
+
+    // Dibujar portada SM64 de prueba (tarjeta a la derecha de "Salir").
+    // Recorte "cover" + gradiente alfa (fx perfil de WhatsApp) ya viene en la textura.
+    if (channelData.id == "COVER_SM64" && transitionProgress < 0.45f) {
+        menu::Image* cover = menu::Resources::getInstance().getImage(menu::Resources::IMAGE_COVER_SM64);
+        if (cover) {
+            cover->activateImage(GX_TEXMAP0);
+            gfx.setTEV(GX_MODULATE);
+            gfx.setColor((GXColor){255, 255, 255, 255});
+            float coverW = finalW * fabsf(cosf(transitionProgress * 3.14159f));
+            if (transitionProgress <= 0.0f && displayScale > 0.0f) coverW = baseW;
+            gfx.drawImage(0, (int)(finalCX - coverW/2.0f), (int)(finalCY - finalH/2.0f),
+                          (int)coverW, (int)finalH, 0, 1, 0, 1);
         }
     }
 }

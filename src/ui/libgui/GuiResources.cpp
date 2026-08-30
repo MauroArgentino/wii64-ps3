@@ -54,6 +54,8 @@ Resources::Resources()
 	controllerWiimoteNunchuckImage = new Image(ControlWiimoteNunchuckTexture, 48, 64, GX_TF_I4, GX_CLAMP, GX_CLAMP, GX_FALSE);
 	controllerWiimoteImage = new Image(ControlWiimoteTexture, 48, 64, GX_TF_I4, GX_CLAMP, GX_CLAMP, GX_FALSE);
 	n64ControllerImage = new Image(N64ControllerTexture, 208, 200, GX_TF_I4, GX_CLAMP, GX_CLAMP, GX_FALSE);
+	// Portada SM64: RGBA8 140x100 con gradiente alfa (fx "perfil de WhatsApp")
+	coverSm64Image = new Image(CoverSm64Texture, 140, 100, GX_TF_RGBA8, GX_CLAMP, GX_CLAMP, GX_FALSE);
 
 }
 
@@ -75,6 +77,7 @@ Resources::~Resources()
 	delete controllerWiimoteNunchuckImage;
 	delete controllerWiimoteImage;
 	delete n64ControllerImage;
+	delete coverSm64Image;
 }
 
 Image* Resources::getImage(int image)
@@ -129,6 +132,9 @@ Image* Resources::getImage(int image)
 		break;
 	case IMAGE_N64_CONTROLLER:
 		returnImage = n64ControllerImage;
+		break;
+	case IMAGE_COVER_SM64:
+		returnImage = coverSm64Image;
 		break;
 	}
 	return returnImage;

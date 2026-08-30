@@ -91,3 +91,11 @@
     .globl CursorGrabTexture_length
     CursorGrabTexture_length:
     .long (CursorGrabTexture_length - CursorGrabTexture)
+
+    .globl CoverSm64Texture
+    .balign 32
+    CoverSm64Texture:
+    .incbin	"../src/ui/resources/SuperMario64.tx"
+    .globl CoverSm64Texture_length
+    CoverSm64Texture_length:
+    .long (CoverSm64Texture_length - CoverSm64Texture)

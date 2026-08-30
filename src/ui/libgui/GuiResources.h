@@ -52,7 +52,8 @@ public:
 		IMAGE_CONTROLLER_CLASSIC,
 		IMAGE_CONTROLLER_WIIMOTENUNCHUCK,
 		IMAGE_CONTROLLER_WIIMOTE,
-		IMAGE_N64_CONTROLLER
+		IMAGE_N64_CONTROLLER,
+		IMAGE_COVER_SM64
 	};
 
 private:
@@ -68,6 +69,7 @@ private:
 	Image *controllerClassicImage, *controllerWiimoteNunchuckImage;
 	Image *controllerWiimoteImage;
 	Image *n64ControllerImage;
+	Image *coverSm64Image;
 
 };
 

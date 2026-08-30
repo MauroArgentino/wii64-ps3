@@ -32,5 +32,6 @@ extern  u8 ControlWiimoteTexture[];
 extern  u8 N64ControllerTexture[];
 extern  u8 CursorPointTexture[];
 extern  u8 CursorGrabTexture[];
+extern  u8 CoverSm64Texture[];
 
 #endif
