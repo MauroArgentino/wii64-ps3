@@ -40,6 +40,7 @@
 #include "ppc/Recompile.h"
 #include "../../platform/ps3/PS3DynarecMemoryManager.h"
 #include "../../debug.h"
+#include "../../main/savestates.h"
 #include <malloc.h>
 #include <sysutil/sysutil.h>
 R4300 r4300;
@@ -254,7 +255,17 @@ void go()
 		dynacore = 0;
 		interpcore = 1;
 		DBG_LOG("[GO] Starting pure interpreter\n");
-		pure_interpreter();
+		/* Process pending savestate jobs (from the in-pause menu or the
+		 * live L1+R1/L2+R2 shortcuts) and re-run the core without going
+		 * back to the menu when a job was requested. */
+		for (;;) {
+			if (savestates_job == LOADSTATE) { savestates_load(); savestates_job = 0; r4300.stop = 0; }
+			else if (savestates_job == SAVESTATE) { savestates_save(); savestates_job = 0; r4300.stop = 0; }
+			pure_interpreter();
+			if (savestates_job != 0)
+				continue; /* live load/save requested while running: keep looping */
+			break;
+		}
 		dynacore = 2;
 		DBG_LOG("[GO] Pure interpreter returned, stop=%d, pc=0x%08x, Count=0x%08x\n", r4300.stop, r4300.pc, Count);
 	} else if(dynacore == 3) {
@@ -262,7 +273,18 @@ void go()
 		interpcore = 2;
 		DBG_LOG("[GO] Starting cached interpreter\n");
 		init_cached_blocks();
-		run_cached_interpreter();
+		for (;;) {
+			if (savestates_job == LOADSTATE) {
+				savestates_load(); savestates_job = 0; r4300.stop = 0;
+				free_cached_blocks();
+				init_cached_blocks();
+			}
+			else if (savestates_job == SAVESTATE) { savestates_save(); savestates_job = 0; r4300.stop = 0; }
+			run_cached_interpreter();
+			if (savestates_job != 0)
+				continue; /* live load/save requested while running: keep looping */
+			break;
+		}
 		free_cached_blocks();
 		PC = NULL;
 		dynacore = 3;

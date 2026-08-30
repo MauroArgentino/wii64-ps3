@@ -27,6 +27,8 @@
 #include <io/pad.h>
 #include "../../debug.h"
 #include "controller.h"
+#include "../r4300/r4300.h"
+#include "../../main/savestates.h"
 
 enum {
 	L_STICK_AS_ANALOG = 1, R_STICK_AS_ANALOG = 2,
@@ -272,6 +274,26 @@ static int _GetKeys(int Control, BUTTONS * Keys, controller_config_t* config)
 
 	buttonsPS3 = shared_buttons[Control];
 	analogPS3 = shared_analog[Control];
+
+	/* Live savestate shortcuts:
+	 *   L2+R2 = Save State, L1+R1 = Load State (rising edge only).
+	 * Setting r4300.stop=1 cleanly exits the interpreter loop; go()
+	 * then processes savestates_job and re-runs without returning to
+	 * the menu, so a load appears seamless. */
+	{
+		static unsigned int prevSSButtons = 0;
+		unsigned int cur = shared_buttons[Control];
+		unsigned int pressed = (cur & ~prevSSButtons);
+		prevSSButtons = cur;
+		if ((pressed & PS3_BTN_L2) && (pressed & PS3_BTN_R2)) {
+			savestates_job = SAVESTATE;
+			r4300.stop = 1;
+		}
+		else if ((pressed & PS3_BTN_L1) && (pressed & PS3_BTN_R1)) {
+			savestates_job = LOADSTATE;
+			r4300.stop = 1;
+		}
+	}
 
 	/* Edge detection: latch rising-edge presses only when pad reports
 	 * a state change (len > 0). This prevents re-latching on every

@@ -599,3 +599,18 @@ void resumeAudio(void){
 	port_started = 0;
 }
 
+// Re-sync the audio backend after a savestate load. The restored N64 AI
+// registers expect to start playing from a clean state; this resets the
+// local ring-buffer/port state so the next add_to_buffer()/play_buffer()
+// cycle re-arms the port from scratch.
+void resetAudioAfterLoad(void){
+	next_write_block = 0;
+	port_started = 0;
+	portDataStart = NULL;
+	which_buffer = 0;
+	buffer_offset = 0;
+	read_pos = 0;
+	drain_level = 0;
+	if (audioEnabled) audioPortStop(portNum);
+}
+

@@ -33,6 +33,7 @@
 void compare_interrupt();
 void gen_dp();
 void init_interrupt();
+void clear_queue();
 
 extern int vi_field;
 extern u32 next_vi;
